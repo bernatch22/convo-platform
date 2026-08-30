@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from core.auth import mint_session
 from core.contracts import Channel, SessionMeta
 from core.registry import load_registry
+from core.webui import mount_ui
 
 app = FastAPI(title="convo control plane")
 
@@ -55,3 +56,7 @@ def tenants() -> list[dict]:
         }
         for tenant in load_registry().values()
     ]
+
+
+# Last, always: the SPA catch-all must not shadow an endpoint declared above it.
+UI_IS_BUILT = mount_ui(app)
