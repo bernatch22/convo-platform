@@ -159,6 +159,7 @@ QUÉ NO HACE LA RECEPCIÓN
 - No adelanta citas por urgencia: si el paciente describe una urgencia vital (dolor en
   el pecho, dificultad para respirar, pérdida de conocimiento, sangrado abundante),
   indica llamar al 112 inmediatamente.
-- No confirma la disponibilidad real de la agenda en esta versión: toma nota de los
-  datos y explica que se comprobará el hueco y se llamará de vuelta.
+- No reserva ni mueve la cita en el sistema en esta versión: consulta la agenda,
+  ofrece las horas libres reales, registra la solicitud del paciente y explica que la
+  confirmación del cambio llega en el mismo día laborable.
 """

@@ -15,13 +15,9 @@ from livekit.agents.llm import ToolError
 from core.context import Project, Tenant, TenantContext
 from core.tools.catalog import ToolCatalog, platform_specs
 from core.tools.contract import SideEffect, ToolSpec
-from core.tools.executor import (
-    FAILURE_MESSAGE,
-    TIMEOUT_MESSAGE,
-    UNKNOWN_TOOL_MESSAGE,
-    LocalExecutor,
-)
+from core.tools.executor import LocalExecutor
 from core.tools.guard import ToolRefused, mask
+from core.tools.messages import DEFAULTS, FAILURE, TIMEOUT, UNKNOWN_TOOL
 
 pytestmark = pytest.mark.unit
 
@@ -59,11 +55,20 @@ class FakeAdapter:
         return {"slots": ["10:00", "12:30"], "date": args.get("date")}
 
 
-def context(adapter: FakeAdapter, catalog: ToolCatalog = CATALOG) -> TenantContext:
+def context(
+    adapter: FakeAdapter,
+    catalog: ToolCatalog = CATALOG,
+    messages: dict[str, str] | None = None,
+) -> TenantContext:
     """A TenantContext wired to the fake adapter and a LocalExecutor, with no registry."""
     tc = TenantContext(
         tenant=Tenant(id="clinica-norte", name="Clínica Norte"),
-        project=Project(id="reagendamiento", name="Reagendamiento", tools=catalog),
+        project=Project(
+            id="reagendamiento",
+            name="Reagendamiento",
+            tools=catalog,
+            messages=messages or {},
+        ),
         channel="chat",
         session_id="test",
         git_sha="test",
@@ -90,7 +95,7 @@ async def test_a_tool_the_project_never_declared_reaches_the_llm_as_a_sentence()
     with pytest.raises(ToolError) as refusal:
         await tc.tools.call("delete_patient", {"id": "42"})
 
-    assert str(refusal.value) == UNKNOWN_TOOL_MESSAGE
+    assert str(refusal.value) == DEFAULTS[UNKNOWN_TOOL]
 
 
 async def test_an_irreversible_tool_without_a_confirmation_token_is_refused() -> None:
@@ -121,7 +126,7 @@ async def test_an_adapter_that_explodes_never_leaks_its_stack_trace_to_the_llm()
     with pytest.raises(ToolError) as failure:
         await tc.tools.call("broken_lookup", {"date": "2026-09-01"})
 
-    assert str(failure.value) == FAILURE_MESSAGE
+    assert str(failure.value) == DEFAULTS[FAILURE]
     assert "10.0.0.7" not in str(failure.value)
     assert "RuntimeError" not in str(failure.value)
 
@@ -132,7 +137,7 @@ async def test_an_adapter_that_hangs_is_cut_off_at_the_declared_timeout() -> Non
     with pytest.raises(ToolError) as failure:
         await tc.tools.call("slow_lookup", {"date": "2026-09-01"})
 
-    assert str(failure.value) == TIMEOUT_MESSAGE
+    assert str(failure.value) == DEFAULTS[TIMEOUT]
 
 
 async def test_pii_arguments_are_masked_before_they_reach_the_log(
@@ -164,3 +169,14 @@ def test_the_platform_catalog_declares_find_availability_as_a_read_with_a_five_s
     assert spec.side_effect is SideEffect.READ
     assert spec.timeout_s == 5.0
     assert spec.needs_confirmation() is False
+
+
+async def test_a_project_speaks_its_own_register_when_a_tool_fails() -> None:
+    usted = "No he podido consultar la agenda. ¿Quiere que lo intente de nuevo?"
+    tc = context(FakeAdapter(), messages={FAILURE: usted})
+
+    with pytest.raises(ToolError) as failure:
+        await tc.tools.call("broken_lookup", {"date": "2026-09-01"})
+
+    assert str(failure.value) == usted
+    assert str(failure.value) != DEFAULTS[FAILURE]
