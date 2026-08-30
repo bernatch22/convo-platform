@@ -21,3 +21,23 @@ jobs:
         run: uv run ruff check . && uv run ruff format --check .
       - name: Unit tests
         run: uv run pytest -m unit -q
+
+  evals:
+    name: DeepEval ring 1 (needs ANTHROPIC_API_KEY)
+    runs-on: ubuntu-latest
+    if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --extra dev
+      - name: Unit tests that call the model
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv run pytest -m unit -q
+      - name: DeepEval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uv run deepeval test run tests/evals -n 2

@@ -24,6 +24,14 @@ python worker.py --help         # the LiveKit Agents CLI (console/dev/start)
 
 From ms-1: `python worker.py console --text` talks to the agent in the terminal.
 
+Evals (ring 1, needs `ANTHROPIC_API_KEY`; the judge is Claude Haiku, set
+`DEEPEVAL_JUDGE_MODEL` to change it):
+
+```bash
+uv run pytest -m unit                # includes LLM-judged tests when the key is present
+uv run deepeval test run tests/evals # per-project goldens; HTML under reports/deepeval/
+```
+
 ## Layout
 
 ```
