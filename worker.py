@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from livekit.agents import AgentServer, JobContext, cli
 
 from core.router import resolve
-from core.session import build_session
+from core.session import build_session, start_session
 
 load_dotenv()
 
@@ -22,7 +22,7 @@ async def entrypoint(ctx: JobContext) -> None:
     """Resolve the tenant for this job and run its conversation."""
     tc = await resolve(ctx)
     session = build_session(tc)
-    await session.start(tc.project.entry_agent(tc), room=ctx.room)
+    await start_session(session, tc.project.entry_agent(tc), room=ctx.room)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ score the text. Nothing here touches audio or a LiveKit server.
 
 import asyncio
 import uuid
+from dataclasses import dataclass, field
 
 from livekit.agents import AgentSession
 from livekit.agents.voice.run_result import RunResult
@@ -32,20 +33,37 @@ def fake_context(tenant_id: str, project_id: str, channel: str = "chat") -> Tena
     )
 
 
-async def run_turns(tc: TenantContext, inputs: list[str]) -> list[RunResult]:
-    """Start the project's entry agent headless and run each user input as one turn.
+@dataclass
+class Conversation:
+    """What a headless run produced: the agent's opening line and one result per input."""
 
-    The greeting produced by `on_enter` is awaited before the first input so the
-    history looks like a real call. Returns one RunResult per input.
+    greeting: str
+    results: list[RunResult] = field(default_factory=list)
+
+    def reply(self, index: int) -> str:
+        """The assistant text of the n-th turn."""
+        return text_of(self.results[index])
+
+
+async def run_conversation(tc: TenantContext, inputs: list[str]) -> Conversation:
+    """Start the project's entry agent headless, capture its greeting, run each input as a turn.
+
+    The greeting comes from `on_enter` before any user input, exactly as on a
+    real call; goldens that judge the opening line read `Conversation.greeting`.
     """
     session: AgentSession[TenantContext] = build_session(tc)
-    results: list[RunResult] = []
     async with session:
         await session.start(tc.project.entry_agent(tc))
         await _wait_for_greeting(session)
+        conversation = Conversation(greeting=greeting_of(session))
         for text in inputs:
-            results.append(await session.run(user_input=text))
-    return results
+            conversation.results.append(await session.run(user_input=text))
+    return conversation
+
+
+async def run_turns(tc: TenantContext, inputs: list[str]) -> list[RunResult]:
+    """Convenience: only the per-input results of `run_conversation`."""
+    return (await run_conversation(tc, inputs)).results
 
 
 def text_of(result: RunResult) -> str:
