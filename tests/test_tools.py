@@ -180,3 +180,44 @@ async def test_a_project_speaks_its_own_register_when_a_tool_fails() -> None:
 
     assert str(failure.value) == usted
     assert str(failure.value) != DEFAULTS[FAILURE]
+
+
+# --- the session log --------------------------------------------------------
+
+
+def logged(tc) -> list[tuple[str, dict]]:
+    return [(e.kind, e.payload) for e in tc.log.events()]
+
+
+async def test_a_call_leaves_call_and_result_events_with_pii_masked() -> None:
+    from core.state.attach import attach_log
+    from core.state.store import MemoryStore
+
+    tc = attach_log(context(FakeAdapter()), MemoryStore())
+
+    await tc.tools.call(
+        "cancel_appointment", {"phone": "600123456", "confirmation_token": "ct-abc123"}
+    )
+
+    kinds = [k for k, _ in logged(tc)]
+    assert kinds == ["session.start", "tool.call", "tool.result"]
+    call = logged(tc)[1][1]
+    assert call["args"]["phone"] == "60*******" and call["side_effect"] == "irreversible"
+    assert logged(tc)[2][1]["shape"] == "dict[2]"
+
+
+async def test_a_refusal_and_a_failure_are_logged_without_payloads() -> None:
+    from core.state.attach import attach_log
+    from core.state.store import MemoryStore
+
+    tc = attach_log(context(FakeAdapter()), MemoryStore())
+
+    with pytest.raises(ToolRefused):
+        await tc.tools.call("cancel_appointment", {"phone": "600123456"})
+    with pytest.raises(ToolError):
+        await tc.tools.call("broken_lookup", {"date": "2026-09-01"})
+
+    kinds = [k for k, _ in logged(tc)]
+    assert kinds == ["session.start", "tool.refused", "tool.call", "tool.error"]
+    assert "10.0.0.7" not in str(logged(tc))
+    assert logged(tc)[3][1]["key"] == FAILURE

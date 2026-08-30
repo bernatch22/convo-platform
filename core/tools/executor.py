@@ -54,11 +54,17 @@ class LocalExecutor:
     async def call(self, name: str, args: dict[str, Any]) -> Any:
         """Run one declared tool: catalog, guard, adapter, timeout, log — in that order."""
         spec = self._spec(name)
-        guard.check(spec, args, self.tc)
-        adapter = self._adapter(spec)
         safe_args = guard.mask(spec, args)
+        try:
+            guard.check(spec, args, self.tc)
+        except guard.ToolRefused as refusal:
+            self._record("tool.refused", spec, args=safe_args, reason=refusal.reason)
+            raise
+        adapter = self._adapter(spec)
         log.info("tool.call %s %s args=%s", self.tc.label(), spec.name, safe_args)
+        self._record("tool.call", spec, args=safe_args)
         result = await self._execute(spec, adapter, args, safe_args)
+        self._record("tool.result", spec, shape=_shape(result))
         log.info("tool.result %s %s ok", self.tc.label(), spec.name)
         return result
 
@@ -106,10 +112,19 @@ class LocalExecutor:
                 spec.timeout_s,
                 safe_args,
             )
+            self._record("tool.error", spec, key=TIMEOUT)
             raise ToolError(self._says(TIMEOUT)) from None
         except Exception:
             log.exception("tool.error %s %s failed args=%s", self.tc.label(), spec.name, safe_args)
+            self._record("tool.error", spec, key=FAILURE)
             raise ToolError(self._says(FAILURE)) from None
+
+    def _record(self, kind: str, spec: ToolSpec, **payload: Any) -> None:
+        """One line in the session log, when the context carries one; payloads never enter it."""
+        if self.tc.log is not None:
+            self.tc.log.append(
+                kind, {"tool": spec.name, "side_effect": str(spec.side_effect), **payload}
+            )
 
     def _says(self, key: str) -> str:
         return sentence(self.tc.project.messages, key)
@@ -125,3 +140,10 @@ def attach_local_tools(tc: "TenantContext") -> "TenantContext":
     tc.adapters = tc.tenant.build_adapters()
     tc.tools = LocalExecutor(tc)
     return tc
+
+
+def _shape(result: Any) -> str:
+    """What a result looked like, never what it said: `list[3]`, `dict[2]`, `str[41]`."""
+    if isinstance(result, (list, dict, str)):
+        return f"{type(result).__name__}[{len(result)}]"
+    return type(result).__name__
