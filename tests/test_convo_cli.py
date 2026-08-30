@@ -55,5 +55,14 @@ def test_show_of_an_unknown_session_says_so(store: MemoryStore, capsys) -> None:
     assert "no session" in capsys.readouterr().out
 
 
+def test_eval_of_an_unknown_session_says_so_without_loading_a_judge(
+    store: MemoryStore, capsys
+) -> None:
+    """The row is checked before deepeval is imported: a typo costs no judge stack."""
+    assert sessions.main(["eval", "nope"], store) == 1
+    assert "no session" in capsys.readouterr().out
+
+
 def test_usage_on_anything_else(store: MemoryStore, capsys) -> None:
     assert sessions.main(["frobnicate"], store) == 2
+    assert "eval <id>" in capsys.readouterr().out
