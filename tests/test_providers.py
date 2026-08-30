@@ -1,0 +1,117 @@
+"""Providers are data before they are connections: every option is asserted without a network."""
+
+import dataclasses
+
+import pytest
+
+from core.context import Project
+from core.providers import stt, tts, turn
+from core.testing import fake_context
+
+pytestmark = pytest.mark.unit
+
+
+@pytest.fixture
+def project() -> Project:
+    """A copy: the registry's project is a singleton and tests below change its voice and model."""
+    return dataclasses.replace(fake_context("clinica-norte", "reagendamiento").project)
+
+
+# --- Soniox ------------------------------------------------------------------
+
+
+def test_soniox_runs_v5_with_the_voice_agent_endpointing_profile(project: Project) -> None:
+    options = stt.stt_options(project)
+
+    assert options.model == "stt-rt-v5"
+    assert options.language_hints == ["es", "en"]
+    assert options.sample_rate == 16000
+    assert options.max_endpoint_delay_ms == 1000
+    assert options.endpoint_latency_adjustment_level == 2
+    assert options.endpoint_sensitivity == 0.3
+
+
+def test_the_project_vocabulary_travels_as_context_terms(project: Project) -> None:
+    project.keyterms = ["Clínica Norte", "Dra. Campos", "traumatología"]
+
+    options = stt.stt_options(project)
+
+    assert options.context is not None
+    assert options.context.terms == ["Clínica Norte", "Dra. Campos", "traumatología"]
+
+
+def test_without_a_soniox_key_there_is_no_stt(project: Project, monkeypatch) -> None:
+    monkeypatch.delenv(stt.KEY_ENV, raising=False)
+    tc = fake_context("clinica-norte", "reagendamiento")
+
+    assert stt.stt_for(tc.tenant, project) is None
+
+
+def test_with_a_key_soniox_is_built_with_those_options(project: Project, monkeypatch) -> None:
+    monkeypatch.setenv(stt.KEY_ENV, "sx-test")
+    tc = fake_context("clinica-norte", "reagendamiento")
+
+    built = stt.stt_for(tc.tenant, project)
+
+    assert built is not None and built.model == "stt-rt-v5"
+    assert built._params.endpoint_sensitivity == 0.3
+
+
+# --- ElevenLabs --------------------------------------------------------------
+
+
+def test_elevenlabs_defaults_to_the_conversational_v3_voice(project: Project) -> None:
+    assert tts.tts_model(project) == "eleven_v3_conversational"
+
+
+@pytest.mark.parametrize("wanted", ["eleven_turbo_v2_5", "eleven_v3"])
+def test_the_deprecated_and_non_realtime_models_are_never_chosen(project: Project, wanted) -> None:
+    project.tts_model = wanted
+
+    assert tts.tts_model(project) == "eleven_v3_conversational"
+
+
+def test_a_project_may_opt_into_the_latency_profile(project: Project) -> None:
+    project.tts_model = tts.LATENCY_MODEL
+
+    assert tts.tts_model(project) == "eleven_flash_v2_5"
+
+
+def test_with_a_key_the_voice_is_the_projects_and_alignment_is_on(
+    project: Project, monkeypatch
+) -> None:
+    monkeypatch.setenv(tts.KEY_ENV, "el-test")
+    tc = fake_context("clinica-norte", "reagendamiento")
+
+    built = tts.tts_for(tc.tenant, project)
+
+    assert built is not None
+    assert built._opts.voice_id == "UOIqAnmS11Reiei1Ytkc"
+    assert built._opts.model == "eleven_v3_conversational"
+    assert built._opts.sync_alignment is True
+    assert built._opts.language == "es"
+
+
+def test_without_a_key_or_a_voice_there_is_no_tts(project: Project, monkeypatch) -> None:
+    tc = fake_context("clinica-norte", "reagendamiento")
+    monkeypatch.delenv(tts.KEY_ENV, raising=False)
+    assert tts.tts_for(tc.tenant, project) is None
+
+    monkeypatch.setenv(tts.KEY_ENV, "el-test")
+    project.voice = None
+    assert tts.tts_for(tc.tenant, project) is None
+
+
+# --- turn taking -------------------------------------------------------------
+
+
+def test_the_vad_keeps_the_minimum_silence_the_session_accepts() -> None:
+    vad = turn.vad_for()
+
+    assert vad._opts.min_silence_duration >= 0.25
+
+
+def test_the_turn_detector_is_the_local_mini_model() -> None:
+    detector = turn.turn_detector_for()
+
+    assert "mini" in detector.model
