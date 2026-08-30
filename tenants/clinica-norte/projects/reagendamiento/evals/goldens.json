@@ -2,22 +2,35 @@
   {
     "input": "(llamada entrante: el agente abre la conversación)",
     "turn": "greeting",
-    "expected_behaviour": "La línea de apertura saluda, se presenta como la recepción de Clínica Norte y pregunta en qué puede ayudar."
+    "expected_behaviour": "La línea de apertura saluda, dice que es la recepción de Clínica Norte y pregunta en qué puede ayudar, todo de una vez.",
+    "expected_tools": []
   },
   {
-    "input": "quiero cambiar mi cita del martes a otro día",
-    "expected_behaviour": "Ofrece ayudar y pide el nombre completo (o los datos de la cita) antes de nada; no promete un hueco."
+    "input": "¿qué turnos hay el jueves?",
+    "expected_behaviour": "Consulta la agenda del jueves y ofrece las horas que le ha devuelto, con el profesional, preguntando cuál prefiere.",
+    "expected_tools": ["find_availability"],
+    "expected_date": "2026-09-03"
   },
   {
-    "input": "¿me podéis decir qué tiempo va a hacer mañana en Madrid?",
-    "expected_behaviour": "Explica con amabilidad que solo gestiona citas y vuelve al tema."
+    "input": "quiero cambiar mi cita al viernes por la tarde",
+    "expected_behaviour": "Consulta la agenda del viernes sin pedir antes el nombre y le ofrece la hora, o las horas, de la tarde que le haya devuelto la agenda; ofrecer una sola es correcto si es la única que encaja en la franja que pidió.",
+    "expected_tools": ["find_availability"],
+    "expected_date": "2026-09-04"
   },
   {
-    "input": "Hi, I need to reschedule my appointment, do you speak English?",
-    "expected_behaviour": "Responde en español, se ofrece a ir despacio y sigue ayudando con la cita."
+    "input": "¿hay hueco mañana con traumatología?",
+    "expected_behaviour": "Consulta la agenda de mañana para traumatología y ofrece las horas que le ha devuelto.",
+    "expected_tools": ["find_availability"],
+    "expected_date": "2026-09-02"
   },
   {
-    "input": "sois unos inútiles, llevo media hora esperando",
-    "expected_behaviour": "Mantiene la calma y la cortesía, no se disculpa en exceso ni discute, y se centra en resolver la gestión."
+    "input": "¿me podéis recetar algo para el dolor de cabeza?",
+    "expected_behaviour": "Explica que las recetas las hace un médico en consulta y ofrece cita; no mira la agenda porque el paciente no ha nombrado ningún día.",
+    "expected_tools": []
+  },
+  {
+    "input": "¿cuánto cuesta una primera consulta?",
+    "expected_behaviour": "Responde el precio con la información del centro que ya tiene; no consulta la agenda, que no sabe de precios.",
+    "expected_tools": []
   }
 ]
