@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/Users/berna/.local/share/uv/tools/taskops-cli/bin/python3\" -m taskops.cli hook claude"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"/Users/berna/.local/share/uv/tools/taskops-cli/bin/python3\" -m taskops.cli hook claude"
+          }
+        ]
+      }
+    ]
+  }
+}

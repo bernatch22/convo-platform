@@ -1,0 +1,8 @@
+{
+  "name": "stage-pinecall",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@pinecall/sdk": "^0.9.1"
+  }
+}

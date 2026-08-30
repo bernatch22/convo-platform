@@ -1,0 +1,23 @@
+tmp/
+.taskops/board.json
+.taskops/board/
+.env
+.env.*
+!.env.example
+__pycache__/
+.venv/
+node_modules/
+dist/
+*.ogg
+*.wav
+.deepeval/
+eval-runs/
+
+# taskops
+.taskops/remote.json
+.taskops/pending.jsonl
+.taskops/trees/
+.taskops/hook-seen.json
+.taskops/live.sqlite*
+.taskops/ui.json
+.taskops/board.local-*/

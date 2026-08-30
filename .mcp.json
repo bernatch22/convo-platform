@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "taskops": {
+      "command": "/Users/berna/.local/share/uv/tools/taskops-cli/bin/python3",
+      "args": [
+        "-m",
+        "taskops.mcp"
+      ],
+      "env": {
+        "TASKOPS_ACTOR": "dev:berna"
+      }
+    }
+  }
+}
