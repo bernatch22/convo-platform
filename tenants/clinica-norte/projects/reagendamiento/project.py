@@ -90,6 +90,7 @@ PROJECT = ReagendamientoProject(
     id="reagendamiento",
     name="Reagendamiento de citas",
     language="es-ES",
+    greeting="Clínica Norte, buenos días, le atiende recepción. ¿En qué puedo ayudarle?",
     voice="UOIqAnmS11Reiei1Ytkc",  # ElevenLabs "Carolina - Spanish woman - es_ES" (used from ms-6)
     tools=platform_specs().merge(
         ToolCatalog.of(FIND_PATIENT, CANCEL_SLOT, BOOK_SLOT, REBOOK_SLOT, SEND_SMS)

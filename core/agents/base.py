@@ -36,12 +36,25 @@ class TenantAgent(Agent):
         self.tc = tc
 
     async def on_enter(self) -> None:
-        """Inherit the previous stage's summary, announce the stage, let the model open the turn."""
+        """Inherit the previous stage's summary, announce the stage, open the turn.
+
+        The very first stage of a session speaks the project's `greeting`
+        verbatim when one is set: a caller hears the business immediately
+        instead of waiting an LLM ttft for a sentence that never changes
+        (measured on a real phone call: 1.9 s of silence). `say` puts the
+        line in the chat history, so the model knows what was said. Every
+        later stage — and a project with no greeting — still opens with
+        `generate_reply`.
+        """
         await self._inherit_summary()
         log.info("stage.enter %s agent=%s", self.tc.label(), self.stage_name())
         record(self.tc, "stage.enter", {"stage": self.stage_name()})
+        opener = self.tc.project.greeting if self.tc.prev_agent is None else None
         self.tc.prev_agent = self
-        self.session.generate_reply()
+        if opener:
+            self.session.say(opener, allow_interruptions=True)
+        else:
+            self.session.generate_reply()
 
     async def transcription_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings
