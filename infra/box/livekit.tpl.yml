@@ -1,0 +1,16 @@
+# livekit-server on convo-box (rendered by setup.sh; keys live ONLY on the box).
+# Host networking: GCP gives the VM a 1:1 NAT, use_external_ip lets the server
+# STUN its public address (34.58.189.131) instead of advertising 10.128.x.x —
+# ms-8's node_ip lesson, cloud edition. Media muxed on one UDP port (7882),
+# matching the convo-media firewall rule.
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  use_external_ip: true
+redis:
+  address: 127.0.0.1:6379
+keys:
+  __API_KEY__: __API_SECRET__
+logging:
+  level: info

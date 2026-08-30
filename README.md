@@ -186,3 +186,16 @@ board holds the plan; this repo carries the board's hooks (`.claude/`,
 Reusable for other teams: the hooks are two lines of JSON, the conventions are
 this section, and the pattern (seams first, then parallel cards, HTML report
 per milestone) does not depend on any particular framework.
+
+## Production box (convo-box)
+
+The dedicated GCP box (`e2-standard-4`, `lk.bernardocastro.dev`) runs the SFU
+stack — livekit-server + livekit-sip + redis, host networking, real keypair
+generated on the box on first run:
+
+```bash
+./infra/box/setup.sh     # idempotent: install docker, render configs, compose up
+```
+
+It also mirrors `LIVEKIT_URL` and the keypair into your local `.env`, so
+`python worker.py dev` registers against the box instead of the laptop stack.
