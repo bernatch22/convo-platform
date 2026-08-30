@@ -17,7 +17,9 @@ load_dotenv(".env")
 # Not deleted but replaced: constructing a client still works (plenty of unit
 # tests build sessions), while any REAL request dies at once with a 401.
 OFFLINE_KEY = "offline-unit-ring-no-provider-calls"
-LLM_KEYS = ("ANTHROPIC_API_KEY",)
+# OPENAI too: deepeval's ToolCorrectnessMetric (deterministic!) still constructs
+# a default OpenAI judge and demands a key it will never use.
+LLM_KEYS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY")
 VOICE_KEYS = ("SONIOX_API_KEY", "ELEVENLABS_API_KEY", "ELEVEN_API_KEY")
 
 
