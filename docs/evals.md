@@ -26,7 +26,7 @@ consent, grounded facts, register — and share not one sentence of criteria.
 | Ring | What is evaluated | When | Status |
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
-| **2** | Voice conversations against a real LiveKit room, with personas | nightly (ms-13) | planned |
+| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: against a real LiveKit room, with personas | offline on demand; live nightly (ms-13) | offline live since ms-6 — §3.9; live planned |
 | **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; grounding is blind to tool results — §3.6 |
 
 The metrics are the same in every ring. A ring changes where the conversation
@@ -323,6 +323,76 @@ log (`send_sms` carries the whole confirmation text), and a project's
   Marta Alonso **Gil** and the clinic a **Dr. Ramón Gil**. A word list that
   cried wolf on a correct call is a metric nobody keeps running.
 
+### 3.9 Voice metrics (offline) — AudioIntegrity and AgentResponsiveness
+
+- **Kind:** neither is a judge. Both are dependency-free DSP over 16-bit PCM
+  (`deepeval/metrics/voice/_detectors.py` + `_analysis.py`): zero model calls,
+  zero cost, `evaluation_model` is `None`. Nothing about them needs an
+  audio-capable LLM, and nothing about them is OpenAI-only — the whole `voice`
+  package of DeepEval 4.2 runs on our keys because it runs on no keys.
+- **Runs on:** a recorded session — `python -m convo sessions eval <id> --voice`
+  and `tests/evals/test_voice_deepeval.py`. The case is `replay`'s
+  `ConversationalTestCase` with `Turn.audio` filled in by
+  `core/testing/audio.py:voice_case_from`.
+- **What each one actually reads.** `AudioIntegrityMetric` looks ONLY at
+  assistant turns and only at their `Audio`: missing, undecodable, clipping,
+  loops (repeated 0.25 s fingerprints), dropouts, an abrupt end.
+  `AgentResponsivenessMetric` reads no audio at all except to check it EXISTS:
+  for every user turn that owed an answer, is the next turn the assistant's,
+  and does it carry sound. It also fails on
+  `metadata["end_reason"] in {AGENT_HANGUP, ERROR, IDLE_TIMEOUT}`.
+- **What `Audio` needs:** `Audio.from_bytes(wav, "audio/wav")` where `wav` is
+  **16-bit PCM** — `wav_bytes_to_pcm16` raises on anything else, and a raise is
+  scored as `audio_undecodable`, a CRITICAL failure. `start_time` is metadata
+  (offset from the start of the conversation); these two detectors never read
+  it, but it is set because it is the only place the turn's place in the file
+  survives.
+
+**What the silent caller channel costs.** An offline recording
+(`python -m core.testing.record`) types the caller's lines, so channel L of the
+OGG is silence and the user turns carry no `Audio` at all. Neither metric
+suffers: integrity ignores user turns by construction, and responsiveness only
+asks whether the ASSISTANT's turn has sound. What is lost is elsewhere: **no
+`stt.final` events**, and no framework `e2e_latency` / `transcription_delay` /
+`end_of_turn_delay`, because all three are measured from an end of utterance a
+typed turn does not have. `llm_node_ttft` and `tts_node_ttfb` are there.
+`python worker.py console --record` is the run that has the other half.
+
+**The score of AudioIntegrity is not a gate, and here is why.** Its dropout
+detector counts every silence of 20-200 ms that is surrounded by speech, with a
+fixed threshold (`DEFAULT_SILENCE_RMS = 300`). On a one-phrase clip that is a
+glitch; on a 5-12 s conversational turn those are the pauses between words, and
+three of them exhaust the penalty. Our seven-turn clinic recording scores
+**0.00** with 7 `audio_dropout` events, 0 clipping, 0 loops, 0 missing and 0
+abrupt cutoffs — i.e. clean audio with normal prosody. Read the **breakdown**,
+not the number: `critical_failure`, `clipping`, `audio_loop`, `audio_missing`,
+`audio_undecodable`. That is what `tests/evals/test_voice_deepeval.py` asserts.
+The upstream fix worth proposing is a dropout threshold that scales with the
+clip, or one that ignores runs adjacent to sentence punctuation.
+
+**Cutting the OGG by turn.** Two clocks meet, and `audio.start` is what ties
+them: its `t_ms` is the log time of sample 0 of the recording. An agent turn's
+audio runs from the last `state → speaking` before it to the `turn.agent`
+event, because `turn.agent` is written when the item is COMMITTED — after its
+audio played out — plus a 250 ms tail so the decay is inside the clip and does
+not read as `abrupt_cutoff`. `tts.word`'s `t1` is deliberately not used: it is
+relative to its own websocket chunk and cannot address the file
+(`core/observability/voice.py:TimedWords`). `tests/test_audio_split.py` pins
+all of this on a synthetic stereo WAV, with no provider and no model.
+
+**The TTS golden is a duration, not a transcript.** `python -m
+core.testing.tts_golden` speaks one sentence with a DNI, an amount and a time
+on both ElevenLabs models. The aligned transcript cannot judge it: in
+`livekit-plugins-elevenlabs` 1.7.1 it is ElevenLabs' `normalizedAlignment`, and
+for Spanish that returns the INPUT text with the digits unchanged. So the check
+is an A/B on duration against a control sentence with the three tokens already
+written out in words — 105 % for `eleven_v3_conversational` and 126 % for
+`eleven_flash_v2_5` means both models read them out rather than swallowing
+them. Cold-start TTFB: 0.98 s v3_conversational, 0.84 s flash; in-call
+`tts_node_ttfb` on a warm websocket is ~0.44 s for both. The WAVs are embedded
+in `tmp/reports/ms-6.html` because the last word on how a number sounds is a
+human's.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
@@ -408,6 +478,7 @@ measure in ms-7, not a default).
 | Never book before yes | 1-3 today, 0-1 after ms-7 | 5 simulated calls |
 | Grounded facts | 0 when everything matches, else 1 | 10/10 at 0 today |
 | Keeps the register | 0 | a word list, always |
+| AudioIntegrity / AgentResponsiveness | 0 | DSP, never a model (§3.9) |
 
 Measured on the ms-5 branch, Haiku everywhere: the clinic's four suites are
 **$0.042** (140 s, 30 metric cases, five simulated calls), and Tienda Sur's two
@@ -460,7 +531,16 @@ about four minutes.
   golden intermittently. It belongs to a clinic card.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
-- Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2 (voice) with ms-13.
+- Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6
+  (§3.9), its live half against a LiveKit room with ms-13.
+- **`AudioIntegrityMetric` is uncalibrated for conversational turns.** Its
+  dropout detector reads normal inter-word pauses as defects, so the score is
+  0.0 for any well-formed sentence longer than a phrase (§3.9). We assert the
+  breakdown instead. Upstream fix: scale the dropout threshold with the clip.
+- **A `--record` run with a microphone has never been scored.** Everything in
+  §3.9 is measured on a recording whose caller channel is silent, so nothing
+  yet exercises overlap, barge-in or the caller's own audio. That needs a human
+  with a microphone (`python worker.py console --record`) or ms-13's room.
 - **Ring 3 cannot ground facts against tool results.** The log stores the shape
   of a result, never its contents, so `grounded_facts_dag` on a replayed
   session escalates every datum that came off the agenda and scores it 0.0 on

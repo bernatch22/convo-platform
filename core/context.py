@@ -43,13 +43,17 @@ class Project:
 
     `messages` overrides the platform's user-facing tool-failure sentences
     (`core.tools.messages`) in the project's own register and language.
+    `backchannels` overrides the murmurs a barge-in filter ignores
+    (`core.barge_in.SPANISH_BACKCHANNELS`) — data, so core knows one language.
     """
 
     id: str
     name: str
     voice: str | None = None
+    tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
     language: str = "es"
     keyterms: list[str] = field(default_factory=list)
+    backchannels: list[str] = field(default_factory=list)  # [] = the Spanish default
     tools: ToolCatalog = field(default_factory=ToolCatalog)
     messages: dict[str, str] = field(default_factory=dict)
     knowledge_seed: str = ""

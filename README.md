@@ -31,6 +31,53 @@ TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --te
 TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
 ```
 
+### Talking to it out loud
+
+Drop `--text` and the console runs in **audio mode**: it opens the laptop
+microphone and speaks back through the speakers. Soniox transcribes, ElevenLabs
+answers in the project's voice, and a local turn detector decides when you have
+finished — no LiveKit server, no GPU, nothing to deploy.
+
+```bash
+TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console
+uv run python worker.py console --record          # also leaves the stereo OGG
+uv run python worker.py console --list-devices    # pick a microphone
+RECORD=1 uv run python worker.py dev              # same recording, against a server
+```
+
+While it runs: **Ctrl+T** switches between speaking and typing, **?** lists the
+shortcuts, **Ctrl+C** exits.
+`--record` writes `console-recordings/session-<stamp>/` — `audio.ogg` (you on
+one channel, the agent on the other) and the framework's `session_report.json`.
+
+Interrupting it works, and murmuring at it does not: an interruption needs two
+words (`InterruptionOptions.min_words`), and a turn that is nothing but Spanish
+backchannel — *vale*, *ajá*, *sí sí*, *mm*, *de acuerdo* — never becomes a
+reply. The list is project data (`Project.backchannels`); why there are two
+filters instead of one is written in [`core/barge_in.py`](core/barge_in.py).
+
+Then read the call back:
+
+```bash
+uv run python -m convo sessions list
+uv run python -m convo sessions show <id>
+```
+
+The log is append-only and written during the call, so it survives a kill:
+
+```
+   5    3767  tts.word     Buenos@0.30 días,@0.11 le@0.21 atiende@0.06 recepción@0.61
+   8    5480  stt.final    {"text": "quiero cambiar mi cita", "language": "es"}
+   9    5678  turn.user    transcription_delay=0.12s end_of_turn_delay=0.30s {...}
+  14   11647  turn.agent   ttft=0.94s e2e=1.87s {"text": "Claro, ¿me dice su DNI?"}
+  24   25783  session.end  {"outcome": "completed", "cost": {...}, "audio": "console-recordings/…/audio.ogg"}
+```
+
+`stt.final` is the transcript (interim hypotheses are never logged),
+`tts.word` the agent's own words with the provider's alignment,
+`interruption.false` and `speech.overlap` the barge-in decisions, and the `t_ms`
+column is milliseconds since the call started.
+
 A third business is a copy of [`tenants/_template/`](tenants/_template/README.md),
 which walks a stranger through it in ten minutes;
 [`docs/tenants.md`](docs/tenants.md) is the table of what a tenant owns and what

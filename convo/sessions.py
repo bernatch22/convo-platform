@@ -12,9 +12,15 @@ LIST_HEADER = (
 )
 SHOW_HEADER = f"{'seq':>4} {'t_ms':>7}  {'kind':<18} payload"
 METRIC_KEYS = ("llm_node_ttft", "e2e_latency", "transcription_delay", "end_of_turn_delay")
-USAGE = "usage: python -m convo sessions list | show <id> | eval <id>"
+USAGE = "usage: python -m convo sessions list | show <id> | eval <id> [--voice]"
 NODE_LINES = ("Label:", "Verdict:", "Reason:")
 WIDTH = 160
+
+SILENT_CALLER = (
+    "voice note: only the agent's channel carries sound on an offline recording — the caller "
+    "typed. Integrity reads assistant audio only, so it is unaffected; responsiveness checks "
+    "that each answer HAS audio, which it does. docs/evals.md §3.9."
+)
 
 BLIND_SPOT = (
     "ring 3 note: the log records the shape of a tool result, never its contents, so nothing "
@@ -31,8 +37,8 @@ def main(argv: list[str], store: Store | None = None) -> int:
         return list_sessions(store)
     if argv[:1] == ["show"] and len(argv) == 2:
         return show_session(store, argv[1])
-    if argv[:1] == ["eval"] and len(argv) == 2:
-        return eval_session(store, argv[1])
+    if argv[:1] == ["eval"] and len(argv) in (2, 3):
+        return eval_session(store, argv[1], voice="--voice" in argv[2:])
     print(USAGE)
     return 2
 
@@ -62,7 +68,7 @@ def show_session(store: Store, session_id: str) -> int:
     return 0
 
 
-def eval_session(store: Store, session_id: str) -> int:
+def eval_session(store: Store, session_id: str, voice: bool = False) -> int:
     """Score one stored session with its own project's conversational metrics (ring 3).
 
     The same metrics the CI suite runs on goldens, on a call that really
@@ -88,6 +94,34 @@ def eval_session(store: Store, session_id: str) -> int:
     note = BLIND_SPOT.format(tools=_and(blind)) if blind else None
     score(metrics.consent_policy(), case)
     score(metrics.grounded_facts_dag(), case, note=note)
+    if voice:
+        score_voice(store, session_id)
+    return 0
+
+
+def score_voice(store: Store, session_id: str) -> int:
+    """Score the recording of a session with the two offline voice metrics (ms-6).
+
+    They are detectors, not judges: `AudioIntegrityMetric` measures the agent's
+    own audio (clipping, dropouts, loops, an abrupt cutoff) and
+    `AgentResponsivenessMetric` reads the shape of the turns and whether every
+    answer arrived with sound. Neither calls a model, so this costs nothing and
+    needs no key — only the OGG the session recorded.
+    """
+    from deepeval.metrics.voice import AgentResponsivenessMetric, AudioIntegrityMetric
+
+    from core.testing.audio import recorded_path, voice_case_from
+
+    path = recorded_path(store.events(session_id))
+    if not path:
+        print(f"\n{session_id} was not recorded: no voice metrics to run.")
+        return 1
+    case = voice_case_from(store, session_id, path)
+    spoken = sum(1 for turn in case.turns if turn.audio is not None)
+    print(f"\naudio {path} — {spoken} of {len(case.turns)} turns carry sound")
+    print(SILENT_CALLER)
+    for metric in (AudioIntegrityMetric(), AgentResponsivenessMetric()):
+        score(metric, case)
     return 0
 
 
@@ -104,14 +138,16 @@ def score(metric: Any, case: Any, note: str | None = None) -> float:
 
 
 def render(event: Event) -> str:
-    """The payload on one line: latencies as `ttft=…` pairs, everything else as compact JSON."""
+    """The payload on one line: timed words as `word@t`, latencies as `ttft=…`, rest as JSON."""
     payload = dict(event.payload)
+    words: list[dict[str, Any]] = payload.pop("words", None) or []
     metrics: dict[str, Any] = payload.pop("metrics", None) or {}
     parts = [
         f"{k.replace('llm_node_', '').replace('_latency', '')}={metrics[k]:.2f}s"
         for k in METRIC_KEYS
         if isinstance(metrics.get(k), (int, float))
     ]
+    parts.extend(f"{word['w']}@{word['t1']:.2f}" for word in words if "t1" in word)
     if payload:
         parts.append(json.dumps(payload, ensure_ascii=False, default=str))
     return " ".join(parts)

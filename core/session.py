@@ -1,14 +1,29 @@
-"""build_session: assemble the AgentSession for one TenantContext."""
+"""build_session: assemble the AgentSession for one TenantContext.
+
+Two shapes of session leave this module. With STT and TTS (keys present) the
+session listens and speaks: Soniox endpointing and the local turn detector
+share the decision of when the caller has finished, a real interruption needs
+two words so a "vale" does not cut the agent off, and every spoken word comes
+back with its time for the log. Without them it is text only, and audio is
+switched off so the console's default audio mode does not crash.
+"""
 
 import logging
 
 from livekit.agents import AgentSession, TurnHandlingOptions
+from livekit.agents.voice.turn import EndpointingOptions, InterruptionOptions
 
 from core.context import TenantContext
 from core.observability.observers import observe
-from core.providers import llm_for, stt_for, tts_for
+from core.observability.voice import observe_voice
+from core.providers import llm_for, stt_for, tts_for, turn_detector_for
 
 log = logging.getLogger("platform.session")
+
+ENDPOINT_MIN_DELAY_S = 0.3
+ENDPOINT_MAX_DELAY_S = 2.5
+INTERRUPTION_MIN_WORDS = 2
+PREEMPTIVE_MAX_RETRIES = 1
 
 
 def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
@@ -20,40 +35,62 @@ def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
     opened the call — and building the session is the one moment every caller
     (worker, console, harness) passes through.
     """
+    stt = stt_for(tc.tenant, tc.project)
+    tts = tts_for(tc.tenant, tc.project)
+    voice = stt is not None and tts is not None and vad is not None
     session = AgentSession[TenantContext](
         llm=llm_for(tc.tenant),
-        stt=stt_for(tc.tenant),
-        tts=tts_for(tc.tenant, tc.project),
+        stt=stt,
+        tts=tts,
         vad=vad,
-        turn_handling=_turn_handling(vad),
+        turn_handling=voice_turn_handling() if voice else text_turn_handling(),
+        use_tts_aligned_transcript=True if voice else None,
         userdata=tc,
         max_tool_steps=4,
     )
     observe(session, tc)
+    if voice:
+        observe_voice(session, tc)
     return session
 
 
-async def start_session(session: AgentSession[TenantContext], agent, room=None) -> None:
-    """Start the session and, without STT/TTS, switch audio off so text-only projects run anywhere.
+def voice_turn_handling() -> TurnHandlingOptions:
+    """Semantic end of turn, short endpointing window, two-word interruptions, one retry."""
+    return TurnHandlingOptions(
+        turn_detection=turn_detector_for(),
+        endpointing=EndpointingOptions(
+            min_delay=ENDPOINT_MIN_DELAY_S, max_delay=ENDPOINT_MAX_DELAY_S
+        ),
+        interruption=InterruptionOptions(
+            min_words=INTERRUPTION_MIN_WORDS, resume_false_interruption=True
+        ),
+        preemptive_generation={"max_retries": PREEMPTIVE_MAX_RETRIES},
+    )
 
-    The console starts in audio mode by default; a project without a TTS would
-    otherwise fail at the first reply ("tts_node called but no TTS node").
+
+def text_turn_handling() -> TurnHandlingOptions:
+    """Text-only sessions have no audio turns: disable the default (VAD-backed) turn detector."""
+    return TurnHandlingOptions(turn_detection=None)
+
+
+async def start_session(
+    session: AgentSession[TenantContext], agent, room=None, record: bool = False
+) -> None:
+    """Start the session; without STT/TTS switch audio off so text-only projects run anywhere.
+
+    `record=True` asks the framework for the stereo OGG (caller on one channel,
+    agent on the other) that ms-6's offline evals score. It is passed
+    explicitly because the default is the SERVER's setting
+    (`job.enable_recording`), which a laptop console has no server to ask.
     """
     if room is None:
-        await session.start(agent)  # headless (console text mode, tests)
+        await session.start(agent, record=record)  # headless (console, tests)
     else:
-        await session.start(agent, room=room)
+        await session.start(agent, room=room, record=record)
     if session.tts is None:
         session.output.set_audio_enabled(False)
         log.info(
-            "no TTS for %s: audio output off (voice arrives in ms-6; use console --text)", agent
+            "no TTS for %s: audio output off (set ELEVENLABS_API_KEY, or console --text)", agent
         )
     if session.stt is None:
         session.input.set_audio_enabled(False)
-
-
-def _turn_handling(vad) -> TurnHandlingOptions:
-    """Text-only sessions have no audio turns: disable the default (VAD-backed) turn detector."""
-    if vad is None:
-        return TurnHandlingOptions(turn_detection=None)
-    return TurnHandlingOptions()
