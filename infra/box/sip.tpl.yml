@@ -1,0 +1,15 @@
+# livekit-sip on convo-box (rendered by setup.sh; keys live ONLY on the box).
+# hide_inbound_port drops unauthenticated INVITEs — the trunk must present
+# the number/auth the inbound trunk declares (ms-11 rule).
+api_key: __API_KEY__
+api_secret: __API_SECRET__
+ws_url: ws://127.0.0.1:7880
+redis:
+  address: 127.0.0.1:6379
+sip_port: 5060
+rtp_port: 10000-20000
+use_external_ip: true
+hide_inbound_port: true
+health_port: 8091
+logging:
+  level: info

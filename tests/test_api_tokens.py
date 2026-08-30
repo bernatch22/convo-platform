@@ -18,7 +18,14 @@ client = TestClient(app)
 
 
 def decoded(token: str) -> dict:
-    return pyjwt.decode(token, "secret", algorithms=["HS256"], options={"verify_aud": False})
+    """Read a minted token with the secret the door actually signed it with.
+
+    Not the literal `"secret"`: since ms-10 a laptop's `.env` carries the real
+    box keypair, and a test that hardcodes the dev default goes red the day
+    the platform gets a server.
+    """
+    secret = os.getenv("LIVEKIT_API_SECRET", "secret")
+    return pyjwt.decode(token, secret, algorithms=["HS256"], options={"verify_aud": False})
 
 
 def test_a_token_names_the_room_the_caller_and_the_dispatch() -> None:

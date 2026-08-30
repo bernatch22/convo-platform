@@ -14,8 +14,16 @@ from core.state.log import EventLog
 from core.state.store import SessionRow, Store
 
 
-def attach_log(tc: TenantContext, store: Store) -> TenantContext:
-    """Open the session in the store, hang an EventLog on the context, write `session.start`."""
+def attach_log(
+    tc: TenantContext, store: Store, sip: dict[str, str] | None = None
+) -> TenantContext:
+    """Open the session in the store, hang an EventLog on the context, write `session.start`.
+
+    `sip` is the caller's `sip.*` attributes when the session came in over the
+    phone: the dialled number, the carrier's call id and the headers the trunk
+    was told to keep. They belong on the very first event — an audit asks which
+    number was dialled long before it asks what was said.
+    """
     store.open_session(
         SessionRow(
             id=tc.session_id,
@@ -34,6 +42,7 @@ def attach_log(tc: TenantContext, store: Store) -> TenantContext:
             "channel": tc.channel,
             "git_sha": tc.git_sha,
             "project_version": tc.project_version,
+            **({"sip": dict(sip)} if sip else {}),
         },
     )
     return tc

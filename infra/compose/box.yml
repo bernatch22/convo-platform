@@ -1,0 +1,31 @@
+# The production stack on convo-box (dedicated to this project).
+# Host networking on every service: SIP needs a 10k-port RTP range and
+# docker's per-port NAT cannot map that; redis binds loopback so nothing
+# but this box ever reaches it. Deployed by infra/box/setup.sh.
+services:
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes --bind 127.0.0.1
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./redis_data:/data
+  livekit:
+    image: livekit/livekit-server:v1.9.1
+    command: --config /etc/livekit.yml
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - redis
+    volumes:
+      - ./livekit.yml:/etc/livekit.yml:ro
+  sip:
+    image: livekit/sip:v1.12
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - redis
+      - livekit
+    volumes:
+      # v1.12 reads /sip/config.yaml, ignoring SIP_CONFIG_FILE
+      - ./sip.yml:/sip/config.yaml:ro
