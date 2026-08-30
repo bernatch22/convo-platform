@@ -25,7 +25,7 @@ log = logging.getLogger("platform.session")
 ENDPOINT_MIN_DELAY_S = 0.3
 ENDPOINT_MAX_DELAY_S = 2.5
 INTERRUPTION_MIN_WORDS = 2
-PREEMPTIVE_MAX_RETRIES = 1
+PREEMPTIVE_MAX_RETRIES = 3  # was 1; see the preemptive_generation comment below
 
 
 def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
@@ -66,7 +66,14 @@ def voice_turn_handling() -> TurnHandlingOptions:
         interruption=InterruptionOptions(
             min_words=INTERRUPTION_MIN_WORDS, resume_false_interruption=True
         ),
-        preemptive_generation={"max_retries": PREEMPTIVE_MAX_RETRIES},
+        preemptive_generation={
+            # Measured on the phone (AJ_AKu49RuK222h): Haiku's 1.6-2.1s ttft sat whole
+            # in the reply gap. Speculate hard: run LLM AND TTS on the interim
+            # transcript, allow retries; a wasted attempt costs a cache-read call,
+            # a saved one removes the largest block of silence we have left.
+            "max_retries": PREEMPTIVE_MAX_RETRIES,
+            "preemptive_tts": True,
+        },
     )
 
 

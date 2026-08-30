@@ -52,6 +52,7 @@ class Project:
     voice: str | None = None
     tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
     language: str = "es"
+    greeting: str | None = None  # spoken verbatim on session start: no LLM turn, no ttft
     keyterms: list[str] = field(default_factory=list)
     backchannels: list[str] = field(default_factory=list)  # [] = the Spanish default
     tools: ToolCatalog = field(default_factory=ToolCatalog)
