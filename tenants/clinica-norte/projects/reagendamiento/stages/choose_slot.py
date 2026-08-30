@@ -24,7 +24,7 @@ class ChooseSlot(TenantAgent):
     """Offers the hours the agenda really has, and books the one the caller confirms."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.choose_slot_prompt())
+        super().__init__(tc, instructions=prompts.choose_slot_prompt(tc))
         self.offered: dict[str, dict[str, str]] = {}
         self.booked: dict[str, str] | None = None
 
