@@ -1,8 +1,12 @@
-"""Reception reads the agenda: the date language, the fake adapter, and the model's first tool call.
+"""Reading the agenda: the date language, the fake adapter, and the model's tool call.
 
 Three rings in one file, cheapest first: `dates.resolve` and `FakeAgenda` are
 pure and run in milliseconds; the last three tests put a real Claude Haiku in
 front of the prompt and are skipped without a key.
+
+The agenda belongs to the ChooseSlot stage from ms-3 on — a call reaches it once
+the patient is identified — so the model tests start there instead of replaying
+an identification whose behaviour is pinned in `tests/test_stages.py`.
 """
 
 import datetime
@@ -13,6 +17,7 @@ import pytest
 
 from core.testing import TODAY, fake_context, final_message, run_conversation
 from tests.conftest import needs_llm
+from tests.test_stages import identified_context
 
 pytestmark = pytest.mark.unit
 
@@ -20,6 +25,7 @@ PROJECT = "tenants.clinica-norte.projects.reagendamiento"
 dates = importlib.import_module(f"{PROJECT}.dates")
 tools_module = importlib.import_module(f"{PROJECT}.tools")
 agenda_module = importlib.import_module("tenants.clinica-norte.adapters.agenda")
+stages = importlib.import_module(f"{PROJECT}.stages")
 FakeAgenda = agenda_module.FakeAgenda
 
 TUESDAY = TODAY  # 2026-09-01
@@ -30,6 +36,13 @@ SUNDAY = datetime.date(2026, 9, 6)
 @pytest.fixture
 def tc():
     return fake_context("clinica-norte", "reagendamiento")
+
+
+@pytest.fixture
+def choosing():
+    """The stage that owns the agenda, entered with the patient already identified."""
+    context = identified_context()
+    return context, stages.ChooseSlot(context)
 
 
 # --- the date language ------------------------------------------------------
@@ -139,7 +152,7 @@ async def test_the_tool_reaches_the_adapter_through_the_platform_executor(tc) ->
 
 
 @needs_llm
-async def test_asking_for_thursday_calls_the_tool_with_the_day_the_patient_said(tc) -> None:
+async def test_asking_for_thursday_calls_the_tool_with_the_day_the_patient_said(choosing) -> None:
     """The turn reaches the agenda, and with the day the patient named — not one the model invented.
 
     Haiku often opens with "Un momento, le consulto la agenda…" before calling,
@@ -148,7 +161,8 @@ async def test_asking_for_thursday_calls_the_tool_with_the_day_the_patient_said(
     fail on a politer answer. What must hold is that the call happens and that
     its `date` argument, resolved against the frozen `today`, is the Thursday.
     """
-    conversation = await run_conversation(tc, ["¿qué turnos hay el jueves?"])
+    tc, stage = choosing
+    conversation = await run_conversation(tc, ["¿qué turnos hay el jueves?"], stage)
 
     turn = conversation.results[0].expect
     turn.skip_next_event_if(type="message", role="assistant")
@@ -158,9 +172,10 @@ async def test_asking_for_thursday_calls_the_tool_with_the_day_the_patient_said(
 
 
 @needs_llm
-async def test_the_reply_offers_the_hours_the_agenda_returned(tc, judge_llm) -> None:
+async def test_the_reply_offers_the_hours_the_agenda_returned(choosing, judge_llm) -> None:
     """The answer, not the filler: `final_message` skips the "un momento" said before the call."""
-    conversation = await run_conversation(tc, ["¿qué turnos hay el jueves?"])
+    tc, stage = choosing
+    conversation = await run_conversation(tc, ["¿qué turnos hay el jueves?"], stage)
 
     message = final_message(conversation.results[0])
     await message.judge(
@@ -171,9 +186,10 @@ async def test_the_reply_offers_the_hours_the_agenda_returned(tc, judge_llm) -> 
 
 
 @needs_llm
-async def test_the_system_prompt_is_served_from_the_cache_on_the_second_turn(tc) -> None:
+async def test_the_system_prompt_is_served_from_the_cache_on_the_second_turn(choosing) -> None:
+    tc, stage = choosing
     conversation = await run_conversation(
-        tc, ["hola, quería cambiar mi cita", "¿qué turnos hay el jueves?"]
+        tc, ["hola, quería cambiar mi cita", "¿me dice qué hay el jueves?"], stage
     )
 
     assert conversation.cached_prompt_tokens() > 0, (
