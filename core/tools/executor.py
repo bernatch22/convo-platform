@@ -8,11 +8,12 @@ be a sentence a caller could hear in the project's language — never a stack
 trace, never an internal identifier, never the name of a system. Every other
 failure (an undeclared tool, a missing adapter, an adapter blowing up, a
 timeout) is translated here into exactly that, and the real cause goes to the
-log instead.
+log instead. Which sentence is spoken comes from `core.tools.messages`, so a
+project chooses its own register.
 
 This module is the only file in `core/tools` that imports livekit: `contract`,
-`guard` and `catalog` stay framework-agnostic, so porting the platform to
-another agent runtime means rewriting this file alone.
+`guard`, `catalog` and `messages` stay framework-agnostic, so porting the
+platform to another agent runtime means rewriting this file alone.
 """
 
 import asyncio
@@ -23,17 +24,13 @@ from livekit.agents.llm import ToolError
 
 from core.tools import guard
 from core.tools.contract import ToolSpec
+from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL, sentence
 
 if TYPE_CHECKING:  # avoid an import cycle: core.context declares the executor it carries
     from core.adapters.base import Adapter
     from core.context import TenantContext
 
 log = logging.getLogger("platform.tools")
-
-UNKNOWN_TOOL_MESSAGE = "No dispongo de esa función ahora mismo. ¿Puedo ayudarte de otra forma?"
-NO_ADAPTER_MESSAGE = "No puedo acceder a ese sistema ahora mismo. ¿Puedo ayudarte de otra forma?"
-TIMEOUT_MESSAGE = "El sistema está tardando demasiado en responder. ¿Lo intento de nuevo?"
-FAILURE_MESSAGE = "No he podido completar esa consulta. ¿Quieres que lo intente de nuevo?"
 
 
 class ToolExecutor(Protocol):
@@ -74,7 +71,7 @@ class LocalExecutor:
                 name,
                 self.tc.project.tools.names(),
             )
-            raise ToolError(UNKNOWN_TOOL_MESSAGE)
+            raise ToolError(self._says(UNKNOWN_TOOL))
         return spec
 
     def _adapter(self, spec: ToolSpec) -> "Adapter":
@@ -87,7 +84,7 @@ class LocalExecutor:
             spec.name,
             sorted(self.tc.adapters),
         )
-        raise ToolError(NO_ADAPTER_MESSAGE)
+        raise ToolError(self._says(NO_ADAPTER))
 
     async def _execute(
         self,
@@ -109,7 +106,22 @@ class LocalExecutor:
                 spec.timeout_s,
                 safe_args,
             )
-            raise ToolError(TIMEOUT_MESSAGE) from None
+            raise ToolError(self._says(TIMEOUT)) from None
         except Exception:
             log.exception("tool.error %s %s failed args=%s", self.tc.label(), spec.name, safe_args)
-            raise ToolError(FAILURE_MESSAGE) from None
+            raise ToolError(self._says(FAILURE)) from None
+
+    def _says(self, key: str) -> str:
+        return sentence(self.tc.project.messages, key)
+
+
+def attach_local_tools(tc: "TenantContext") -> "TenantContext":
+    """Give a freshly built context its tenant's adapters and a local executor over them.
+
+    Two steps that only make sense together and only after the context exists
+    (the executor holds it), so every builder of a TenantContext — the router in
+    production, the harness in tests — ends with this one line.
+    """
+    tc.adapters = tc.tenant.build_adapters()
+    tc.tools = LocalExecutor(tc)
+    return tc

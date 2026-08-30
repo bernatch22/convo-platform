@@ -5,6 +5,7 @@ session's `userdata` and reachable from every tool as `ctx.userdata`.
 """
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
 from core.contracts import Channel
@@ -24,10 +25,23 @@ class Tenant:
     region: str = "eu"
     projects: dict[str, "Project"] = field(default_factory=dict)
 
+    def build_adapters(self) -> dict[str, "Adapter"]:
+        """The customer's own systems, one adapter each, built fresh per session.
+
+        A tenant that has none keeps the default: it simply cannot run tools.
+        Subclasses in `tenants/<id>/tenant.py` override it — core never imports
+        a customer's code, so the factory has to travel on the tenant itself.
+        """
+        return {}
+
 
 @dataclass
 class Project:
-    """A use case of a tenant: prompts, voice, tools, entry agent."""
+    """A use case of a tenant: prompts, voice, tools, failure sentences, entry agent.
+
+    `messages` overrides the platform's user-facing tool-failure sentences
+    (`core.tools.messages`) in the project's own register and language.
+    """
 
     id: str
     name: str
@@ -35,11 +49,19 @@ class Project:
     language: str = "es"
     keyterms: list[str] = field(default_factory=list)
     tools: ToolCatalog = field(default_factory=ToolCatalog)
+    messages: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
 class TenantContext:
-    """Per-session context: tenant, project, channel, identifiers and collaborators."""
+    """Per-session context: tenant, project, channel, identifiers and collaborators.
+
+    `today` is the calendar day the conversation happens on. It lives here and
+    never in the system prompt: Haiku 4.5 only caches a prefix of 4096+ tokens
+    and only while that prefix is byte-identical, so a date in the instructions
+    would throw the cache away on every new day. Tools that read "el jueves"
+    resolve it against this instead.
+    """
 
     tenant: Tenant
     project: Project
@@ -47,6 +69,7 @@ class TenantContext:
     session_id: str
     git_sha: str
     project_version: str
+    today: date = field(default_factory=date.today)
     adapters: dict[str, "Adapter"] = field(default_factory=dict)
     tools: "ToolExecutor | None" = None
     customer: dict[str, Any] | None = None
