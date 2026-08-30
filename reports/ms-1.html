@@ -54,8 +54,28 @@ session usage over 5 requests: input=23614  cache_creation=4850 (first turn)  ca
 <h2>What passed</h2>
 <p class="ok">pytest -m unit: 7 passed · ruff check + format: clean · no STT/TTS/VAD instantiated (<code>assert s.stt is None and s.tts is None and s.vad is None</code>) · 4-turn conversation coherent, on-topic, in Spain Spanish</p>
 
+<h2>DeepEval — ring 1 on the reception prompt</h2>
+<p>Five goldens in <code>tenants/clinica-norte/projects/reagendamiento/evals/goldens.json</code>, one <code>GEval</code> metric ("Reception line": Spain Spanish, usted, 2-3 sentences, one question, on topic, never invents), judge Claude Haiku, threshold 0.7.</p>
+<table>
+<tr><th>Input</th><th>Expected behaviour</th><th>Score</th></tr>
+<tr><td>hola, buenos días</td><td>saluda, se presenta, pregunta en qué ayuda</td><td>0.70</td></tr>
+<tr><td>quiero cambiar mi cita del martes a otro día</td><td>pide el nombre antes de nada; no promete hueco</td><td>0.90</td></tr>
+<tr><td>¿qué tiempo va a hacer mañana en Madrid?</td><td>solo gestiona citas y vuelve al tema</td><td>0.90</td></tr>
+<tr><td>Hi, I need to reschedule… do you speak English?</td><td>responde en español, se ofrece a ir despacio</td><td>0.80</td></tr>
+<tr><td>sois unos inútiles, llevo media hora esperando</td><td>calma y cortesía, se centra en resolver</td><td>0.80</td></tr>
+</table>
+<p class="ok">deepeval test run tests/evals: 5/5 passed · 17 s · $0.012 in judge tokens</p>
+<p><strong>Variance, stated plainly:</strong> the CI run scored 5/5; the second run that produced the HTML below scored 4/5 — the greeting fell under 0.7. Same prompt, same judge: LLM-judged evals move a few hundredths between runs, and a golden sitting on the threshold flips. That is why the greeting gets a prompt tweak in ms-2 and why voice-era goldens will carry <code>flaky=True</code> (report, do not block).</p>
+<p>Full judge reasoning: <a href="deepeval/clinica-norte-reagendamiento_20260830_140025.html">DeepEval HTML report</a> (regenerate with <code>uv run python -m core.testing.report clinica-norte reagendamiento</code>). The greeting sits exactly on the threshold — the judge wants the question in the same breath as the introduction; a prompt tweak for ms-2.</p>
+
+<h2>Tests you can run</h2>
+<pre>uv run pytest -m unit          # 10 tests: 7 contracts + 3 LLM-judged (skipped without ANTHROPIC_API_KEY)
+uv run deepeval test run tests/evals -n 3</pre>
+<p><code>tests/test_reception.py</code> uses <code>result.expect.next_event().is_message().judge(llm, intent=…)</code>: the same <code>session.run()</code> the console uses, with a Haiku judge deciding whether the reply fulfils an intent. <code>core/testing/harness.py</code> (<code>fake_context</code>, <code>run_turns</code>, <code>text_of</code>) is the bridge from LiveKit's RunResult to DeepEval test cases.</p>
+
 <h2>Read the code</h2>
-<pre>nvim -p worker.py core/providers.py core/session.py core/agents/base.py core/registry.py core/router.py tenants/clinica-norte/tenant.py tenants/clinica-norte/projects/reagendamiento/project.py tenants/clinica-norte/projects/reagendamiento/prompts.py tenants/clinica-norte/projects/reagendamiento/knowledge.py tenants/clinica-norte/projects/reagendamiento/agents.py</pre>
+<pre>nvim -p core/testing/harness.py core/testing/report.py tests/test_reception.py tests/evals/test_reception_deepeval.py tenants/clinica-norte/projects/reagendamiento/evals/goldens.json
+nvim -p worker.py core/providers.py core/session.py core/agents/base.py core/registry.py core/router.py tenants/clinica-norte/tenant.py tenants/clinica-norte/projects/reagendamiento/project.py tenants/clinica-norte/projects/reagendamiento/prompts.py tenants/clinica-norte/projects/reagendamiento/knowledge.py tenants/clinica-norte/projects/reagendamiento/agents.py</pre>
 
 <h2>Two things learned the hard way</h2>
 <p><strong>anthropic SDK 1.x breaks livekit-plugins-anthropic 1.7</strong> (it hands the client an <code>httpx.AsyncClient</code>, the new SDK wants <code>httpx2</code>) → pinned <code>anthropic&gt;=0.41,&lt;1</code>. <strong>The default TurnDetector needs a VAD</strong> → text-only sessions pass <code>TurnHandlingOptions(turn_detection=None)</code>.</p>

@@ -1,0 +1,22 @@
+[
+  {
+    "input": "hola, buenos días",
+    "expected_behaviour": "Saluda, se presenta como la recepción de Clínica Norte y pregunta en qué puede ayudar."
+  },
+  {
+    "input": "quiero cambiar mi cita del martes a otro día",
+    "expected_behaviour": "Ofrece ayudar y pide el nombre completo (o los datos de la cita) antes de nada; no promete un hueco."
+  },
+  {
+    "input": "¿me podéis decir qué tiempo va a hacer mañana en Madrid?",
+    "expected_behaviour": "Explica con amabilidad que solo gestiona citas y vuelve al tema."
+  },
+  {
+    "input": "Hi, I need to reschedule my appointment, do you speak English?",
+    "expected_behaviour": "Responde en español, se ofrece a ir despacio y sigue ayudando con la cita."
+  },
+  {
+    "input": "sois unos inútiles, llevo media hora esperando",
+    "expected_behaviour": "Mantiene la calma y la cortesía, no se disculpa en exceso ni discute, y se centra en resolver la gestión."
+  }
+]

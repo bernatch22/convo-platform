@@ -21,3 +21,5 @@ eval-runs/
 .taskops/live.sqlite*
 .taskops/ui.json
 .taskops/board.local-*/
+.deepeval/
+reports/deepeval/*.html
