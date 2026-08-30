@@ -14,4 +14,5 @@ sheets) live under `tmp/reports/` and are not versioned.
 |---|---|---|
 | ms-0 skeleton — repo, toolchain, contracts, CI | landed | [ms-0.md](ms-0.md) |
 | ms-1 LLM in text — talk to Claude Haiku from the terminal | landed | [ms-1.md](ms-1.md) |
-| ms-2 one tool with a contract | in progress | — |
+| ms-2 one tool with a contract — the LLM calls a fake adapter | landed | [ms-2.md](ms-2.md) |
+| ms-3 stages + confirmation — Identify → ChooseSlot → Farewell, ConfirmTask, saga | next | — |
