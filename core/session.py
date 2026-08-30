@@ -11,9 +11,11 @@ switched off so the console's default audio mode does not crash.
 import logging
 
 from livekit.agents import AgentSession, TurnHandlingOptions
+from livekit.agents.voice.room_io import RoomOptions
 from livekit.agents.voice.turn import EndpointingOptions, InterruptionOptions
 
 from core.context import TenantContext
+from core.contracts import Channel
 from core.observability.observers import observe
 from core.observability.voice import observe_voice
 from core.providers import llm_for, stt_for, tts_for, turn_detector_for
@@ -73,8 +75,23 @@ def text_turn_handling() -> TurnHandlingOptions:
     return TurnHandlingOptions(turn_detection=None)
 
 
+def channel_options(channel: Channel) -> RoomOptions:
+    """How the session meets the room: chat is text both ways, voice keeps its tracks.
+
+    Text input (`lk.chat`) and the agent's transcription (`lk.transcription`)
+    are on in both — a voice caller still reads what was said.
+    """
+    if channel == "chat":
+        return RoomOptions(audio_input=False, audio_output=False)
+    return RoomOptions()
+
+
 async def start_session(
-    session: AgentSession[TenantContext], agent, room=None, record: bool = False
+    session: AgentSession[TenantContext],
+    agent,
+    room=None,
+    record: bool = False,
+    channel: Channel = "voice",
 ) -> None:
     """Start the session; without STT/TTS switch audio off so text-only projects run anywhere.
 
@@ -82,11 +99,19 @@ async def start_session(
     agent on the other) that ms-6's offline evals score. It is passed
     explicitly because the default is the SERVER's setting
     (`job.enable_recording`), which a laptop console has no server to ask.
+
+    `channel` is the session's, never the project's: the same project answers a
+    phone call with audio tracks and a web chat with text, and only the room IO
+    differs. It is passed to `session.start` because a room the agent joins
+    with audio enabled publishes a track and subscribes to one — on a chat
+    session that is a microphone permission nobody asked for.
     """
     if room is None:
         await session.start(agent, record=record)  # headless (console, tests)
     else:
-        await session.start(agent, room=room, record=record)
+        await session.start(
+            agent, room=room, room_options=channel_options(channel), record=record
+        )
     if session.tts is None:
         session.output.set_audio_enabled(False)
         log.info(

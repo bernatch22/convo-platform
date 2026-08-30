@@ -3,7 +3,13 @@
 import pytest
 
 from core.providers import stt, tts
-from core.session import build_session, start_session, text_turn_handling, voice_turn_handling
+from core.session import (
+    build_session,
+    channel_options,
+    start_session,
+    text_turn_handling,
+    voice_turn_handling,
+)
 from core.testing import fake_context
 from tests.conftest import needs_llm
 
@@ -22,6 +28,18 @@ def test_voice_turn_handling_combines_soniox_endpointing_with_the_local_detector
 
 def test_text_turn_handling_has_no_turn_detector() -> None:
     assert text_turn_handling()["turn_detection"] is None
+
+
+def test_a_chat_session_meets_the_room_with_no_audio_either_way() -> None:
+    options = channel_options("chat")
+
+    assert options.audio_input is False and options.audio_output is False
+
+
+def test_a_voice_session_keeps_the_room_defaults() -> None:
+    options = channel_options("voice")
+
+    assert options.audio_input is not False and options.audio_output is not False
 
 
 async def test_with_providers_and_a_vad_the_session_is_a_voice_session(monkeypatch) -> None:
