@@ -1,23 +1,28 @@
 """Data plane entry point: one AgentServer, one fleet, every tenant.
 
-Run `python worker.py console --text` to talk to the agent from the terminal,
-`python worker.py dev` against a LiveKit server. The entrypoint is wired here
-and filled in by later milestones (ms-1 adds the first session).
+`python worker.py console --text` talks to the agent from the terminal;
+`python worker.py dev` registers against a LiveKit server.
 """
 
 import os
 
+from dotenv import load_dotenv
 from livekit.agents import AgentServer, JobContext, cli
+
+from core.router import resolve
+from core.session import build_session
+
+load_dotenv()
 
 server = AgentServer()
 
 
 @server.rtc_session(agent_name=os.getenv("FLEET", "cc"))
 async def entrypoint(ctx: JobContext) -> None:
-    """Resolve the tenant for this job and start its session (implemented in ms-1)."""
-    raise NotImplementedError(
-        "ms-0 ships the skeleton only. ms-1 resolves the tenant and starts an AgentSession."
-    )
+    """Resolve the tenant for this job and run its conversation."""
+    tc = await resolve(ctx)
+    session = build_session(tc)
+    await session.start(tc.project.entry_agent(tc), room=ctx.room)
 
 
 if __name__ == "__main__":
