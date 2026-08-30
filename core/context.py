@@ -8,9 +8,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from core.contracts import Channel
+from core.tools.catalog import ToolCatalog
 
 if TYPE_CHECKING:  # avoid import cycles; these are filled in by later milestones
     from core.adapters.base import Adapter
+    from core.tools.executor import ToolExecutor
 
 
 @dataclass
@@ -32,6 +34,7 @@ class Project:
     voice: str | None = None
     language: str = "es"
     keyterms: list[str] = field(default_factory=list)
+    tools: ToolCatalog = field(default_factory=ToolCatalog)
 
 
 @dataclass
@@ -45,6 +48,7 @@ class TenantContext:
     git_sha: str
     project_version: str
     adapters: dict[str, "Adapter"] = field(default_factory=dict)
+    tools: "ToolExecutor | None" = None
     customer: dict[str, Any] | None = None
     prev_agent: Any = None
 
