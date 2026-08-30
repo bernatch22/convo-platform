@@ -121,9 +121,19 @@ async def test_the_tool_reaches_the_adapter_through_the_platform_executor(tc) ->
 
 @needs_llm
 async def test_asking_for_thursday_calls_the_tool_with_the_day_the_patient_said(tc) -> None:
+    """The turn reaches the agenda, and with the day the patient named — not one the model invented.
+
+    Haiku often opens with "Un momento, le consulto la agenda…" before calling,
+    so the leading message is skipped rather than asserted against: whether the
+    model says something first is style, and pinning it would make this test
+    fail on a politer answer. What must hold is that the call happens and that
+    its `date` argument, resolved against the frozen `today`, is the Thursday.
+    """
     conversation = await run_conversation(tc, ["¿qué turnos hay el jueves?"])
 
-    call = conversation.results[0].expect.next_event().is_function_call(name="find_availability")
+    turn = conversation.results[0].expect
+    turn.skip_next_event_if(type="message", role="assistant")
+    call = turn.next_event().is_function_call(name="find_availability")
     said = call.event().item.arguments
     assert dates.resolve(_argument(said, "date"), tc.today) == THURSDAY
 
