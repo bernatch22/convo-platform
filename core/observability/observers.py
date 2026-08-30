@@ -23,6 +23,7 @@ import logging
 from typing import Any
 
 from core.observability.prices import session_cost
+from core.observability.voice import recording_path
 
 log = logging.getLogger("platform.observers")
 
@@ -106,15 +107,16 @@ class SessionObserver:
         self._append("error", {"source": type(event.source).__name__, "error": repr(event.error)})
 
     def on_close(self, event) -> None:
-        """The envelope closes: why the call ended, and what its models cost in EUR."""
-        self._append(
-            "session.end",
-            {
-                "outcome": outcome_of(event),
-                "reason": str(getattr(event.reason, "value", event.reason)),
-                "cost": session_cost(self.session.usage),
-            },
-        )
+        """The envelope closes: why the call ended, what it cost, and where its audio is."""
+        payload = {
+            "outcome": outcome_of(event),
+            "reason": str(getattr(event.reason, "value", event.reason)),
+            "cost": session_cost(self.session.usage),
+        }
+        audio = recording_path(self.session)
+        if audio:
+            payload["audio"] = audio
+        self._append("session.end", payload)
 
     def _append(self, kind: str, payload: dict[str, Any]) -> None:
         self.tc.log.append(kind, payload)

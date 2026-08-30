@@ -4,6 +4,9 @@
 (`--text` for the keyboard); `python worker.py dev` registers against a
 LiveKit server. The VAD is loaded once per process in `prewarm`, inside the
 10 s budget, and handed to every job that process runs.
+
+`--record` (or `RECORD=1`) leaves the stereo OGG of the call on disk and its
+path in the session log's `session.end`.
 """
 
 import logging
@@ -11,6 +14,7 @@ import os
 
 from dotenv import load_dotenv
 from livekit.agents import AgentServer, JobContext, JobProcess, cli
+from livekit.agents.cli import AgentsConsole
 
 from core.providers import vad_for
 from core.router import resolve
@@ -37,7 +41,19 @@ async def entrypoint(ctx: JobContext) -> None:
     tc = await resolve(ctx)
     session = build_session(tc, vad=ctx.proc.userdata.get("vad"))
     ctx.add_shutdown_callback(_report_filer(ctx, session, tc))
-    await start_session(session, tc.project.entry_agent(tc), room=ctx.room)
+    await start_session(session, tc.project.entry_agent(tc), room=ctx.room, record=recording())
+
+
+def recording() -> bool:
+    """Whether this run keeps its audio: `console --record`, or `RECORD=1` anywhere else.
+
+    The console's own flag is the one a human types, and it already exists
+    upstream — it just does not reach `session.start`, which defaults to the
+    server's `job.enable_recording` and so is False on a laptop. `RECORD=1` is
+    the same switch for `dev` and for a job that has no console at all.
+    """
+    console = AgentsConsole.get_instance()
+    return bool(console.enabled and console.record) or os.getenv("RECORD") == "1"
 
 
 def _report_filer(ctx: JobContext, session, tc):

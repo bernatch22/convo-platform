@@ -104,14 +104,16 @@ def score(metric: Any, case: Any, note: str | None = None) -> float:
 
 
 def render(event: Event) -> str:
-    """The payload on one line: latencies as `ttft=…` pairs, everything else as compact JSON."""
+    """The payload on one line: timed words as `word@t`, latencies as `ttft=…`, rest as JSON."""
     payload = dict(event.payload)
+    words: list[dict[str, Any]] = payload.pop("words", None) or []
     metrics: dict[str, Any] = payload.pop("metrics", None) or {}
     parts = [
         f"{k.replace('llm_node_', '').replace('_latency', '')}={metrics[k]:.2f}s"
         for k in METRIC_KEYS
         if isinstance(metrics.get(k), (int, float))
     ]
+    parts.extend(f"{word['w']}@{word['t1']:.2f}" for word in words if "t1" in word)
     if payload:
         parts.append(json.dumps(payload, ensure_ascii=False, default=str))
     return " ".join(parts)

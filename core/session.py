@@ -15,6 +15,7 @@ from livekit.agents.voice.turn import EndpointingOptions, InterruptionOptions
 
 from core.context import TenantContext
 from core.observability.observers import observe
+from core.observability.voice import observe_voice
 from core.providers import llm_for, stt_for, tts_for, turn_detector_for
 
 log = logging.getLogger("platform.session")
@@ -48,6 +49,8 @@ def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
         max_tool_steps=4,
     )
     observe(session, tc)
+    if voice:
+        observe_voice(session, tc)
     return session
 
 
@@ -70,12 +73,20 @@ def text_turn_handling() -> TurnHandlingOptions:
     return TurnHandlingOptions(turn_detection=None)
 
 
-async def start_session(session: AgentSession[TenantContext], agent, room=None) -> None:
-    """Start the session; without STT/TTS switch audio off so text-only projects run anywhere."""
+async def start_session(
+    session: AgentSession[TenantContext], agent, room=None, record: bool = False
+) -> None:
+    """Start the session; without STT/TTS switch audio off so text-only projects run anywhere.
+
+    `record=True` asks the framework for the stereo OGG (caller on one channel,
+    agent on the other) that ms-6's offline evals score. It is passed
+    explicitly because the default is the SERVER's setting
+    (`job.enable_recording`), which a laptop console has no server to ask.
+    """
     if room is None:
-        await session.start(agent)  # headless (console text mode, tests)
+        await session.start(agent, record=record)  # headless (console, tests)
     else:
-        await session.start(agent, room=room)
+        await session.start(agent, room=room, record=record)
     if session.tts is None:
         session.output.set_audio_enabled(False)
         log.info(
