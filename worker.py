@@ -41,7 +41,13 @@ async def entrypoint(ctx: JobContext) -> None:
     tc = await resolve(ctx)
     session = build_session(tc, vad=ctx.proc.userdata.get("vad"))
     ctx.add_shutdown_callback(_report_filer(ctx, session, tc))
-    await start_session(session, tc.project.entry_agent(tc), room=ctx.room, record=recording())
+    await start_session(
+        session,
+        tc.project.entry_agent(tc),
+        room=ctx.room,
+        record=recording(),
+        channel=tc.channel,
+    )
 
 
 def recording() -> bool:
