@@ -51,7 +51,11 @@ async def test_the_first_stage_enters_with_nothing_to_inherit() -> None:
     await session.start(first)
     await session.aclose()
 
-    assert [item for item in first.chat_ctx.items if hasattr(item, "text_content")] == []
+    texts = [i.text_content or "" for i in first.chat_ctx.items if hasattr(i, "text_content")]
+    meaningful = [t for t in texts if t and t != "identify"]  # instructions render as an item too
+    assert len(meaningful) == 1 and meaningful[0].startswith(
+        "Hoy es martes 1 de septiembre de 2026"
+    )
 
 
 def test_hand_off_returns_the_next_stage_and_what_to_say() -> None:
