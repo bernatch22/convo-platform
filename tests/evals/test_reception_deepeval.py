@@ -1,33 +1,35 @@
 """DeepEval ring 1 for the reception prompt: does every reply keep the reception line?
 
-Run with `deepeval test run tests/evals` (needs ANTHROPIC_API_KEY). The judge is
-Claude Haiku; the HTML report lands under reports/deepeval/.
+One GEval over every golden of the project, judged against the behaviour the
+golden describes. The criterion, the judge and the threshold live in the
+project's own `evals/metrics.py`, so this file only decides which turn to run
+and what to judge — and the HTML report a reviewer opens scores the same runs
+by the same rules.
+
+The greeting golden judges the opening line the agent produces in `on_enter`,
+never a mid-conversation reply: the agent introduces itself once, and asking it
+to do so again is asking for a behaviour a real call should not have. Every
+other golden judges the WHOLE turn, filler included, because "un momento, le
+consulto la agenda" and the answer that follows are one thing to the caller.
+
+Run with `deepeval test run tests/evals` (needs ANTHROPIC_API_KEY).
 """
 
 import json
-import os
 import pathlib
 
 import pytest
 from deepeval import assert_test
-from deepeval.metrics import GEval
-from deepeval.models import AnthropicModel
-from deepeval.test_case import LLMTestCase, SingleTurnParams
 
-from core.testing import fake_context, run_conversation, text_of
+from core.testing import deepeval as bridge
+from core.testing import fake_context, run_conversation
 
 pytestmark = pytest.mark.evals
 
-GOLDENS = pathlib.Path("tenants/clinica-norte/projects/reagendamiento/evals/goldens.json")
-JUDGE_MODEL = os.getenv("DEEPEVAL_JUDGE_MODEL", "claude-haiku-4-5")
+TENANT, PROJECT = "clinica-norte", "reagendamiento"
+GOLDENS = pathlib.Path("tenants") / TENANT / "projects" / PROJECT / "evals" / "goldens.json"
 
-
-async def actual_output(tc, golden: dict) -> str:
-    """The text the golden judges: the opening line for `turn: greeting`, else the reply."""
-    if golden.get("turn") == "greeting":
-        return (await run_conversation(tc, [])).greeting
-    conversation = await run_conversation(tc, [golden["input"]])
-    return text_of(conversation.results[0])
+metrics = bridge.project_metrics(TENANT, PROJECT)
 
 
 def load_goldens() -> list[dict]:
@@ -35,33 +37,11 @@ def load_goldens() -> list[dict]:
     return json.loads(GOLDENS.read_text())
 
 
-def reception_line_metric() -> GEval:
-    """Does the reply sound like Clínica Norte's reception and stay within its remit?"""
-    return GEval(
-        name="Reception line",
-        criteria=(
-            "The reply is what a phone receptionist of Clínica Norte (Madrid) would say: "
-            "Spanish from Spain using 'usted', polite and warm, two or three short sentences, "
-            "ends with one question or a concrete next step, stays on appointments and clinic "
-            "information, never invents availability or clinical advice. Judge against the "
-            "expected behaviour given in the input context."
-        ),
-        evaluation_params=[
-            SingleTurnParams.INPUT,
-            SingleTurnParams.ACTUAL_OUTPUT,
-            SingleTurnParams.CONTEXT,
-        ],
-        model=AnthropicModel(model=JUDGE_MODEL),
-        threshold=0.7,
-    )
-
-
 @pytest.mark.parametrize("golden", load_goldens(), ids=lambda g: g["input"][:32])
 async def test_reception_keeps_its_line(golden: dict) -> None:
-    tc = fake_context("clinica-norte", "reagendamiento")
-    case = LLMTestCase(
-        input=golden["input"],
-        actual_output=await actual_output(tc, golden),
-        context=[f"Expected behaviour: {golden['expected_behaviour']}"],
-    )
-    assert_test(case, [reception_line_metric()])
+    tc = fake_context(TENANT, PROJECT)
+    inputs = [] if golden.get("turn") == bridge.GREETING_TURN else [golden["input"]]
+    conversation = await run_conversation(tc, inputs)
+    case = bridge.test_case_for(golden, conversation, bridge.tool_descriptions(tc))
+
+    assert_test(case, [metrics.reception_line()])
