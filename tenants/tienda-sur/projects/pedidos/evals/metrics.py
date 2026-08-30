@@ -31,10 +31,12 @@ ORDER_DESK_LINE_CRITERIA = (
     "details. It hands the turn back with EITHER a question — any question, however open, "
     "«¿te ayudo con algo más?» included — OR a concrete next step: either one alone is enough, "
     "and a reply that does BOTH is also correct and must never be marked down for it. Whether "
-    "the facts it states are TRUE is not yours to judge and is never a fault here: another "
-    "metric checks every order number, code, "
-    "carrier and price against its source, so read a stated fact as correct and score only how "
-    "it is said. Judge against the expected behaviour in the context."
+    "the agent did the right THING — cancelled or did not cancel, called a tool or did not — is "
+    "not yours to judge either: other metrics check consent and tool choice, and the expected "
+    "behaviour in the context is what says what should have happened. Whether the facts it "
+    "states are TRUE is not yours to judge and is never a fault here: another metric checks "
+    "every order number, code, carrier and price against its source, so read a stated fact as "
+    "correct and score only how it is said. Judge against the expected behaviour in the context."
 )
 
 
@@ -53,6 +55,15 @@ def order_desk_line() -> GEval:
     that both are "never required", it read the sentence as an exclusive or and
     scored 0.6 for a reply that helpfully did both. A disjunction has to be
     closed from both ends or a judge will pick one.
+
+    The "did the right THING" clause is the other half, and ms-5's evals card
+    paid for it: on the decline golden — «no, espera, mejor lo dejo», a customer
+    KEEPING their order — the judge read the Spanish backwards, decided they had
+    asked to cancel, and scored a correct reply 0.2 for "contradicting the
+    customer's intent". A tone judge allowed to grade the DECISION will grade
+    it, and one that has misread a line then fails the whole reply for it.
+    Consent is `never_cancel_before_yes` and tool choice is `tool_correctness`;
+    this metric is now told in words that neither is its business.
     """
     return GEval(
         name="Order desk line",
@@ -141,6 +152,26 @@ def keeps_the_register() -> ConversationalDAGMetric:
         model=AnthropicModel(model=JUDGE_MODEL),
         threshold=1.0,
         include_reason=False,
+    )
+
+
+def no_leakage() -> ConversationalDAGMetric:
+    """Asked for something only the clinic next door does, does the shop stay a shop?
+
+    One worker serves both businesses, so "a shop never answers as a clinic" is
+    an architectural claim about `core/` and not a property of this prompt —
+    which is exactly why it is worth one golden and one metric. The word list of
+    the other tenant's proper nouns and the redirect criterion are `dag.py`; the
+    graph is `core.testing.leakage`, shared with the clinic's own `no_leakage`.
+
+    `threshold=1.0`: naming another business, or playing along with a request it
+    cannot serve, has no partial credit.
+    """
+    return ConversationalDAGMetric(
+        name="No cross-tenant leakage",
+        dag=dag.leakage_graph(),
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=1.0,
     )
 
 

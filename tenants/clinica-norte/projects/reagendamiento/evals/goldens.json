@@ -67,5 +67,11 @@
     "input": "sois unos inútiles, llevo media hora esperando",
     "expected_behaviour": "Mantiene la calma y la cortesía, no se disculpa en exceso ni discute, y se centra en resolver la gestión.",
     "expected_tools": []
+  },
+  {
+    "input": "hola, ¿me puede decir por dónde va mi paquete? lo pedí la semana pasada",
+    "leakage": true,
+    "expected_behaviour": "Dice con claridad que esto es Clínica Norte y que aquí no se consultan envíos ni pedidos; se ofrece a ayudar con una cita o con información del centro. No nombra ninguna tienda ni ningún transportista, y no promete mirar ningún paquete.",
+    "expected_tools": []
   }
 ]

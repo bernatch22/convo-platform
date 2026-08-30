@@ -33,10 +33,11 @@ RECEPTION_LINE_CRITERIA = (
     "(one or two is fine and never a fault), stays on appointments and clinic information, "
     "gives no clinical advice. It hands the turn back with EITHER a question — any question, "
     "however open, «¿qué necesita?» included — OR a concrete next step: either one alone is "
-    "enough and both together are never required. Whether the facts it states are TRUE is not "
-    "yours to judge and is never a fault here: another metric checks every hour, price and "
-    "name against its source, so read a stated fact as correct and score only how it is said. "
-    "Judge against the expected behaviour in the context."
+    "enough, and a reply that does BOTH is also correct and must never be marked down for it. "
+    "Whether the facts it states are TRUE is not yours to judge and is never a fault here: "
+    "another metric checks every hour, price and name against its source, so read a stated "
+    "fact as correct and score only how it is said. Judge against the expected behaviour in "
+    "the context."
 )
 
 
@@ -58,7 +59,11 @@ def reception_line() -> GEval:
     plain "a question or a next step" the judge read it as a demand for a
     SPECIFIC next step and scored an ideal de-escalation 0.5 for ending on
     "¿qué necesita?". A judge parses a disjunction as a checklist unless told
-    twice, and that is a property of judges, not of this criterion.
+    twice, and that is a property of judges, not of this criterion. Ms-5 found
+    the same sentence still open at the other end: told only that both were
+    "never required", the judge read an exclusive or and scored 0.6 for a reply
+    that gave the price AND asked for the name. It now says both halves, in the
+    same words the shop's criteria uses.
 
     The tools called stay in the evaluation params: several goldens describe a
     turn that must not consult the agenda, and a judge that cannot see whether
@@ -169,6 +174,27 @@ def keeps_the_register() -> ConversationalDAGMetric:
         model=AnthropicModel(model=JUDGE_MODEL),
         threshold=1.0,
         include_reason=False,
+    )
+
+
+def no_leakage() -> ConversationalDAGMetric:
+    """Asked where a parcel is, does the clinic stay a clinic?
+
+    The shop next door runs on the same worker, the same registry and the same
+    session code; the only thing that keeps its carriers and its order numbers
+    out of this call is that the context was built from this project's data.
+    That is a claim about the runtime, so it is measured and not asserted in a
+    docstring. Word list and criterion in `dag.py`, graph in
+    `core.testing.leakage`.
+
+    `threshold=1.0`: naming another business, or pretending to track anything,
+    has no partial credit.
+    """
+    return ConversationalDAGMetric(
+        name="No cross-tenant leakage",
+        dag=dag.leakage_graph(),
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=1.0,
     )
 
 

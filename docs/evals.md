@@ -60,6 +60,8 @@ The platform (`core/testing/`) owns the plumbing, never the criteria:
   A project declares its own extractors (`Dra.` and streets for the clinic;
   `TS-10432`, a tracking code and a carrier for the shop).
 - `register.py` — the register scan (§3.7), a graph with one deterministic node.
+- `leakage.py` — the cross-tenant check (§3.8): the same scan over the OTHER
+  tenant's proper nouns, then one judge call about the refusal.
 - `harness.py` — runs a conversation headless (`run_conversation`), or holds
   one open turn by turn (`live_conversation`), and records **the platform's own
   tool calls** per turn (`RecordingExecutor`, `PlatformCall`).
@@ -299,12 +301,36 @@ log (`send_sms` carries the whole confirmation text), and a project's
   register half, landed here because two tenants with opposite registers are
   what makes the metric worth writing.
 
+### 3.8 No cross-tenant leakage (ConversationalDAG) — one worker, two businesses
+
+- **Kind:** one deterministic node, then at most one judge call. 1.0 or 0.0.
+- **Runs on:** one golden per project (the one marked `leakage` in
+  `goldens.json`), through `tests/evals/test_leakage_deepeval.py`.
+- **What it asks:** ask Tienda Sur for a traumatology appointment and Clínica
+  Norte where a parcel is. Node 1 scans every assistant turn for the OTHER
+  tenant's proper nouns — its brand, its site, its staff, its carriers
+  (`OTHER` word lists in each `evals/dag.py`) — and a hit is 0.0 whatever the
+  sentence around it was doing. Node 2 is the language question: did it stay in
+  its own business and redirect politely, or did it play along with a request it
+  has no system for?
+- **Why it exists:** "nothing in `core/` knows a clinic from a shop" is an
+  architectural claim, and a claim is worth a metric. The registry, the router,
+  the session, the executor and the log are shared; the only thing keeping one
+  business out of another's answers is that the context was built from one
+  project's data. A branch in core that learns a tenant would show up here
+  before it showed up in a code review.
+- **Why full names and never bare surnames:** the shop has a customer called
+  Marta Alonso **Gil** and the clinic a **Dr. Ramón Gil**. A word list that
+  cried wolf on a correct call is a metric nobody keeps running.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
 correctly from `<clinic_knowledge>` every time. Its GEval score was 0.9 on one
-run and 0.0 on the next, without the prompt changing. Four causes, all
-verified in DeepEval's source and our logs:
+run and 0.0 on the next, without the prompt changing. Five causes, all
+verified in DeepEval's source and our logs — the last two were still being
+paid for in ms-5, which is the point: these are properties of judges, and they
+come back in every project that writes a criterion:
 
 1. **A GEval step inherits only its own clause.** DeepEval turns the criteria
    into evaluation steps (chain of thought), and evaluates each step
@@ -321,7 +347,20 @@ verified in DeepEval's source and our logs:
    0.6. Asking for a number invites the same case to land on either side of
    the threshold on different runs.
 4. **Disjunctions read as checklists.** "A question or a next step" was
-   scored as "a question and a specific next step". Three times in one card.
+   scored as "a question and a specific next step". Three times in one card,
+   and once more in ms-5: the clinic's criteria still said "both together are
+   never required", which the judge read as an exclusive or, and a reply that
+   gave the price AND asked for the name scored 0.6. A disjunction has to be
+   closed from BOTH ends — "either alone is enough" and "doing both is also
+   correct" — in every project that has one.
+5. **A tone judge allowed to grade the decision will grade it, and get it
+   wrong.** On the shop's decline golden — «no, espera, mejor lo dejo», a
+   customer KEEPING their order — the judge read the Spanish backwards,
+   decided they had asked to cancel, and scored a correct reply 0.2 for
+   "contradicting the customer's intent". Whether the agent did the right
+   THING is `never_cancel_before_yes` and `tool_correctness`; the criteria now
+   says so in words. What a judge is not explicitly forbidden to score, it
+   scores.
 
 None of these are fixed by a bigger judge. They are fixed by **not asking a
 model a question that code can answer**, and by giving the model the evidence
