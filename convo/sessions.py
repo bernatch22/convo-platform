@@ -31,9 +31,9 @@ def list_sessions(store: Store) -> int:
     for row in store.sessions():
         started = time.strftime("%Y-%m-%d %H:%M", time.localtime(row.started_at))
         who = f"{row.tenant}/{row.project}"
-        print(
-            f"{row.id:<26} {who:<32} {row.channel:<7} {started:<16} {row.outcome or '-':<10} {row.event_count}"
-        )
+        outcome = row.outcome or "-"
+        line = f"{row.id:<26} {who:<32} {row.channel:<7} {started:<16} {outcome:<10}"
+        print(f"{line} {row.event_count}")
     return 0
 
 

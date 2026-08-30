@@ -112,7 +112,7 @@ class MemoryStore:
 
 
 class SQLiteStore:
-    """The laptop's and the dev box's store: one file, durable per append, append-only by trigger."""
+    """The laptop's and dev box's store: one file, durable per append, append-only by trigger."""
 
     def __init__(self, path: str | os.PathLike[str] | None = None) -> None:
         self.path = Path(path or os.getenv(DB_ENV, DEFAULT_DB))
