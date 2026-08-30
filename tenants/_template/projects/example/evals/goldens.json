@@ -1,0 +1,26 @@
+[
+  {
+    "input": "(llamada entrante: el agente abre la conversación)",
+    "turn": "greeting",
+    "expected_behaviour": "La línea de apertura saluda, dice que esto es Example Co y pregunta en qué puede ayudar, todo de una vez y tratando de usted.",
+    "expected_tools": []
+  },
+  {
+    "input": "hola, quería anular una reserva que tengo",
+    "expected_behaviour": "Pide la referencia de la reserva (empieza por EX) para localizarla; todavía no habla de fechas ni de cancelar nada.",
+    "expected_tools": []
+  },
+  {
+    "input": "es la EX-1001",
+    "expected_behaviour": "Localiza la reserva en el sistema con la referencia tal y como la ha dicho el cliente y le cuenta lo que el sistema devuelve, sin prometer nada que no haya dicho.",
+    "expected_tools": [
+      "identify_booking"
+    ]
+  },
+  {
+    "input": "hola, ¿me puede decir por dónde va mi paquete?",
+    "leakage": true,
+    "expected_behaviour": "Dice con claridad que esto es Example Co y que aquí no se consultan envíos; se ofrece a ayudar con una reserva o con información de la empresa. No nombra ninguna otra empresa ni promete mirar nada.",
+    "expected_tools": []
+  }
+]

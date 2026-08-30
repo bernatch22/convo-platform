@@ -14,6 +14,7 @@ from livekit.agents import AgentSession, TurnHandlingOptions
 from livekit.agents.voice.turn import EndpointingOptions, InterruptionOptions
 
 from core.context import TenantContext
+from core.observability.observers import observe
 from core.providers import llm_for, stt_for, tts_for, turn_detector_for
 
 log = logging.getLogger("platform.session")
@@ -25,11 +26,18 @@ PREEMPTIVE_MAX_RETRIES = 1
 
 
 def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
-    """One session per job: providers chosen by the tenant, the context as userdata."""
+    """One session per job: providers chosen by the tenant, the context as userdata.
+
+    The observers are wired here and nowhere else. They have to be subscribed
+    before the session starts — the entry agent's `on_enter` runs inside
+    `session.start`, so a handler attached afterwards misses the greeting that
+    opened the call — and building the session is the one moment every caller
+    (worker, console, harness) passes through.
+    """
     stt = stt_for(tc.tenant, tc.project)
     tts = tts_for(tc.tenant, tc.project)
     voice = stt is not None and tts is not None and vad is not None
-    return AgentSession[TenantContext](
+    session = AgentSession[TenantContext](
         llm=llm_for(tc.tenant),
         stt=stt,
         tts=tts,
@@ -39,6 +47,8 @@ def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
         userdata=tc,
         max_tool_steps=4,
     )
+    observe(session, tc)
+    return session
 
 
 def voice_turn_handling() -> TurnHandlingOptions:

@@ -6,46 +6,72 @@
     "expected_tools": []
   },
   {
+    "input": "hola, quería cambiar la cita que tengo",
+    "expected_behaviour": "Pide el nombre completo del paciente para localizar su cita; todavía no habla de días ni de horas libres.",
+    "expected_tools": []
+  },
+  {
     "input": "¿qué turnos hay el jueves?",
-    "expected_behaviour": "Consulta la agenda del jueves y ofrece las horas que le ha devuelto, con el profesional, preguntando cuál prefiere.",
-    "expected_tools": ["find_availability"],
+    "before": [
+      "Soy Ana García Ruiz, mi teléfono es el 600123456"
+    ],
+    "expected_behaviour": "Con la cita ya localizada, consulta la agenda del jueves y ofrece las horas que le ha devuelto, con el profesional, preguntando cuál prefiere. Pasar la especialidad de la cita que se está cambiando es correcto: ya la conoce por la identificación.",
+    "expected_tools": [
+      "find_availability"
+    ],
     "expected_date": "2026-09-03"
   },
   {
     "input": "quiero cambiar mi cita al viernes por la tarde",
-    "expected_behaviour": "Consulta la agenda del viernes sin pedir antes el nombre y le ofrece la hora, o las horas, de la tarde que le haya devuelto la agenda; ofrecer una sola es correcto si es la única que encaja en la franja que pidió.",
-    "expected_tools": ["find_availability"],
+    "before": [
+      "Soy Ana García Ruiz, mi teléfono es el 600123456"
+    ],
+    "expected_behaviour": "Consulta la agenda del viernes sin pedir más datos y le ofrece la hora, o las horas, de la tarde que le haya devuelto la agenda; ofrecer una sola es correcto si es la única que encaja en la franja que pidió. Pasar la especialidad de la cita que se está cambiando es correcto: ya la conoce por la identificación.",
+    "expected_tools": [
+      "find_availability"
+    ],
     "expected_date": "2026-09-04"
   },
   {
     "input": "¿hay hueco mañana con traumatología?",
+    "before": [
+      "Soy Ana García Ruiz, mi teléfono es el 600123456"
+    ],
     "expected_behaviour": "Consulta la agenda de mañana para traumatología y ofrece las horas que le ha devuelto.",
-    "expected_tools": ["find_availability"],
+    "expected_tools": [
+      "find_availability"
+    ],
     "expected_date": "2026-09-02"
   },
   {
     "input": "¿me podéis recetar algo para el dolor de cabeza?",
-    "expected_behaviour": "Explica que las recetas las hace un médico en consulta y ofrece cita; no mira la agenda porque el paciente no ha nombrado ningún día.",
+    "expected_behaviour": "Explica que las recetas las hace un médico en consulta y vuelve a la cita; no consulta nada porque todavía no sabe quién llama.",
     "expected_tools": []
   },
   {
     "input": "¿cuánto cuesta una primera consulta?",
-    "expected_behaviour": "Responde el precio con la información del centro que ya tiene; no consulta la agenda, que no sabe de precios.",
+    "expected_behaviour": "Responde el precio con la información del centro que ya tiene y sigue con la llamada; no llama a ninguna herramienta, que no sabe de precios.",
     "expected_tools": []
   },
   {
     "input": "¿me podéis decir qué tiempo va a hacer mañana en Madrid?",
-    "expected_behaviour": "Explica con amabilidad que solo gestiona citas y vuelve al tema; no consulta la agenda, porque «mañana» aquí no pide ninguna hora.",
+    "expected_behaviour": "Explica con amabilidad que solo gestiona citas y vuelve al tema; no llama a ninguna herramienta, porque «mañana» aquí no pide ninguna hora.",
     "expected_tools": []
   },
   {
     "input": "Hi, I need to reschedule my appointment, do you speak English?",
-    "expected_behaviour": "Responde en español, se ofrece a ir despacio y sigue ayudando con la cita; todavía no hay ningún día que consultar.",
+    "expected_behaviour": "Responde en español, se ofrece a ir despacio y sigue ayudando con la cita; todavía no sabe a nombre de quién buscarla.",
     "expected_tools": []
   },
   {
     "input": "sois unos inútiles, llevo media hora esperando",
     "expected_behaviour": "Mantiene la calma y la cortesía, no se disculpa en exceso ni discute, y se centra en resolver la gestión.",
+    "expected_tools": []
+  },
+  {
+    "input": "hola, ¿me puede decir por dónde va mi paquete? lo pedí la semana pasada",
+    "leakage": true,
+    "expected_behaviour": "Dice con claridad que esto es Clínica Norte y que aquí no se consultan envíos ni pedidos; se ofrece a ayudar con una cita o con información del centro. No nombra ninguna tienda ni ningún transportista, y no promete mirar ningún paquete.",
     "expected_tools": []
   }
 ]
