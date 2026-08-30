@@ -14,12 +14,13 @@ voice. Both are audit and turn-taking, not business, so no stage overrides them.
 import logging
 from collections.abc import AsyncGenerator, AsyncIterable
 
-from livekit.agents import Agent, StopResponse
-from livekit.agents.llm import ChatContext, ChatMessage
+from livekit.agents import Agent, RunContext, StopResponse
+from livekit.agents.llm import ChatContext, ChatMessage, function_tool
 from livekit.agents.voice.agent import ModelSettings
 
 from core.barge_in import backchannels_of, holds_the_floor, is_backchannel
 from core.context import TenantContext
+from core.dates_note import date_note
 from core.observability.voice import TimedWords
 from core.state.log import record
 
@@ -37,6 +38,7 @@ class TenantAgent(Agent):
 
     async def on_enter(self) -> None:
         """Inherit the previous stage's summary, announce the stage, let the model open the turn."""
+        await self._note_the_date()
         await self._inherit_summary()
         log.info("stage.enter %s agent=%s", self.tc.label(), self.stage_name())
         record(self.tc, "stage.enter", {"stage": self.stage_name()})
@@ -83,6 +85,18 @@ class TenantAgent(Agent):
         record(self.tc, "turn.backchannel", {"text": text})
         raise StopResponse()
 
+    @function_tool
+    async def fecha_y_hora_actual(self, ctx: RunContext) -> str:
+        """Consulta la fecha y la hora actuales, exactas, en este momento.
+
+        Llámala siempre que el interlocutor pregunte qué día es, qué hora es, o
+        cuando necesites la hora presente para responder. No calcules ni
+        recuerdes la hora tú: cambia durante la llamada y esta herramienta la
+        lee del reloj cada vez.
+        """
+        tc = self.tc
+        return date_note(tc.today, tc.now())
+
     def summary(self) -> str:
         """One prose line the next stage reads about what happened here; stages override it."""
         return f"Etapa anterior: {self.stage_name()}."
@@ -116,6 +130,20 @@ class TenantAgent(Agent):
     def stage_name(self) -> str:
         """The stage as it appears in logs and, from ms-4, in the event log."""
         return type(self).__name__
+
+    async def _note_the_date(self) -> None:
+        """Once per session, tell the model what day it is — in the messages, cache-safe.
+
+        The system prompt cannot carry the date (the cached prefix must stay
+        byte-identical), and a model with no calendar invents one when asked
+        "¿hoy qué día es?" — it said "viernes" on a Saturday, on a real call.
+        """
+        if self.tc.date_noted:
+            return
+        self.tc.date_noted = True
+        chat_ctx: ChatContext = self.chat_ctx.copy()
+        chat_ctx.add_message(role=SUMMARY_ROLE, content=date_note(self.tc.today))
+        await self.update_chat_ctx(chat_ctx)
 
     async def _inherit_summary(self) -> None:
         previous = self.tc.prev_agent
