@@ -109,9 +109,7 @@ async def start_session(
     if room is None:
         await session.start(agent, record=record)  # headless (console, tests)
     else:
-        await session.start(
-            agent, room=room, room_options=channel_options(channel), record=record
-        )
+        await session.start(agent, room=room, room_options=channel_options(channel), record=record)
     if session.tts is None:
         session.output.set_audio_enabled(False)
         log.info(

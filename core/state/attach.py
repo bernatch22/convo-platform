@@ -14,9 +14,7 @@ from core.state.log import EventLog
 from core.state.store import SessionRow, Store
 
 
-def attach_log(
-    tc: TenantContext, store: Store, sip: dict[str, str] | None = None
-) -> TenantContext:
+def attach_log(tc: TenantContext, store: Store, sip: dict[str, str] | None = None) -> TenantContext:
     """Open the session in the store, hang an EventLog on the context, write `session.start`.
 
     `sip` is the caller's `sip.*` attributes when the session came in over the
