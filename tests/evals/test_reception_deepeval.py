@@ -1,10 +1,21 @@
-"""DeepEval ring 1 for the reception prompt: does every reply keep the reception line?
+"""DeepEval ring 1 for the reception prompt: does every reply keep the line, and hold up?
 
-One GEval over every golden of the project, judged against the behaviour the
-golden describes. The criterion, the judge and the threshold live in the
-project's own `evals/metrics.py`, so this file only decides which turn to run
-and what to judge — and the HTML report a reviewer opens scores the same runs
-by the same rules.
+Two metrics over every golden of the project, from one conversation, because a
+headless turn against real Haiku is the expensive part:
+
+- `grounded_facts_dag`, first, because it is deterministic and free in the
+  normal case: code pulls every hour, price, name, phone and address out of
+  what the agent said and matches it against the clinic's sheet, what the
+  caller said and what the tools returned. A judge is paid only for what is
+  left over, and only ever sees that claim next to the evidence.
+- `reception_line`, the GEval, on tone, register, length and remit. It used to
+  own the invention rule as well and flipped the price golden between 0.0 and
+  0.9 across runs; the rule moved to the DAG and the criterion lost the clause.
+
+The criteria, the judge and the thresholds live in the project's own
+`evals/metrics.py`, so this file only decides which turn to run and what to
+judge — and the HTML report a reviewer opens scores the same runs by the same
+rules.
 
 The greeting golden judges the opening line the agent produces in `on_enter`,
 never a mid-conversation reply: the agent introduces itself once, and asking it
@@ -41,6 +52,11 @@ def load_goldens() -> list[dict]:
 async def test_reception_keeps_its_line(golden: dict) -> None:
     tc = fake_context(TENANT, PROJECT)
     conversation = await run_conversation(tc, bridge.inputs_for(golden))
-    case = bridge.test_case_for(golden, conversation, bridge.tool_descriptions(tc))
+    descriptions = bridge.tool_descriptions(tc)
 
-    assert_test(case, [metrics.reception_line()])
+    grounded = bridge.conversational_test_case_for(
+        conversation, descriptions, scenario=golden["expected_behaviour"], name=golden["input"]
+    )
+    assert_test(grounded, [metrics.grounded_facts_dag()])
+    line = bridge.test_case_for(golden, conversation, descriptions)
+    assert_test(line, [metrics.reception_line()])

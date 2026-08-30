@@ -31,15 +31,21 @@ from collections.abc import Mapping
 from types import ModuleType
 from typing import Any
 
-from deepeval.test_case import LLMTestCase, ToolCall
+from deepeval.test_case import ConversationalTestCase, LLMTestCase, ToolCall, Turn
 from livekit.agents.llm import tool_context
 from livekit.agents.llm import utils as llm_utils
 from livekit.agents.voice.run_result import RunResult
 
 from core.context import TenantContext
-from core.testing.harness import Conversation, text_of
+from core.testing.harness import Conversation, Exchange, PlatformCall, text_of
 
 GREETING_TURN = "greeting"
+
+PLATFORM_TOOL = (
+    "Run by the platform itself against the customer's own systems — this is the call their "
+    "booking system actually received, not a tool the model chose to call."
+)
+REFUSED = "refused: the customer's system rejected it and nothing was written"
 
 
 def tool_descriptions(tc: TenantContext) -> dict[str, str]:
@@ -151,15 +157,92 @@ def test_case_for(
     )
 
 
+def turn_tool_calls(
+    exchange: Exchange, descriptions: Mapping[str, str] | None = None
+) -> list[ToolCall]:
+    """Everything one turn called: the model's own tools, then the platform's writes.
+
+    Both, and in that order, because they answer different questions. The
+    model's calls say what it decided to do; the platform's say what the
+    customer's systems were actually told. A metric about consent reads the
+    second — `book_appointment` is the model asking for a yes, `book_slot` is
+    the appointment moving — and the names are kept as they are so a criterion
+    can name one without hitting the other.
+    """
+    return [
+        *tool_calls_of(exchange.result, descriptions),
+        *(_platform_call(call) for call in exchange.platform_calls),
+    ]
+
+
+def conversational_test_case_for(
+    conversation: Conversation,
+    descriptions: Mapping[str, str] | None = None,
+    *,
+    scenario: str | None = None,
+    expected_outcome: str | None = None,
+    name: str | None = None,
+) -> ConversationalTestCase:
+    """A whole headless run as the multi-turn case a ConversationalDAGMetric reads.
+
+    One `Turn` per side of each exchange, in the order they were spoken, with
+    the assistant's turns carrying what that turn called. The opening line goes
+    in first as an assistant turn of its own: it happens in `on_enter`, before
+    anybody has said anything, and a transcript that starts with the caller
+    talking into silence is not the call that took place.
+
+    `scenario` and `expected_outcome` travel from the golden that drove the
+    conversation, so the report a reviewer opens says what this call was
+    supposed to be, not just what was said.
+    """
+    turns: list[Turn] = []
+    if conversation.greeting:
+        turns.append(Turn(role="assistant", content=conversation.greeting))
+    for exchange in conversation.exchanges:
+        turns.append(Turn(role="user", content=exchange.input))
+        turns.append(
+            Turn(
+                role="assistant",
+                content=text_of(exchange.result),
+                tools_called=turn_tool_calls(exchange, descriptions),
+            )
+        )
+    return ConversationalTestCase(
+        turns=turns,
+        scenario=scenario,
+        expected_outcome=expected_outcome,
+        name=name,
+    )
+
+
+def project_evals(tenant_id: str, project_id: str, module: str) -> ModuleType:
+    """One module of a project's `evals/` package, imported by name.
+
+    Imported the way `core.registry` imports a tenant — by name, at call time —
+    so core still compiles with no customer folder on disk, and a tenant
+    directory name with a hyphen in it is still reachable.
+    """
+    return importlib.import_module(f"tenants.{tenant_id}.projects.{project_id}.evals.{module}")
+
+
 def project_metrics(tenant_id: str, project_id: str) -> ModuleType:
     """The `evals/metrics.py` a project declares, imported by name.
 
     Metrics are project data, like prompts and goldens: what "a good reply"
     means for a clinic's reception is not what it means for a shop's returns
-    desk. Imported the way `core.registry` imports a tenant — by name, at call
-    time — so core still compiles with no customer folder on disk.
+    desk.
     """
-    return importlib.import_module(f"tenants.{tenant_id}.projects.{project_id}.evals.metrics")
+    return project_evals(tenant_id, project_id, "metrics")
+
+
+def _platform_call(call: PlatformCall) -> ToolCall:
+    """One platform write as a ToolCall a judge can read, refusals included."""
+    return ToolCall(
+        name=call.name,
+        description=PLATFORM_TOOL,
+        input_parameters=call.args,
+        output=str(call.result) if call.ok else REFUSED,
+    )
 
 
 def _stages(tc: TenantContext) -> list[Any]:
