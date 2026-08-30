@@ -96,10 +96,11 @@ def session_meta(ctx: Any, store: Store, sip: dict[str, str] | None = None) -> S
         if route is None:
             raise UnroutableTenant(f"no route for {number!r} on this fleet")
         return SessionMeta(tenant=route.tenant, project=route.project, channel=route.channel)
+    # a console with a microphone IS a voice session: the env fallback is voice
     return SessionMeta(
         tenant=os.getenv(TENANT_ENV, DEFAULT_TENANT),
         project=os.getenv("PROJECT", DEFAULT_PROJECT),
-        channel="chat",
+        channel="voice",
     )
 
 
