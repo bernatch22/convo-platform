@@ -29,6 +29,7 @@ from core.context import TenantContext
 from core.contracts import SessionMeta
 from core.registry import load_registry
 from core.sip import caller_attributes, dialled_number
+from core.state import overrides
 from core.state.attach import attach_log
 from core.state.store import SQLiteStore, Store
 from core.tools.executor import attach_local_tools
@@ -62,6 +63,7 @@ async def resolve(ctx: Any, store: Store | None = None) -> TenantContext:
     project = tenant.projects.get(meta.project)
     if project is None:
         raise UnroutableTenant(f"tenant {meta.tenant!r} has no project {meta.project!r}")
+    project = overrides.apply(tenant.id, project, store)
     pinned = store.pinned_version(tenant.id, project.id)
     tc = TenantContext(
         tenant=tenant,

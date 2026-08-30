@@ -33,6 +33,22 @@ class Route:
 
 
 @dataclass(frozen=True)
+class PipelineOverride:
+    """One field of a project's pipeline set from the console instead of from git.
+
+    Voice, TTS model and greeting are the three a supervisor changes between
+    calls; the row is what makes the change survive without a deploy. The read
+    is one row per field, so the console can show when each was last touched.
+    """
+
+    tenant: str
+    project: str
+    field: str
+    value: str
+    updated_at: float = 0.0
+
+
+@dataclass(frozen=True)
 class ProjectVersion:
     """A pinned prompt version: git is the seed, this row is the override the box serves."""
 
@@ -44,7 +60,7 @@ class ProjectVersion:
 
 
 class Store(Protocol):
-    """Sessions and their events, plus the two small tables the router reads."""
+    """Sessions and their events, plus the three small tables the router reads."""
 
     def open_session(self, row: SessionRow) -> None:
         """Register a session before its first event."""
@@ -92,4 +108,12 @@ class Store(Protocol):
 
     def versions(self) -> list[ProjectVersion]:
         """Every pinned version, sorted by tenant and project."""
+        ...
+
+    def pipeline_overrides(self, tenant: str, project: str) -> list[PipelineOverride]:
+        """The console's overrides for one project, one row per field, sorted by field."""
+        ...
+
+    def set_pipeline_override(self, override: PipelineOverride) -> None:
+        """Set (or replace) one overridden field of a project's pipeline."""
         ...

@@ -3,8 +3,9 @@
 Built to survive the one failure that matters for an audit log: the process
 dying mid-call. WAL journaling with `synchronous=FULL` makes every `append`
 durable when it returns, and two triggers refuse UPDATE and DELETE on
-`events`. `routes` and `project_versions` are the two small tables the router
-reads before a session starts. Postgres later is this same interface over a
+`events`. ``routes`, `project_versions` and
+`pipeline_overrides` are the three small tables the router reads before a
+session starts. Postgres later is this same interface over a
 pool in `api.py`; the job process never opens a database of its own in
 production, but on a laptop the file is the control plane.
 """
@@ -17,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from core.state.events import Event
-from core.state.store.protocol import ProjectVersion, Route, SessionRow
+from core.state.store.protocol import PipelineOverride, ProjectVersion, Route, SessionRow
 
 DEFAULT_DB = "tmp/convo.db"
 DB_ENV = "CONVO_DB"
@@ -42,6 +43,10 @@ CREATE TABLE IF NOT EXISTS routes (
 CREATE TABLE IF NOT EXISTS project_versions (
   tenant TEXT NOT NULL, project TEXT NOT NULL, version TEXT NOT NULL,
   knowledge_override TEXT, created_at REAL NOT NULL, PRIMARY KEY (tenant, project)
+);
+CREATE TABLE IF NOT EXISTS pipeline_overrides (
+  tenant TEXT NOT NULL, project TEXT NOT NULL, field TEXT NOT NULL, value TEXT NOT NULL,
+  updated_at REAL NOT NULL, PRIMARY KEY (tenant, project, field)
 );
 """
 
@@ -150,6 +155,27 @@ class SQLiteStore:
             "FROM project_versions ORDER BY tenant, project"
         )
         return [ProjectVersion(*row) for row in cursor]
+
+    def pipeline_overrides(self, tenant: str, project: str) -> list[PipelineOverride]:
+        cursor = self.db.execute(
+            "SELECT tenant, project, field, value, updated_at FROM pipeline_overrides "
+            "WHERE tenant=? AND project=? ORDER BY field",
+            (tenant, project),
+        )
+        return [PipelineOverride(*row) for row in cursor]
+
+    def set_pipeline_override(self, override: PipelineOverride) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO pipeline_overrides "
+            "(tenant, project, field, value, updated_at) VALUES (?,?,?,?,?)",
+            (
+                override.tenant,
+                override.project,
+                override.field,
+                override.value,
+                override.updated_at or time.time(),
+            ),
+        )
 
 
 def _dumps(payload: Any) -> str:
