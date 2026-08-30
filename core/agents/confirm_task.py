@@ -20,6 +20,7 @@ from livekit.agents import RunContext, function_tool
 from livekit.agents.voice import AgentTask
 
 from core import confirm
+from core.state.log import record
 
 log = logging.getLogger("platform.confirm")
 
@@ -55,6 +56,9 @@ class ConfirmTask(AgentTask[bool]):
     async def on_enter(self) -> None:
         """Ask the question as soon as the task takes over."""
         log.info("confirm.ask %s tool=%s", self.tc.label(), self.tool)
+        # The audience digest, never the arguments: it names the exact call the
+        # caller is being asked about without putting a phone number in the log.
+        record(self.tc, "confirm.request", self._audit(question=self.question))
         self.session.generate_reply()
 
     @function_tool
@@ -62,10 +66,16 @@ class ConfirmTask(AgentTask[bool]):
         """La persona ha dicho que sí, claramente, a la pregunta que le has hecho."""
         confirm.mint(self.tc, self.tool, self.args)
         log.info("confirm.yes %s tool=%s", self.tc.label(), self.tool)
+        record(self.tc, "confirm.granted", self._audit())
         self.complete(True)
 
     @function_tool
     async def decline(self, ctx: RunContext) -> None:
         """La persona no ha dicho que sí: ha dicho que no, duda, o quiere otra cosa."""
         log.info("confirm.no %s tool=%s", self.tc.label(), self.tool)
+        record(self.tc, "confirm.declined", self._audit())
         self.complete(False)
+
+    def _audit(self, **extra: Any) -> dict[str, Any]:
+        """What every confirm event says: which call, by tool and audience digest."""
+        return {"tool": self.tool, "audience": confirm.audience(self.tool, self.args), **extra}

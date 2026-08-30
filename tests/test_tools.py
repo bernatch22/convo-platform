@@ -193,10 +193,10 @@ async def test_a_call_leaves_call_and_result_events_with_pii_masked() -> None:
     from core.state.store import MemoryStore
 
     tc = attach_log(context(FakeAdapter()), MemoryStore())
+    args = {"phone": "600123456"}
+    confirm.mint(tc, "cancel_appointment", args)  # irreversible: the guard needs a real yes
 
-    await tc.tools.call(
-        "cancel_appointment", {"phone": "600123456", "confirmation_token": "ct-abc123"}
-    )
+    await tc.tools.call("cancel_appointment", args)
 
     kinds = [k for k, _ in logged(tc)]
     assert kinds == ["session.start", "tool.call", "tool.result"]
