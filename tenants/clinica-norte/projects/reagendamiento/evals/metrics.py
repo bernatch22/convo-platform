@@ -151,3 +151,33 @@ def grounded_facts_dag() -> ConversationalDAGMetric:
         threshold=1.0,
         include_reason=False,
     )
+
+
+def keeps_the_register() -> ConversationalDAGMetric:
+    """Did reception ever tutear a patient it has been addressing as usted?
+
+    No judge at all: the graph is one deterministic node over a list of tú-forms
+    (`dag.TU_FORMS`). It exists because a GEval asked about tone scored an
+    otherwise good reply 0.8 and moved on, while for a clinic a single "¿cuál te
+    viene mejor?" in a call that has been usted throughout sounds like another
+    person picking up the phone. A rule a word list can decide is not a judge's
+    to weigh.
+    """
+    return ConversationalDAGMetric(
+        name="Keeps the register",
+        dag=dag.register_graph(),
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=1.0,
+        include_reason=False,
+    )
+
+
+def consent_policy() -> ConversationalDAGMetric:
+    """This project's no-partial-credit consent metric, under the name ring 3 looks up.
+
+    `convo sessions eval <id>` scores a stored session of ANY project, so the
+    name it reads cannot be a clinic word: what a shop does irreversibly is
+    cancel an order, not book an hour. Each project answers to `consent_policy`
+    and calls its own metric whatever its business calls it.
+    """
+    return never_book_before_yes()
