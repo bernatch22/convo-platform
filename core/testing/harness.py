@@ -17,6 +17,8 @@ from livekit.agents.voice.run_result import ChatMessageAssert, RunResult
 from core.context import TenantContext
 from core.registry import load_registry
 from core.session import build_session
+from core.state.attach import attach_log
+from core.state.store import MemoryStore
 from core.tools.executor import attach_local_tools
 
 GREETING_WAIT_S = 6.0
@@ -46,7 +48,7 @@ def fake_context(
         project_version="git:test",
         today=today,
     )
-    return attach_local_tools(tc)
+    return attach_log(attach_local_tools(tc), MemoryStore())
 
 
 @dataclass

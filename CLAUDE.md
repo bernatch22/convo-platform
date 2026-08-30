@@ -96,7 +96,7 @@ uv sync                                  # deps
 python worker.py console                 # talk to the agent in the terminal (key toggles text/mic), --record saves OGG
 python worker.py console --tenant tienda-sur
 python worker.py dev                     # against a LiveKit server (LIVEKIT_URL/API_KEY/API_SECRET)
-python -m platform sessions show <id>    # read a session's event log
+python -m convo sessions list|show <id>  # read a session's event log (not `platform`: it shadows the stdlib module)
 pytest -m unit                           # ring 1 (fast)
 deepeval test run tests/evals -n 4       # ring 1 metrics; tenants/*/evals for per-project goldens
 docker compose -f infra/compose/dev.yml up   # livekit-server --dev + redis (ms-8+)
