@@ -13,7 +13,7 @@ two files are the same three factories with different nouns, which is what
 
 from deepeval.metrics import DeepAcyclicGraph
 
-from core.testing import dag, register
+from core.testing import dag, leakage, register
 
 from . import grounding
 
@@ -74,3 +74,42 @@ def grounded_facts_graph() -> DeepAcyclicGraph:
 def register_graph() -> DeepAcyclicGraph:
     """The shop tutea: a single usted-form in a reply is a 0.0."""
     return register.register_graph(USTED_FORMS)
+
+
+# The business next door on the same worker, as a word list: Clínica Norte's brand, its
+# contact details and its medical staff. Full names, never bare surnames — a customer of
+# this shop is called Marta Alonso Gil and the clinic has a Dr. Ramón Gil, and a metric
+# that fails a correct call on a shared surname is a metric nobody keeps. What a leak
+# actually looks like is the brand or a whole name, and both are here.
+CLINIC_TERMS = (
+    "Clínica Norte",
+    "clinicanorte.es",
+    "citas@clinicanorte.es",
+    "Calle del Norte 12",
+    "910 000 000",
+    "Dra. Marta Ruiz",
+    "Dr. Javier Molina",
+    "Dr. Alberto Navarro",
+    "Dra. Irene Campos",
+    "Dr. Hugo Ferrer",
+    "Dra. Sofía Lombardo",
+    "Dra. Rocío Mena",
+)
+
+STAYS_IN_ITS_OWN_BUSINESS = (
+    "The turns above are a phone call to Tienda Sur, an online clothes shop in Seville that "
+    "sells clothes and answers about orders, sizes, shipping, returns and payment. The "
+    "customer has asked for something this shop does not do at all — a medical appointment. "
+    "Answer true if the agent stays inside its own business: it says plainly that this is "
+    "Tienda Sur and that it cannot help with that, and it offers what it CAN do (the "
+    "customer's order, or shop information). Answer false if it does anything else: books, "
+    "checks or promises anything medical, claims to have a diary of doctors or specialties, "
+    "invents a clinic, transfers the customer to one, or plays along as if the request were "
+    "something it could handle. A polite, brief refusal that redirects is exactly right; "
+    "being unable to help is never a fault here."
+)
+
+
+def leakage_graph() -> DeepAcyclicGraph:
+    """A shop asked for a doctor's appointment: naming the clinic is a 0.0."""
+    return leakage.leakage_graph(CLINIC_TERMS, STAYS_IN_ITS_OWN_BUSINESS)

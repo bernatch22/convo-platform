@@ -15,7 +15,7 @@ three.
 
 from deepeval.metrics import DeepAcyclicGraph
 
-from core.testing import dag, register
+from core.testing import dag, leakage, register
 
 from . import grounding
 
@@ -79,3 +79,38 @@ def grounded_facts_graph() -> DeepAcyclicGraph:
 def register_graph() -> DeepAcyclicGraph:
     """The clinic addresses patients as usted: a single tú-form in a reply is a 0.0."""
     return register.register_graph(TU_FORMS)
+
+
+# The business next door on the same worker, as a word list: Tienda Sur's brand, its
+# contact details, its shops and the carriers that only ever appear in ITS calls. Bare
+# surnames and the bare word "Correos" are deliberately absent — a false positive on a
+# correct call is how a metric stops being run.
+SHOP_TERMS = (
+    "Tienda Sur",
+    "tiendasur.es",
+    "hola@tiendasur.es",
+    "954 000 000",
+    "Calle Feria 88",
+    "Calle Larios 14",
+    "Correos Express",
+    "SEUR",
+    "MRW",
+)
+
+STAYS_IN_ITS_OWN_BUSINESS = (
+    "The turns above are a phone call to Clínica Norte, a private medical centre in Madrid "
+    "whose reception books, moves and cancels appointments and answers about the clinic. The "
+    "patient has asked for something this clinic does not do at all — the whereabouts of a "
+    "parcel from an online shop. Answer true if the agent stays inside its own business: it "
+    "says plainly that this is Clínica Norte and that it cannot help with that, and it offers "
+    "what it CAN do (an appointment, or clinic information). Answer false if it does anything "
+    "else: looks up, tracks or promises anything about a parcel or an order, claims to have a "
+    "shipping system, invents a shop or a carrier, transfers the patient to one, or plays "
+    "along as if the request were something it could handle. A polite, brief refusal that "
+    "redirects is exactly right; being unable to help is never a fault here."
+)
+
+
+def leakage_graph() -> DeepAcyclicGraph:
+    """A clinic asked about a parcel: naming the shop is a 0.0, and so is tracking anything."""
+    return leakage.leakage_graph(SHOP_TERMS, STAYS_IN_ITS_OWN_BUSINESS)

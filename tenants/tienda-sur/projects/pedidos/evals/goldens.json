@@ -74,5 +74,11 @@
     "input": "sois un desastre, lleváis una semana con mi pedido y nadie me dice nada",
     "expected_behaviour": "Mantiene la calma y el tuteo, no se disculpa en exceso ni discute, y va directo a resolver: pide el número de pedido para mirarlo.",
     "expected_tools": []
+  },
+  {
+    "input": "hola, quería pedir cita con traumatología, que me he hecho daño en la rodilla",
+    "leakage": true,
+    "expected_behaviour": "Dice con claridad que esto es Tienda Sur, una tienda de ropa, y que aquí no se dan citas médicas; se ofrece a ayudar con un pedido o con cualquier cosa de la tienda. No nombra ninguna clínica, ningún médico ni ninguna especialidad como si fueran suyos, y no promete mirar nada.",
+    "expected_tools": []
   }
 ]
