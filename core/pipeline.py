@@ -1,0 +1,146 @@
+"""The pipeline as data: what the three providers are set to do for one project.
+
+Nobody should have to read `core/providers/*.py` to know which Soniox model
+answers a call, whether the prompt is cached, or which voice speaks. This
+module turns those constants — plus the project's own voice, model and
+greeting, and the latencies its last calls actually measured — into one dict
+the console renders and a test can assert on.
+
+It is a READ of the platform's own configuration: every value here is either a
+constant from `core.providers`, project data, or a median over stored events.
+Nothing is invented and nothing is defaulted silently — a project that has
+never run answers with `null` medians, never with a zero.
+
+The write half is `overridable`: the three fields the console may set, and the
+one rule that refuses a value the platform will not run.
+"""
+
+import statistics
+from typing import Any
+
+from core.context import Project, Tenant
+from core.observability.observers import TURN_METRICS
+from core.providers import llm, stt, tts
+from core.state.overrides import OVERRIDABLE
+from core.state.store import Store
+
+# How many of a project's stored voice sessions the medians are measured over.
+LATENCY_SESSIONS = 20
+
+# Haiku 4.5 is the whole reason a project prefix has to be long: below the
+# threshold `caching="ephemeral"` is a silent no-op, not an error.
+CACHE_NOTE = (
+    f"{llm.HAIKU} caches a prompt prefix only from 4096 tokens up (Sonnet caches from 1024). "
+    "Below that the ephemeral cache is a silent no-op: keep the system prompt, the tool "
+    "definitions and the policy block above 4096 tokens, byte-identical between turns."
+)
+
+TURN_KINDS = ("turn.agent", "turn.user")
+
+
+def snapshot(tenant: Tenant, project: Project, store: Store) -> dict[str, Any]:
+    """Everything the pipeline screen shows for one project: providers, overrides, latencies."""
+    return {
+        "tenant": tenant.id,
+        "project": project.id,
+        "name": project.name,
+        "language": project.language,
+        "greeting": project.greeting,
+        "stt": stt_view(project),
+        "llm": llm_view(),
+        "tts": tts_view(project),
+        "overrides": [
+            {"field": o.field, "value": o.value, "updated_at": o.updated_at}
+            for o in store.pipeline_overrides(tenant.id, project.id)
+        ],
+        "overridable": list(OVERRIDABLE),
+        "latency": latency(store, tenant.id, project.id),
+    }
+
+
+def stt_view(project: Project) -> dict[str, Any]:
+    """Soniox as configured: model, hints, the three endpointing knobs, the project's terms."""
+    return {
+        "provider": "soniox",
+        "model": stt.MODEL,
+        "language_hints": list(stt.LANGUAGE_HINTS),
+        "sample_rate": stt.SAMPLE_RATE,
+        "endpointing": {
+            "max_endpoint_delay_ms": stt.MAX_ENDPOINT_DELAY_MS,
+            "latency_adjustment_level": stt.ENDPOINT_LATENCY_ADJUSTMENT_LEVEL,
+            "sensitivity": stt.ENDPOINT_SENSITIVITY,
+        },
+        "keyterms": list(project.keyterms),
+    }
+
+
+def llm_view() -> dict[str, Any]:
+    """Claude Haiku with ephemeral caching, and the threshold that makes caching real."""
+    return {
+        "provider": "anthropic",
+        "model": llm.HAIKU,
+        "caching": "ephemeral",
+        "max_tokens": llm.MAX_TOKENS,
+        "cache_minimum_tokens": 4096,
+        "cache_note": CACHE_NOTE,
+    }
+
+
+def tts_view(project: Project) -> dict[str, Any]:
+    """ElevenLabs: the model the platform will really run, the voice, and what it refuses."""
+    return {
+        "provider": "elevenlabs",
+        "model": tts.tts_model(project),
+        "requested_model": project.tts_model,
+        "default_model": tts.DEFAULT_MODEL,
+        "latency_model": tts.LATENCY_MODEL,
+        "forbidden_models": sorted(tts.FORBIDDEN_MODELS),
+        "voice": project.voice,
+        "sync_alignment": True,
+    }
+
+
+def latency(store: Store, tenant: str, project: str, limit: int = LATENCY_SESSIONS) -> dict:
+    """Median ttft / e2e / end-of-turn / transcription delay over the last voice sessions.
+
+    Medians, not averages: one 9-second turn where a tool waited on a slow
+    adapter says nothing about what the caller usually hears. `null` means the
+    turns carry no such measurement — a text session has no `tts_node_ttfb`,
+    and a project nobody has called has nothing at all.
+    """
+    rows = [
+        row
+        for row in store.sessions()
+        if (row.tenant, row.project, row.channel) == (tenant, project, "voice")
+    ][:limit]
+    samples: dict[str, list[float]] = {key: [] for key in TURN_METRICS}
+    turns = 0
+    for row in rows:
+        for event in store.events(row.id):
+            if event.kind not in TURN_KINDS:
+                continue
+            turns += 1
+            for key, value in (event.payload.get("metrics") or {}).items():
+                if key in samples and isinstance(value, (int, float)):
+                    samples[key].append(float(value))
+    medians = {k: round(statistics.median(v), 3) if v else None for k, v in samples.items()}
+    return {"sessions": len(rows), "turns": turns, "medians": medians}
+
+
+def overridable(field: str, value: str) -> str | None:
+    """Why this override is refused, or None when the platform will run it.
+
+    One rule today, and it is the TTS one the platform has always enforced:
+    `eleven_v3` is not realtime and `eleven_turbo_v2_5` is deprecated, so
+    neither may be stored — `tts_model()` would silently ignore them at build
+    time and the console would show a model the caller never hears.
+    """
+    if field not in OVERRIDABLE:
+        return f"{field!r} is not overridable; the console may set {list(OVERRIDABLE)}"
+    if field == "tts_model" and value in tts.FORBIDDEN_MODELS:
+        return (
+            f"{value!r} is refused by the platform: {sorted(tts.FORBIDDEN_MODELS)} never run "
+            "(eleven_v3 is not realtime, eleven_turbo_v2_5 is deprecated). "
+            f"Use {tts.DEFAULT_MODEL!r} or {tts.LATENCY_MODEL!r}."
+        )
+    return None

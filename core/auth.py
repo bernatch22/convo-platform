@@ -6,6 +6,10 @@ The JWT also carries `RoomAgentDispatch(agent_name=FLEET, metadata=SessionMeta)`
 — the same JSON `core.router.resolve` reads — so who a session is for is
 decided once, at the door, and travels with the room.
 
+`mint_observer` is the second ticket this module signs: the same fence, with
+the publish rights removed, so a supervisor can listen to a call in progress
+without the caller ever learning that somebody joined.
+
 Open source note: `mint_session` is a generic recipe for explicit agent
 dispatch on livekit-agents 1.7 — a JWT from plain args, no server round-trip.
 """
@@ -32,6 +36,41 @@ def mint_session(meta: SessionMeta, user_id: str = "anonymous") -> dict[str, str
         .to_jwt()
     )
     return {"url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"), "room": room, "token": token}
+
+
+def mint_observer(room: str) -> dict[str, str]:
+    """A listen-only ticket into ONE existing room: subscribe, never publish, never appear.
+
+    This is how a supervisor listens to a call that is already happening. The
+    grant is the opposite of a caller's: `can_publish=False` means no
+    microphone can reach the room from this token however the browser is
+    driven, and `hidden=True` keeps the observer out of the room's participant
+    list, so the caller is not told somebody joined. It carries no
+    `RoomConfiguration`: an observer never dispatches an agent, it joins a room
+    an agent is already in.
+    """
+    identity = f"observer:{uuid.uuid4().hex[:8]}"
+    grants = api.VideoGrants(
+        room_join=True,
+        room=room,
+        can_publish=False,
+        can_publish_data=False,
+        can_subscribe=True,
+        hidden=True,
+    )
+    token = (
+        api.AccessToken(os.getenv("LIVEKIT_API_KEY", "devkey"), _secret())
+        .with_identity(identity)
+        .with_attributes({"role": "observer"})
+        .with_grants(grants)
+        .to_jwt()
+    )
+    return {
+        "url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
+        "room": room,
+        "identity": identity,
+        "token": token,
+    }
 
 
 def fleet() -> str:
