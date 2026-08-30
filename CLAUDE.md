@@ -118,14 +118,20 @@ docker compose -f infra/compose/dev.yml up   # livekit-server --dev + redis (ms-
 ## Every milestone ships four things (non-negotiable)
 
 1. **A command the human runs** to see it working (`console`, a CLI, a URL).
-2. **`reports/ms-N.html`** — a self-contained usage report opened in the browser:
-   what was built, how to try it step by step, example transcripts, the tests
-   and evals that passed, and known limits. Written for the reviewer, not for us.
+2. **`.taskops/reports/ms-N.md`** — a learning report, not a usage sheet: what we
+   set out to do, what we achieved, what we learned the hard way (with the real
+   cause), the decisions and why, where the project stands, what comes next.
+   Written so a person or an agent picking the project up cold understands how
+   we got here. Index in `.taskops/reports/README.md`. How-to lives in README,
+   design in REPORT.md, generated artifacts (DeepEval HTML, recordings) in `tmp/`.
+   After the commit that carries a report, register it on the board with
+   `taskops_filed path=.taskops/reports/ms-N.md title=… sha=<commit> milestone=ms-…`
+   — a report that is not filed does not exist for the board.
 3. **DeepEval, incrementally** — even one metric. Prompts must keep a consistent
    line milestone to milestone: per-project `goldens.json` grows with every card,
    `deepeval test run` is part of the milestone's definition of done, and the
    HTML report links the DeepEval HTML output.
-4. **An nvim command** in the report and in the merge note to read the code:
+4. **An nvim command** in the closing note of every card to read the code:
    `nvim -p core/x.py core/y.py tenants/…` — the human is a code judge too.
 
 Core before UI: the core must be tested (unit + evals + real calls through

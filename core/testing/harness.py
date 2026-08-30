@@ -7,45 +7,92 @@ score the text. Nothing here touches audio or a LiveKit server.
 
 import asyncio
 import uuid
+from dataclasses import dataclass, field
+from datetime import date
 
 from livekit.agents import AgentSession
-from livekit.agents.voice.run_result import RunResult
+from livekit.agents.metrics import AgentSessionUsage, LLMModelUsage
+from livekit.agents.voice.run_result import ChatMessageAssert, RunResult
 
 from core.context import TenantContext
 from core.registry import load_registry
 from core.session import build_session
+from core.tools.executor import attach_local_tools
 
 GREETING_WAIT_S = 6.0
+TODAY = date(2026, 9, 1)  # a Tuesday: "el jueves" is always two days out in tests
 
 
-def fake_context(tenant_id: str, project_id: str, channel: str = "chat") -> TenantContext:
-    """A TenantContext for tests: real tenant and project, synthetic session ids."""
+def fake_context(
+    tenant_id: str,
+    project_id: str,
+    channel: str = "chat",
+    today: date = TODAY,
+) -> TenantContext:
+    """A TenantContext for tests: real tenant and project, synthetic ids, a frozen calendar.
+
+    `today` is fixed so a test can name the date it expects ("el jueves" is
+    2026-09-03) without the assertion rotting overnight; wired with the tenant's
+    adapters and a local executor exactly as `core.router.resolve` wires one.
+    """
     tenant = load_registry()[tenant_id]
     project = tenant.projects[project_id]
-    return TenantContext(
+    tc = TenantContext(
         tenant=tenant,
         project=project,
         channel=channel,
         session_id=f"test-{uuid.uuid4().hex[:8]}",
         git_sha="test",
         project_version="git:test",
+        today=today,
     )
+    return attach_local_tools(tc)
 
 
-async def run_turns(tc: TenantContext, inputs: list[str]) -> list[RunResult]:
-    """Start the project's entry agent headless and run each user input as one turn.
+@dataclass
+class Conversation:
+    """What a headless run produced: the opening line, one result per input, the token bill."""
 
-    The greeting produced by `on_enter` is awaited before the first input so the
-    history looks like a real call. Returns one RunResult per input.
+    greeting: str
+    results: list[RunResult] = field(default_factory=list)
+    usage: AgentSessionUsage | None = None
+
+    def reply(self, index: int) -> str:
+        """The assistant text of the n-th turn."""
+        return text_of(self.results[index])
+
+    def cached_prompt_tokens(self) -> int:
+        """Prompt tokens the LLM served from its cache — 0 means the prefix was never reused."""
+        if self.usage is None:
+            return 0
+        return sum(
+            model.input_cached_tokens
+            for model in self.usage.model_usage
+            if isinstance(model, LLMModelUsage)
+        )
+
+
+async def run_conversation(tc: TenantContext, inputs: list[str]) -> Conversation:
+    """Start the project's entry agent headless, capture its greeting, run each input as a turn.
+
+    The greeting comes from `on_enter` before any user input, exactly as on a
+    real call; goldens that judge the opening line read `Conversation.greeting`.
     """
     session: AgentSession[TenantContext] = build_session(tc)
-    results: list[RunResult] = []
     async with session:
         await session.start(tc.project.entry_agent(tc))
         await _wait_for_greeting(session)
+        conversation = Conversation(greeting=greeting_of(session))
         for text in inputs:
-            results.append(await session.run(user_input=text))
-    return results
+            conversation.results.append(await session.run(user_input=text))
+        # read before the context manager closes: leaving it resets the usage collector
+        conversation.usage = session.usage
+    return conversation
+
+
+async def run_turns(tc: TenantContext, inputs: list[str]) -> list[RunResult]:
+    """Convenience: only the per-input results of `run_conversation`."""
+    return (await run_conversation(tc, inputs)).results
 
 
 def text_of(result: RunResult) -> str:
@@ -56,6 +103,22 @@ def text_of(result: RunResult) -> str:
         if e.type == "message" and e.item.role == "assistant"
     ]
     return " ".join(p.strip() for p in parts if p.strip())
+
+
+def final_message(result: RunResult) -> ChatMessageAssert:
+    """The turn's LAST assistant message, ready to assert on or hand to a judge.
+
+    One turn can hold several: Haiku often says "un momento, le consulto la
+    agenda" before calling a tool and only answers once the result is back.
+    Judging the first message would be judging the filler, so a golden about
+    what the agent ANSWERS reads this one; a golden about the order of events
+    (a tool call before the answer) still walks `result.expect` itself.
+    """
+    for index in reversed(range(len(result.events))):
+        event = result.events[index]
+        if event.type == "message" and event.item.role == "assistant":
+            return result.expect[index].is_message(role="assistant")
+    raise AssertionError("the turn produced no assistant message at all")
 
 
 def greeting_of(session: AgentSession) -> str:

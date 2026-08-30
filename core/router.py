@@ -2,12 +2,14 @@
 
 import os
 import subprocess
+from datetime import date
 
 from livekit.agents import JobContext
 
 from core.context import TenantContext
 from core.contracts import SessionMeta
 from core.registry import load_registry
+from core.tools.executor import attach_local_tools
 
 
 class UnroutableTenant(LookupError):
@@ -15,7 +17,12 @@ class UnroutableTenant(LookupError):
 
 
 async def resolve(ctx: JobContext) -> TenantContext:
-    """Read the dispatch metadata (or the console fallback) and build the context."""
+    """Read the dispatch metadata (or the console fallback) and build the wired context.
+
+    Wired means the tenant's adapters are built and an executor sits over them:
+    a context handed to a session must be able to run the tools its project
+    declares, or the model calls into a void.
+    """
     meta = _session_meta(ctx)
     registry = load_registry()
     tenant = registry.get(meta.tenant)
@@ -24,14 +31,16 @@ async def resolve(ctx: JobContext) -> TenantContext:
     project = tenant.projects.get(meta.project)
     if project is None:
         raise UnroutableTenant(f"tenant {meta.tenant!r} has no project {meta.project!r}")
-    return TenantContext(
+    tc = TenantContext(
         tenant=tenant,
         project=project,
         channel=meta.channel,
         session_id=ctx.job.id,
         git_sha=git_sha(),
         project_version=meta.project_version or f"git:{git_sha()}",
+        today=date.today(),
     )
+    return attach_local_tools(tc)
 
 
 def git_sha() -> str:

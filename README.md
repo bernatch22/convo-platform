@@ -11,7 +11,8 @@ runtime that talks.
 Built in public as an architecture exercise: the design is in
 [`REPORT.md`](REPORT.md), the working rules in [`CLAUDE.md`](CLAUDE.md), and
 every step of the build lives on a public taskops board (milestones = chapters,
-cards = briefs). Each milestone ships an HTML usage report under `reports/`.
+cards = briefs). Each milestone lands with a learning report under
+`.taskops/reports/` — what was achieved, learned and decided.
 
 ## Run
 
@@ -29,7 +30,7 @@ Evals (ring 1, needs `ANTHROPIC_API_KEY`; the judge is Claude Haiku, set
 
 ```bash
 uv run pytest -m unit                # includes LLM-judged tests when the key is present
-uv run deepeval test run tests/evals # per-project goldens; HTML under reports/deepeval/
+uv run deepeval test run tests/evals # per-project goldens; HTML under tmp/reports/deepeval/
 ```
 
 ## Layout
@@ -40,7 +41,7 @@ api.py        control plane (ms-8+): tokens, dispatch, tools hub, call log
 core/         runtime: contracts, agents, tools, adapters, state, observability
 tenants/      one folder per customer: adapters + projects (agents, prompts, evals)
 tests/        unit tests and ring-1 evals
-reports/      per-milestone HTML reports for reviewers
+.taskops/reports/  per-milestone learning reports (Markdown)
 presentation/ self-narrating deck engine
 ```
 
@@ -53,8 +54,8 @@ board holds the plan; this repo carries the board's hooks (`.claude/`,
 `.mcp.json`) so any clone can join it.
 
 - **Milestones are chapters.** Each one is small enough for a human to review
-  in minutes and ends with a command to run plus `reports/ms-N.html`, a
-  self-contained page explaining what was built and how to try it.
+  in minutes and ends with a command to run plus `.taskops/reports/ms-N.md`, a
+  learning report: what was achieved, what was learned, what was decided.
 - **Cards are briefs.** A card carries a spec a stranger could pick up, the
   files it may touch, acceptance criteria, and — when a decision was made — a
   short essay in its thread explaining why.
