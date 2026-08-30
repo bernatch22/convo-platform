@@ -1,0 +1,20 @@
+# livekit-server config for the LOCAL dev stack (infra/compose/dev.yml).
+# Deterministic on purpose: fixed ports, the dev keypair, no external IP
+# discovery — a laptop, not a cloud box (that config arrives in ms-10).
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 7882          # single muxed UDP port: one -p line, no 50000-60000 range
+  use_external_ip: false
+  # The ICE candidate the server advertises. Without this it advertises the
+  # address it sees on itself — the compose network's 172.x — and on macOS the
+  # host cannot route to it: every peer connection dies with
+  # `wait_pc_connection timed out`, worker and client alike. The published
+  # ports make 127.0.0.1 the address that really reaches this container.
+  node_ip: 127.0.0.1
+redis:
+  address: redis:6379
+keys:
+  devkey: secret
+logging:
+  level: info
