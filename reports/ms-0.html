@@ -39,6 +39,8 @@ python worker.py --help # LiveKit Agents CLI: console / dev / start</pre>
 <h2>Open-source note</h2>
 <p>The contracts are framework-agnostic: <code>ToolSpec</code>, <code>Adapter</code> and <code>Event</code> can be lifted into any voice-agent codebase (Pipecat, LiveKit, custom) as the seam between "what the LLM may call" and "what touches the customer's systems".</p>
 
+<h2>Continuous integration</h2>
+<p><code>.github/workflows/ci.yml</code> runs <code>ruff check</code>, <code>ruff format --check</code> and <code>pytest -m unit</code> on every push with uv and Python 3.12. No provider keys are needed at this stage; the evals job arrives in ms-1 gated on secrets.</p>
 <h2>The board hooks</h2>
 <p><code>.claude/settings.json</code> and <code>.mcp.json</code> call taskops through <code>uvx --from taskops-cli …</code>, so any clone joins the board without machine-specific paths. The README section <em>How this repository is orchestrated</em> explains milestones, cards, workers and human review.</p>
 

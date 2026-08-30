@@ -1,5 +1,7 @@
 # convo-platform
 
+[![ci](https://github.com/bernatch22/convo-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/bernatch22/convo-platform/actions/workflows/ci.yml)
+
 A multi-tenant conversational platform for contact centers — voice and chat —
 built on self-hosted [LiveKit](https://livekit.io) (SFU + SIP + Agents),
 Anthropic Claude Haiku, Soniox STT and ElevenLabs TTS. One deploy serves many
