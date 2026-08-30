@@ -86,7 +86,7 @@ def eval_session(store: Store, session_id: str) -> int:
     print(f"{len(case.turns)} turns replayed from {row.event_count} events")
     blind = replay.missing_tool_outputs(case)
     note = BLIND_SPOT.format(tools=_and(blind)) if blind else None
-    score(metrics.never_book_before_yes(), case)
+    score(metrics.consent_policy(), case)
     score(metrics.grounded_facts_dag(), case, note=note)
     return 0
 

@@ -9,10 +9,15 @@ document is built around:
 > **The judge does not need to be smarter. It needs to see more and decide less.**
 
 Everything below is verified against DeepEval 4.2 and the code in
-`core/testing/` and `tenants/clinica-norte/projects/reagendamiento/evals/`.
-Run the suite with `deepeval test run tests/evals -n 3`; read the HTML with
+`core/testing/` and the two tenants' `evals/` folders. Run the suite with
+`deepeval test run tests/evals -n 3`; read the HTML with
 `python -m core.testing.report clinica-norte reagendamiento` (writes
 `tmp/reports/deepeval/`).
+
+Since ms-5 there are two businesses on this platform and the split above is
+what makes that cheap: the GRAPHS live in core and the WORDS live in each
+project. Clínica Norte and Tienda Sur run the same three metric shapes —
+consent, grounded facts, register — and share not one sentence of criteria.
 
 ---
 
@@ -32,16 +37,29 @@ comes from, never how it is judged.
 Metrics are **project data**, next to the prompt and the goldens:
 
 ```
-tenants/clinica-norte/projects/reagendamiento/evals/
+tenants/<tenant>/projects/<project>/evals/
   goldens.json     one entry per behaviour: input, expected_behaviour, expected_tools, before
   metrics.py       one factory per metric — the only file the suite and the HTML report import
-  dag.py           the two hard policies as decision graphs (+ DeterministicNode)
-  grounding.py     pure functions: which facts a reply states, what evidence backs them
-  simulator.py     three personas, five unscripted calls
+  dag.py           the tool names, the criteria wording and the register word list
+  grounding.py     this project's extractors (its vocabulary) and its knowledge block
+  simulator.py     the personas and the unscripted calls
 ```
+
+Nothing in those five files is a graph any more: since ms-5 the shapes are
+core's and a project supplies its nouns. `dag.py` is ~70 lines of constants and
+three one-line factories in both tenants, and the two read as translations of
+each other.
 
 The platform (`core/testing/`) owns the plumbing, never the criteria:
 
+- `dag.py` — `DeterministicNode` and the two graph builders every project
+  reuses: `consent_graph(irreversible_tool, asking_tool, yes_criteria)` and
+  `grounded_facts_graph(stated, backing, criteria)`.
+- `grounding.py` — the language-agnostic half of §3.5: `Extractor`, `Datum`,
+  `Evidence`, the clock/price/phone patterns, normalisation and `unsupported`.
+  A project declares its own extractors (`Dra.` and streets for the clinic;
+  `TS-10432`, a tracking code and a carrier for the shop).
+- `register.py` — the register scan (§3.7), a graph with one deterministic node.
 - `harness.py` — runs a conversation headless (`run_conversation`), or holds
   one open turn by turn (`live_conversation`), and records **the platform's own
   tool calls** per turn (`RecordingExecutor`, `PlatformCall`).
@@ -54,7 +72,11 @@ The platform (`core/testing/`) owns the plumbing, never the criteria:
 - `report.py` — the same goldens and the same metrics rendered to HTML.
 
 A threshold is a business decision (a clinic's tolerance for tuteo is not a
-shop's), so it is set in `metrics.py`, never in core. Every factory returns a
+shop's — the shop's whole register IS tuteo), so it is set in `metrics.py`,
+never in core. One name is a convention rather than a choice: `consent_policy()`,
+which `convo sessions eval <id>` looks up because it scores a stored session of
+any project and cannot know whether the irreversible act is a booking or a
+cancellation. Every factory returns a
 fresh instance because a DeepEval metric keeps the score of the last case it
 measured.
 
@@ -186,6 +208,14 @@ Two decisions in this graph are worth knowing about:
                  yes ──▶ 1.0      │ no ──▶ 0.0
 ```
 
+**Evidence has two scopes.** `Datum.against` says where a claim must be found:
+`TEXT` is knowledge + call, `CALL` is the call alone. The shop's information
+sheet names every carrier it works with, so the sheet grounds "lo lleva MRW"
+about a parcel SEUR is carrying — an invention with a source. Order numbers,
+tracking codes and carriers are therefore checked against `CALL`; prices,
+opening hours and policies against `TEXT`. Hours and phones have their own
+normalised indexes (`HOURS`, `DIGITS`).
+
 Nodes 1-3 are `DeterministicNode` subclasses of DeepEval's conversational
 nodes with `_execute` overridden in Python. DeepEval ships no LLM-free node;
 this mixin (in `dag.py`) is the upstream contribution. `include_reason=False`
@@ -249,6 +279,26 @@ see §8. A cheaper half-step exists too: the masked ARGUMENTS are already in the
 log (`send_sms` carries the whole confirmation text), and a project's
 `evidence_of` could read `input_parameters` as well as outputs.
 
+### 3.7 Keeps the register (ConversationalDAG) — usted or tú, and never both
+
+- **Kind:** one deterministic node, **0 judge calls, always**. 1.0 or 0.0.
+- **Runs on:** every golden and every simulated call of both projects.
+- **What it decides:** whether any assistant turn used a word the business does
+  not say. Clínica Norte declares `TU_FORMS` (te, ti, tu, tus, tienes, quieres,
+  puedes, prefieres, dime…) and Tienda Sur declares `USTED_FORMS` (usted,
+  ustedes, dígame, disculpe, perdone, espere…), each in its own `evals/dag.py`.
+- **How it matches:** whole words on flattened text (lowercase, accent-free,
+  punctuation-free), so "usted" never trips "te" and "disculpa" never trips
+  "disculpe". Only assistant turns are scored: callers tutear a receptionist
+  all day and that is not the agent's register.
+- **Why it is not part of the GEval:** ms-3 saw a single "¿cuál **te** viene
+  mejor?" in 21 clinic cases and the tone judge gave the reply 0.8 and moved
+  on. For a business whose calls have been "usted" for five minutes, one slip
+  sounds like a different person picking up the phone. A rule a word list can
+  decide is not a judge's to weigh — this is the ms-7 card `tk-ff61b4`'s
+  register half, landed here because two tenants with opposite registers are
+  what makes the metric worth writing.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
@@ -286,7 +336,7 @@ judged turn is ChooseSlot's); `expected_tools` feeds ToolCorrectness;
 `expected_behaviour` is what the GEval judge reads as context. Adding a golden
 is adding one JSON object — no code.
 
-**Simulated calls** (`simulator.py`, 5 today). DeepEval's
+**Simulated calls** (`simulator.py`, 5 for the clinic and 3 for the shop). DeepEval's
 `ConversationSimulator` with three personas, all Haiku, all in Spanish from
 Spain, all reaching a *live* `ChooseSlot` stage (a session held open between
 turns — replaying the script every turn regenerates the replies the simulated
@@ -318,22 +368,33 @@ measure in ms-7, not a default).
 | Reception line (GEval) | 1 | steps generated once and cached by DeepEval |
 | Never book before yes | 1-3 today, 0-1 after ms-7 | 5 simulated calls |
 | Grounded facts | 0 when everything matches, else 1 | 10/10 at 0 today |
+| Keeps the register | 0 | a word list, always |
 
-A full ring-1 run (`deepeval test run tests/evals -n 3`) is **≈ $0.04-0.05**
-and about two minutes; the five simulated calls are most of it.
+Measured on the ms-5 branch, Haiku everywhere: the clinic's four suites are
+**$0.042** (140 s, 30 metric cases, five simulated calls), and Tienda Sur's two
+are **$0.033** for the 10 goldens (48 s, 20 metric cases) plus a simulated-call
+run of the same order. A full ring-1 run of both tenants is **≈ $0.10** and
+about four minutes.
 
 ## 7. How to add a metric to a project
 
 1. Decide what kind of question it is. A rule with no degrees (consent, no
    invention, register) is a **DAG**; a judgement of quality (tone, warmth,
    clarity) is a **GEval**; "did it call X" is **ToolCorrectness**.
-2. For a DAG, write the nodes so that everything code can decide is a
-   `DeterministicNode` (`dag.py` has the three shapes: binary verdict, matched
-   verdict, rendered evidence), and the judge gets **one binary question with
-   the evidence attached**. Never give a judge node the whole transcript unless
-   the question is about the whole transcript.
-3. For a GEval, one property per sentence, no disjunctions without "either
-   alone is enough", and say explicitly what the judge must *not* score.
+2. Check `core/testing/` first: consent, grounded facts and register are
+   already builders, and a new project usually writes constants, not nodes.
+   If the shape really is new, write the nodes so that everything code can
+   decide is a `DeterministicNode` (`core/testing/dag.py` has the three shapes:
+   binary verdict, matched verdict, rendered evidence), and the judge gets
+   **one binary question with the evidence attached**. Never give a judge node
+   the whole transcript unless the question is about the whole transcript. A
+   shape a second tenant would reuse belongs in core, with the words left
+   behind in the project.
+3. For a GEval, one property per sentence, and close every disjunction from
+   both ends — "either alone is enough" AND "doing both is also correct".
+   Ms-5 paid for the second half: told only that both were "never required",
+   the judge read an exclusive or and scored 0.6 for a reply that helpfully
+   did both. Say explicitly what the judge must *not* score.
 4. Add the factory to `metrics.py` with a docstring that says why it is that
    kind of metric and what it must not judge. Threshold there, not in core.
 5. Wire it in `tests/evals/test_<project>_*.py` with `assert_test`, and — if
@@ -345,11 +406,19 @@ and about two minutes; the five simulated calls are most of it.
 ## 8. Known gaps, tracked
 
 - Consent DAG nodes 1-2 are still judge `TaskNode`s; both are extractable in
-  code (ms-7, `tk-ff61b4`).
+  code (ms-7, `tk-ff61b4`). The register half of that card landed in ms-5
+  (§3.7).
 - An intermittent tuteo ("¿Cuál **te** viene mejor?") appeared once in 21
   cases in ms-3. The judge was right. It is an agent defect, not a metric one:
-  the prompt is hardened and a deterministic register node is added in the
-  same ms-7 card.
+  the deterministic register node now catches it (§3.7) and hardening the
+  clinic's ChooseSlot prompt is what remains of `tk-ff61b4`.
+- **The clinic answers "¿qué turnos hay el jueves?" without consulting the
+  agenda when the patient's existing cita is on a Thursday** ("El jueves tiene
+  ya su cita a las 10:00, ¿quiere cambiarla a otra hora?"). Reproduced on the
+  ms-5 branch before any ms-5 tenant work (`git archive` of the merge commit),
+  so it is not a regression from the metric lift: it is a clinic prompt defect
+  that fails `test_reception_tools.py` and the "¿qué turnos hay el jueves?"
+  golden intermittently. It belongs to a clinic card.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2 (voice) with ms-13.
