@@ -41,6 +41,8 @@ python worker.py --help # LiveKit Agents CLI: console / dev / start</pre>
 
 <h2>Continuous integration</h2>
 <p><code>.github/workflows/ci.yml</code> runs <code>ruff check</code>, <code>ruff format --check</code> and <code>pytest -m unit</code> on every push with uv and Python 3.12. No provider keys are needed at this stage; the evals job arrives in ms-1 gated on secrets.</p>
+<h2>The board hooks</h2>
+<p><code>.claude/settings.json</code> and <code>.mcp.json</code> call taskops through <code>uvx --from taskops-cli …</code>, so any clone joins the board without machine-specific paths. The README section <em>How this repository is orchestrated</em> explains milestones, cards, workers and human review.</p>
 
 <h2>Known limits</h2>
 <p>No behaviour yet: no session, no providers, no tenants. <code>python worker.py console</code> starts and fails with the ms-0 message by design.</p>

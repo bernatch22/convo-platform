@@ -37,3 +37,27 @@ presentation/ self-narrating deck engine
 ```
 
 License: Apache-2.0.
+
+## How this repository is orchestrated
+
+The build itself is public. A [taskops](https://pypi.org/project/taskops-cli/)
+board holds the plan; this repo carries the board's hooks (`.claude/`,
+`.mcp.json`) so any clone can join it.
+
+- **Milestones are chapters.** Each one is small enough for a human to review
+  in minutes and ends with a command to run plus `reports/ms-N.html`, a
+  self-contained page explaining what was built and how to try it.
+- **Cards are briefs.** A card carries a spec a stranger could pick up, the
+  files it may touch, acceptance criteria, and — when a decision was made — a
+  short essay in its thread explaining why.
+- **One orchestrator, many workers.** The orchestrator plans, assigns (each
+  card gets its own git worktree), reviews the diff in session and merges with
+  `--no-ff`. Workers are AI sub-agents, one per brief; the first infrastructure
+  cards were done by the orchestrator itself.
+- **Humans judge.** Every milestone report leaves an `nvim -p …` command to
+  read the code; evaluations (DeepEval) run on every milestone so prompts keep
+  a consistent line as the system grows.
+
+Reusable for other teams: the hooks are two lines of JSON, the conventions are
+this section, and the pattern (seams first, then parallel cards, HTML report
+per milestone) does not depend on any particular framework.
