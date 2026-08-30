@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from livekit.agents.llm import ToolError
 
+from core.state.log import record
 from core.tools import guard
 from core.tools.contract import ToolSpec
 from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL, sentence
@@ -31,6 +32,11 @@ if TYPE_CHECKING:  # avoid an import cycle: core.context declares the executor i
     from core.context import TenantContext
 
 log = logging.getLogger("platform.tools")
+
+# The keys of `tc.customer` that identify a person. A project fills that dict
+# from its own CRM, so this is a convention, not a schema — an unknown key is
+# simply not learned, and the tool that carries it still masks it by name.
+CUSTOMER_PII_KEYS = ("patient", "name", "phone")
 
 
 class ToolExecutor(Protocol):
@@ -54,7 +60,8 @@ class LocalExecutor:
     async def call(self, name: str, args: dict[str, Any]) -> Any:
         """Run one declared tool: catalog, guard, adapter, timeout, log — in that order."""
         spec = self._spec(name)
-        safe_args = guard.mask(spec, args)
+        self._learn_pii(spec, args)
+        safe_args = guard.mask(spec, args, known=self.tc.pii_values)
         try:
             guard.check(spec, args, self.tc)
         except guard.ToolRefused as refusal:
@@ -68,6 +75,17 @@ class LocalExecutor:
         self._record("tool.result", spec, shape=_shape(result))
         log.info("tool.result %s %s ok", self.tc.label(), spec.name)
         return result
+
+    def _learn_pii(self, spec: ToolSpec, args: dict[str, Any]) -> None:
+        """Remember this call's PII values BEFORE masking, so its own log line is masked too.
+
+        Order is the whole point. `send_sms` carries the patient's name inside
+        `text`, and the only reason we know that string is a name is that some
+        argument, somewhere, declared it. Learning after masking would leak the
+        first occurrence of every value — which is the one that matters.
+        """
+        guard.learn(self.tc.pii_values, guard.pii_values(spec, args))
+        guard.learn(self.tc.pii_values, _identity_of(self.tc.customer))
 
     def _spec(self, name: str) -> ToolSpec:
         spec = self.tc.project.tools.get(name)
@@ -121,11 +139,13 @@ class LocalExecutor:
             raise ToolError(self._says(FAILURE)) from None
 
     def _record(self, kind: str, spec: ToolSpec, **payload: Any) -> None:
-        """One line in the session log, when the context carries one; payloads never enter it."""
-        if self.tc.log is not None:
-            self.tc.log.append(
-                kind, {"tool": spec.name, "side_effect": str(spec.side_effect), **payload}
-            )
+        """One line in the session log, when the context carries one; payloads never enter it.
+
+        `record` scrubs known PII values from whatever this hands it, so a
+        refusal reason or a timeout note cannot leak a name the arguments
+        already had masked.
+        """
+        record(self.tc, kind, {"tool": spec.name, "side_effect": str(spec.side_effect), **payload})
 
     def _says(self, key: str) -> str:
         return sentence(self.tc.project.messages, key)
@@ -141,6 +161,17 @@ def attach_local_tools(tc: "TenantContext") -> "TenantContext":
     tc.adapters = tc.tenant.build_adapters()
     tc.tools = LocalExecutor(tc)
     return tc
+
+
+def _identity_of(customer: dict[str, Any] | None) -> list[Any]:
+    """Who the caller is, by the conventional keys a project puts on `tc.customer`.
+
+    A session knows the patient's name from the moment Identify found them,
+    before any tool has carried it as an argument. Naming the keys here — and
+    not reading the whole dict — keeps an appointment id or a doctor out of the
+    mask, which would blank half of every log line for nothing.
+    """
+    return [(customer or {}).get(key) for key in CUSTOMER_PII_KEYS]
 
 
 def _shape(result: Any) -> str:

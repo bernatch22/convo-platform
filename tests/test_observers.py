@@ -35,6 +35,11 @@ from tests.conftest import needs_llm
 pytestmark = pytest.mark.unit
 
 APPOINTMENT = "ap-20260903-1000-trau"  # seeded in tenants/clinica-norte/adapters/patients.py
+PATIENT = "Ana García Ruiz"  # the name that must not appear in an audit line
+# The kinds an operator audits, as opposed to the transcript. A turn IS what was
+# said — the agent greets the patient by name and the replay eval reads it back —
+# so the no-PII rule is about the lines that describe the machine, not the call.
+AUDITED = ("tool.", "confirm.", "saga.", "stage.")
 stages = importlib.import_module("tenants.clinica-norte.projects.reagendamiento.stages")
 
 HAIKU_USAGE = AgentSessionUsage(
@@ -281,6 +286,9 @@ async def test_a_booking_writes_the_whole_story_in_seq_order(capsys) -> None:
     # nothing irreversible before the yes, and the log is what proves it
     assert first(story, "confirm.granted") < book_slot_at(tc)
     assert first(story, "confirm.granted") < first(story, "stage.handoff")
+
+    audited = [e.payload for e in tc.log.events() if e.kind.startswith(AUDITED)]
+    assert PATIENT not in str(audited), audited  # masked by value, not by argument name
 
     end = payload(tc, "session.end")
     assert end["outcome"] == "completed"
