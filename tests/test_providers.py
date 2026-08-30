@@ -60,7 +60,15 @@ def test_with_a_key_soniox_is_built_with_those_options(project: Project, monkeyp
 # --- ElevenLabs --------------------------------------------------------------
 
 
-def test_elevenlabs_defaults_to_the_conversational_v3_voice(project: Project) -> None:
+def test_the_clinic_opts_into_the_latency_profile_after_the_pstn_measurements(
+    project: Project,
+) -> None:
+    assert tts.tts_model(project) == "eleven_flash_v2_5"
+
+
+def test_the_platform_default_is_still_conversational_v3(project: Project) -> None:
+    project.tts_model = None
+
     assert tts.tts_model(project) == "eleven_v3_conversational"
 
 
@@ -87,7 +95,7 @@ def test_with_a_key_the_voice_is_the_projects_and_alignment_is_on(
 
     assert built is not None
     assert built._opts.voice_id == "UOIqAnmS11Reiei1Ytkc"
-    assert built._opts.model == "eleven_v3_conversational"
+    assert built._opts.model == "eleven_flash_v2_5"
     assert built._opts.sync_alignment is True
     assert built._opts.language == "es"
 
