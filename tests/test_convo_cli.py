@@ -88,3 +88,32 @@ def test_versions_pin_and_list(tmp_path, capsys) -> None:
     assert versions.main(["list"], store) == 0
     out = capsys.readouterr().out
     assert "pinned to v3 with override" in out and "5 chars" in out
+
+
+async def test_tail_yields_events_appended_after_it_started(monkeypatch, capsys) -> None:
+    """`tail` follows a growing session: events appended while it watches are printed."""
+    import threading
+
+    from convo import sessions as cli
+    from core.state.store import MemoryStore
+    from core.testing import fake_context
+
+    store = MemoryStore()
+    tc = fake_context("clinica-norte", "reagendamiento")
+    from core.state.attach import attach_log
+
+    tc = attach_log(tc, store)
+    from core.state.log import record
+
+    record(tc, "stage.enter", {"stage": "Identify"})
+
+    def feed() -> None:
+        record(tc, "stt.final", {"text": "hola"})
+        record(tc, "session.end", {"outcome": "completed"})
+
+    threading.Timer(0.15, feed).start()
+    code = cli.tail_session(store, tc.session_id, poll_s=0.05)
+
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "stage.enter" in out and "stt.final" in out and "session.end" in out
