@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>ms-0 · skeleton</title>
+<style>
+  :root{--ink:#1b1b1f;--mute:#6b6f76;--line:#e5e7eb;--ok:#0a7d4f;--bg:#fbfaf7}
+  body{font:16px/1.55 -apple-system,Inter,system-ui,sans-serif;color:var(--ink);background:var(--bg);max-width:880px;margin:40px auto;padding:0 24px}
+  h1{font-size:28px;margin:0 0 4px}h2{font-size:18px;margin:32px 0 8px;border-bottom:1px solid var(--line);padding-bottom:4px}
+  .sub{color:var(--mute)}code,pre{font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+  pre{background:#fff;border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow:auto}
+  table{border-collapse:collapse;width:100%}td,th{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  .ok{color:var(--ok);font-weight:600}.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}
+</style></head><body>
+<h1>ms-0 · skeleton <span class="tag">reviewed by a human</span></h1>
+<p class="sub">Repo, toolchain, contracts, first tests. Nothing runs a conversation yet — that is ms-1.</p>
+
+<h2>What exists</h2>
+<table>
+<tr><th>Path</th><th>What it is</th></tr>
+<tr><td><code>worker.py</code></td><td>The data plane: one <code>AgentServer</code>, one fleet (<code>FLEET</code> env, default <code>cc</code>). The entrypoint raises <code>NotImplementedError</code> until ms-1.</td></tr>
+<tr><td><code>core/context.py</code></td><td><code>Tenant</code>, <code>Project</code>, <code>TenantContext</code> — the one object every session carries.</td></tr>
+<tr><td><code>core/contracts.py</code></td><td><code>SessionMeta</code>: what the dispatcher tells the worker (tenant, project, channel). Unknown fields ignored on purpose.</td></tr>
+<tr><td><code>core/tools/contract.py</code></td><td><code>ToolSpec</code> + <code>SideEffect</code>: irreversible tools always need a confirmation token; <code>pii_scope</code> says what to mask in logs.</td></tr>
+<tr><td><code>core/adapters/base.py</code></td><td><code>Adapter</code> port: <code>capabilities()</code> / <code>execute()</code>. Tenants implement it; tools never call HTTP directly.</td></tr>
+<tr><td><code>core/state/events.py</code></td><td><code>Event</code>: one line of the append-only session log, numbered by <code>seq</code>.</td></tr>
+<tr><td><code>tests/</code></td><td><code>test_core_isolation</code> (core never imports tenants) and <code>test_contracts</code> (the rules above hold).</td></tr>
+</table>
+
+<h2>Try it</h2>
+<pre>uv sync --extra dev
+pytest -m unit          # 7 tests, no keys
+ruff check .
+python worker.py --help # LiveKit Agents CLI: console / dev / start</pre>
+
+<h2>What passed</h2>
+<p class="ok">pytest -m unit: 7 passed · ruff: clean · worker.py --help: prints the CLI</p>
+
+<h2>Read the code</h2>
+<pre>nvim -p pyproject.toml worker.py core/context.py core/contracts.py core/tools/contract.py core/adapters/base.py core/state/events.py tests/test_contracts.py</pre>
+
+<h2>Open-source note</h2>
+<p>The contracts are framework-agnostic: <code>ToolSpec</code>, <code>Adapter</code> and <code>Event</code> can be lifted into any voice-agent codebase (Pipecat, LiveKit, custom) as the seam between "what the LLM may call" and "what touches the customer's systems".</p>
+
+<h2>Continuous integration</h2>
+<p><code>.github/workflows/ci.yml</code> runs <code>ruff check</code>, <code>ruff format --check</code> and <code>pytest -m unit</code> on every push with uv and Python 3.12. No provider keys are needed at this stage; the evals job arrives in ms-1 gated on secrets.</p>
+<h2>The board hooks</h2>
+<p><code>.claude/settings.json</code> and <code>.mcp.json</code> call taskops through <code>uvx --from taskops-cli …</code>, so any clone joins the board without machine-specific paths. The README section <em>How this repository is orchestrated</em> explains milestones, cards, workers and human review.</p>
+
+<h2>Known limits</h2>
+<p>No behaviour yet: no session, no providers, no tenants. <code>python worker.py console</code> starts and fails with the ms-0 message by design.</p>
+</body></html>

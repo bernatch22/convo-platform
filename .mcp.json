@@ -1,13 +1,16 @@
 {
   "mcpServers": {
     "taskops": {
-      "command": "/Users/berna/.local/share/uv/tools/taskops-cli/bin/python3",
+      "command": "uvx",
       "args": [
+        "--from",
+        "taskops-cli",
+        "python",
         "-m",
         "taskops.mcp"
       ],
       "env": {
-        "TASKOPS_ACTOR": "dev:berna"
+        "TASKOPS_ACTOR": "dev:${USER}"
       }
     }
   }
