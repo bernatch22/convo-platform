@@ -14,10 +14,9 @@ interface RailProps {
   tenants: Tenant[];
 }
 
-const SECTIONS = [
-  { to: "sessions", label: "Sessions", glyph: "≡" },
-  { to: "pipeline", label: "Pipeline", glyph: "⇄" },
-] as const;
+const SECTIONS = ["sessions", "pipeline"] as const;
+
+const FLEET = ["evals", "supervisor"] as const;
 
 export function Rail({ tenants }: RailProps) {
   const { tenant: current } = useParams();
@@ -31,9 +30,7 @@ export function Rail({ tenants }: RailProps) {
           <ConnectionDot />
         </div>
 
-        {tenants.length === 0 && (
-          <div className="rail__tenant faint">no tenant answering</div>
-        )}
+        {tenants.length === 0 && <div className="rail__tenant faint">no tenant answering</div>}
 
         {tenants.map((tenant) => (
           <div key={tenant.tenant}>
@@ -44,7 +41,6 @@ export function Rail({ tenants }: RailProps) {
                 to={`/t/${tenant.tenant}/${project.id}`}
                 className={link("rail__link rail__link--project")}
               >
-                <span className="rail__glyph">▸</span>
                 <span>{project.id}</span>
                 <span className="rail__tag">{project.language}</span>
               </NavLink>
@@ -55,34 +51,22 @@ export function Rail({ tenants }: RailProps) {
 
       {active && (
         <div className="rail__group">
-          <div className="rail__label">
-            <span>{active}</span>
-          </div>
+          <div className="rail__label">{active}</div>
           {SECTIONS.map((section) => (
-            <NavLink
-              key={section.to}
-              to={`/t/${active}/${section.to}`}
-              className={link("rail__link")}
-            >
-              <span className="rail__glyph">{section.glyph}</span>
-              <span>{section.label}</span>
+            <NavLink key={section} to={`/t/${active}/${section}`} className={link("rail__link")}>
+              {label(section)}
             </NavLink>
           ))}
         </div>
       )}
 
       <div className="rail__group">
-        <div className="rail__label">
-          <span>Fleet</span>
-        </div>
-        <NavLink to="/evals" className={link("rail__link")}>
-          <span className="rail__glyph">✓</span>
-          <span>Evals</span>
-        </NavLink>
-        <NavLink to="/supervisor" className={link("rail__link")}>
-          <span className="rail__glyph">◎</span>
-          <span>Supervisor</span>
-        </NavLink>
+        <div className="rail__label">Fleet</div>
+        {FLEET.map((section) => (
+          <NavLink key={section} to={`/${section}`} className={link("rail__link")}>
+            {label(section)}
+          </NavLink>
+        ))}
       </div>
 
       <div className="rail__foot">
@@ -95,4 +79,8 @@ export function Rail({ tenants }: RailProps) {
 
 function link(base: string) {
   return ({ isActive }: { isActive: boolean }) => (isActive ? `${base} is-active` : base);
+}
+
+function label(section: string): string {
+  return section.charAt(0).toUpperCase() + section.slice(1);
 }

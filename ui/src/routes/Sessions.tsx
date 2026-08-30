@@ -1,10 +1,20 @@
-/* Sessions — the call log for one tenant. The columns are real; the rows arrive with the read API. */
+/* Sessions — the call log for one tenant. The columns are the API's; the rows arrive next card. */
 
 import { useParams } from "react-router";
 
 import { EmptyState } from "../components/EmptyState";
 
-const COLUMNS = ["session", "project", "channel", "started", "outcome", "turns", "cost"];
+/** The columns of GET /sessions, in the order an operator scans them. */
+const COLUMNS = [
+  { key: "id", num: false },
+  { key: "project", num: false },
+  { key: "channel", num: false },
+  { key: "started_at", num: false },
+  { key: "outcome", num: false },
+  { key: "turns", num: true },
+  { key: "events", num: true },
+  { key: "cost_eur", num: true },
+];
 
 export function Sessions() {
   const { tenant = "" } = useParams();
@@ -15,9 +25,10 @@ export function Sessions() {
         <div className="page__eyebrow">{tenant}</div>
         <h1 className="page__title">Sessions</h1>
         <p className="page__lede">
-          Every conversation this tenant has had, newest first. A row opens the session&apos;s
-          append-only log: one line per fact, numbered by <code className="mono">seq</code>, with
-          the per-turn STT / LLM / TTS breakdown and the consent proof beside it.
+          Every conversation this tenant has had, newest first — phone calls included. A row opens
+          the session&apos;s append-only log: one line per fact, numbered by{" "}
+          <code className="mono">seq</code>, with the per-turn STT / LLM / TTS breakdown and the
+          consent proof beside it.
         </p>
       </header>
 
@@ -26,8 +37,8 @@ export function Sessions() {
           <thead>
             <tr>
               {COLUMNS.map((column) => (
-                <th key={column} className={column === "turns" || column === "cost" ? "num" : ""}>
-                  {column}
+                <th key={column.key} className={column.num ? "num" : ""}>
+                  {column.key}
                 </th>
               ))}
             </tr>
@@ -35,7 +46,7 @@ export function Sessions() {
           <tbody>
             <tr>
               <td colSpan={COLUMNS.length} className="faint mono">
-                no rows — awaiting GET /sessions
+                no rows loaded
               </td>
             </tr>
           </tbody>
@@ -44,17 +55,21 @@ export function Sessions() {
 
       <section className="section">
         <EmptyState
-          title="The read side is not wired yet"
+          title="The table has its columns, not its loader"
           milestone="ms-9"
-          card="tk-667be6"
-          command="python -m convo sessions list"
+          card="the sessions card"
+          command={`curl -s 'localhost:8090/sessions?tenant=${tenant}&limit=20'`}
         >
           <p>
-            Sessions are already being written — every call and every console run appends to the
-            store as it happens. What is missing is <code className="mono">GET /sessions</code>, the
-            endpoint that hands them to this table; it is being built alongside this shell.
+            <code className="mono">GET /sessions</code> is merged and answering — these are its
+            fields, verbatim. What this screen still needs is the route loader that calls it and
+            the row rendering, which is a card of its own so this seam could land first.
           </p>
-          <p>Until it lands, the same rows are readable from the CLI.</p>
+          <p>
+            <code className="mono">outcome</code> and <code className="mono">cost_eur</code> are
+            null while a call is still running; the same rows are readable from the CLI today with{" "}
+            <code className="mono">python -m convo sessions list</code>.
+          </p>
         </EmptyState>
       </section>
     </div>

@@ -1,7 +1,7 @@
-/* An empty screen that tells the truth: what is missing, which milestone fills it, how to check.
+/* An empty screen that tells the truth: what is missing, what fills it, how to check today.
  *
  * No lorem ipsum and no fake rows: an operator who cannot tell "nothing
- * happened yet" from "the feature was never built" has been lied to by the UI.
+ * happened yet" from "this was never built" has been lied to by the UI.
  */
 
 import type { ReactNode } from "react";
@@ -17,14 +17,13 @@ interface EmptyStateProps {
 export function EmptyState({ title, children, milestone, card, command }: EmptyStateProps) {
   return (
     <div className="empty">
-      <div className="empty__rule" aria-hidden />
       <h2 className="empty__title">{title}</h2>
       <div className="empty__body">{children}</div>
 
       {(milestone || card) && (
         <div className="empty__meta">
-          {milestone && <span className="badge badge--accent">{milestone}</span>}
-          {card && <span className="badge badge--muted">card {card}</span>}
+          {milestone && <span className="badge">{milestone}</span>}
+          {card && <span className="badge">{card}</span>}
         </div>
       )}
 

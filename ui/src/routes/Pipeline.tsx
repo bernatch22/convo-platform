@@ -19,7 +19,7 @@ export function Pipeline() {
         <p className="page__lede">
           The three legs of a voice turn as data, not as prose: what hears, what decides, what
           speaks — with the medians measured over this project&apos;s stored sessions, and the
-          three fields an operator may change without a deploy.
+          three fields a supervisor may change without a deploy.
         </p>
       </header>
 
@@ -58,28 +58,29 @@ export function Pipeline() {
           />
         </div>
         <p className="note">
-          shown from the invariants in CLAUDE.md — the live values and the medians come from GET
-          /pipeline
+          the platform&apos;s invariants — the live snapshot and the medians come from GET /pipeline
         </p>
       </section>
 
       <section className="section">
         <EmptyState
-          title="Nothing is controllable from here yet"
+          title="Reading the real snapshot is the next card"
           milestone="ms-9"
-          card="tk-667be6"
-          command={`curl -s localhost:8090/pipeline/${tenant}/<project>`}
+          card="the pipeline card"
+          command={`curl -s localhost:8090/pipeline/${tenant}/${projects[0]?.id ?? "<project>"}`}
         >
           <p>
-            <code className="mono">GET /pipeline/{"{tenant}"}/{"{project}"}</code> will report the
-            three legs as they are actually configured plus the measured ttft / e2e / eot medians,
-            and <code className="mono">PUT</code> will let an operator change voice, TTS model and
-            greeting for the next session — applied by{" "}
-            <code className="mono">core.router.resolve</code>, so no deploy and no restart.
+            <code className="mono">GET /pipeline/{"{tenant}"}/{"{project}"}</code> is merged: the
+            three legs as the NEXT session will run them, the overrides already applied, and the
+            medians (<code className="mono">transcription_delay</code>,{" "}
+            <code className="mono">end_of_turn_delay</code>, <code className="mono">llm_node_ttft</code>
+            , <code className="mono">tts_node_ttfb</code>, <code className="mono">e2e_latency</code>)
+            — null, never zero, when nothing measured them.
           </p>
           <p>
-            The provider rules still hold at the door: a PUT of a forbidden TTS model comes back
-            422 naming the rule it broke.
+            <code className="mono">PUT</code> takes voice, tts_model and greeting and returns the
+            changed snapshot, so no refetch. A model the platform refuses to run comes back 422
+            naming the rule it broke.
           </p>
         </EmptyState>
       </section>
@@ -98,7 +99,7 @@ function Leg({ role, provider, rows }: LegProps) {
     <article className="panel">
       <div className="panel__head">
         <span className="panel__title">{provider}</span>
-        <span className="badge badge--accent">{role}</span>
+        <span className="badge">{role}</span>
       </div>
       <div className="panel__body">
         <table className="kv">

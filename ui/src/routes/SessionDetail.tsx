@@ -1,4 +1,4 @@
-/* One session, read as its log: the seq table, the report, the live tail. */
+/* One session, read as its log: the seq table, the report, and the live tail over SSE. */
 
 import { Link, useParams } from "react-router";
 
@@ -37,7 +37,7 @@ export function SessionDetail() {
           <tbody>
             <tr>
               <td colSpan={COLUMNS.length} className="faint mono">
-                no events — awaiting GET /sessions/{"{id}"} and /live
+                no events loaded
               </td>
             </tr>
           </tbody>
@@ -46,16 +46,17 @@ export function SessionDetail() {
 
       <section className="section">
         <EmptyState
-          title="This log has no reader yet"
+          title="The log has an endpoint, not yet a reader"
           milestone="ms-9"
-          card="tk-667be6"
-          command={`python -m convo sessions show ${id || "<id>"}`}
+          card="the sessions card"
+          command={`curl -s localhost:8090/sessions/${id || "<id>"}`}
         >
           <p>
-            The events exist. What this screen still needs is{" "}
-            <code className="mono">GET /sessions/{"{id}"}</code> for the stored log and{" "}
-            <code className="mono">/sessions/{"{id}"}/live</code> for the SSE tail, plus the report
-            that <code className="mono">on_session_end</code> persists.
+            <code className="mono">GET /sessions/{"{id}"}</code> returns the stored log and the
+            end-of-call report; <code className="mono">/sessions/{"{id}"}/live?after=&lt;seq&gt;</code>{" "}
+            streams <code className="mono">open</code> / <code className="mono">append</code> /{" "}
+            <code className="mono">end</code> frames as they are written. Both are typed in{" "}
+            <code className="mono">lib/api.ts</code>; rendering them is the next card.
           </p>
         </EmptyState>
       </section>

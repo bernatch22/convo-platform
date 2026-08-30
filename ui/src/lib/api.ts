@@ -1,10 +1,9 @@
 /* The only file that knows the control plane exists.
  *
- * Everything the UI reads or writes goes through here, typed once. Two of these
- * endpoints (`/tenants`, `/token`) are live on master today; the rest are the
- * read side and the pipeline API being built alongside this shell (card
- * tk-667be6) — their types are written from that card's spec so the day they
- * land the diff is a deletion of the "not built yet" guards, nothing more.
+ * Every type here is transcribed from a route docstring in api.py, which is
+ * where the shapes are defined — field for field, including the ones this
+ * shell does not render yet, so a later card fills a screen instead of
+ * inventing a contract.
  *
  * In dev, vite proxies these paths to the control plane (see vite.config.ts).
  * In production api.py serves this bundle itself, so relative paths are right
@@ -27,7 +26,7 @@ export interface Tenant {
   projects: Project[];
 }
 
-/* ── /token ───────────────────────────────────────────────────────────────── */
+/* ── /token and /observe ──────────────────────────────────────────────────── */
 
 export type Channel = "voice" | "chat";
 
@@ -46,85 +45,150 @@ export interface SessionTicket {
   token: string;
 }
 
+/** A listen-only ticket: receives audio and transcription, publishes nothing, stays hidden. */
+export interface ObserverTicket {
+  url: string;
+  room: string;
+  identity: string;
+  token: string;
+}
+
 /* ── /sessions ────────────────────────────────────────────────────────────── */
 
-/** One row of the call log: what the store knows about a session besides its events. */
-export interface SessionRow {
+/** One line of the call log. `outcome` and `cost_eur` are null while the call runs. */
+export interface SessionLine {
   id: string;
   tenant: string;
   project: string;
   channel: Channel;
-  started: number;
-  ended: number | null;
+  started_at: number;
+  ended_at: number | null;
   outcome: string | null;
-  cost: number | null;
+  events: number;
   turns: number;
+  cost_eur: number | null;
 }
 
-/** One line of the append-only log: numbered, timed, never edited. */
+/** One fact in the append-only log. A turn's latencies live in `payload.metrics`. */
 export interface SessionEvent {
   seq: number;
-  kind: string;
   t_ms: number;
+  kind: string;
   payload: Record<string, unknown>;
 }
 
-/** A finished session in full: its row, every event in seq order, and the framework's report. */
-export interface SessionDetail {
-  session: SessionRow;
+/** One session in full: its list line, the end-of-call report, every event in seq order. */
+export interface SessionView extends SessionLine {
+  report: Record<string, unknown> | null;
+  events_log: SessionEvent[];
+}
+
+/** The raw body of GET /sessions/{id} — `events` is the array here, not the count. */
+type SessionViewBody = Omit<SessionLine, "events"> & {
   events: SessionEvent[];
   report: Record<string, unknown> | null;
+};
+
+/* ── /sessions/{id}/live (SSE) ────────────────────────────────────────────── */
+
+/** The four frames the live log emits, in the order a reader meets them. */
+export type LiveFrame =
+  | { type: "open"; session: SessionLine }
+  | { type: "append"; event: SessionEvent }
+  | { type: "end"; seq: number; outcome: string | null }
+  | { type: "error"; error: string };
+
+/* ── /live-calls ──────────────────────────────────────────────────────────── */
+
+/** A call happening right now, as the SFU sees it. A phone call never passed through /token. */
+export interface LiveCall {
+  room: string;
+  sid: string;
+  participants: number;
+  started_at: number;
+  agent: boolean;
+  identities: string[];
+  phone: string | null;
+  session_id: string | null;
+  tenant: string | null;
+  project: string | null;
 }
 
 /* ── /pipeline ────────────────────────────────────────────────────────────── */
 
-/** Soniox as configured for this project — model plus the endpointing knobs. */
-export interface SttConfig {
+/** Soniox as the next session will run it, endpointing knobs included. */
+export interface SttSnapshot {
   provider: string;
   model: string;
   language_hints: string[];
-  endpointing: Record<string, number>;
-  context: string | null;
+  sample_rate: number;
+  endpointing: {
+    max_endpoint_delay_ms: number;
+    latency_adjustment_level: number;
+    sensitivity: number;
+  };
+  keyterms: string[];
 }
 
-/** The LLM leg: model id and whether the prefix is being cached. */
-export interface LlmConfig {
+/** The LLM leg, with the cache floor that makes caching a no-op below it. */
+export interface LlmSnapshot {
   provider: string;
   model: string;
   caching: string | null;
+  max_tokens: number;
+  cache_minimum_tokens: number;
+  cache_note: string;
 }
 
-/** The TTS leg: model chosen by tts_model(), the project's voice, alignment. */
-export interface TtsConfig {
+/** The TTS leg: what was asked for, what runs, and what the platform refuses to run. */
+export interface TtsSnapshot {
   provider: string;
   model: string;
+  requested_model: string | null;
+  default_model: string;
+  latency_model: string;
+  forbidden_models: string[];
   voice: string;
   sync_alignment: boolean;
 }
 
-/** Measured medians over the last N stored voice sessions of this project, in ms. */
-export interface PipelineLatencies {
-  ttft_ms: number | null;
-  e2e_ms: number | null;
-  eot_ms: number | null;
-  transcription_delay_ms: number | null;
-  sessions: number;
+/** One field the console changed, and when. */
+export interface PipelineOverrideRow {
+  field: string;
+  value: string;
+  updated_at: number;
 }
 
-/** The three providers as data, plus what an operator may change without a deploy. */
-export interface Pipeline {
+/** Medians in ms over stored voice sessions; a never-measured one is null, never 0. */
+export interface LatencyMedians {
+  transcription_delay: number | null;
+  end_of_turn_delay: number | null;
+  llm_node_ttft: number | null;
+  tts_node_ttfb: number | null;
+  e2e_latency: number | null;
+}
+
+/** Everything the pipeline screen reads: the three legs, the overrides, the measurements. */
+export interface PipelineSnapshot {
   tenant: string;
   project: string;
-  stt: SttConfig;
-  llm: LlmConfig;
-  tts: TtsConfig;
-  greeting: string;
+  name: string;
   language: string;
-  latencies: PipelineLatencies;
+  greeting: string;
+  stt: SttSnapshot;
+  llm: LlmSnapshot;
+  tts: TtsSnapshot;
+  overrides: PipelineOverrideRow[];
+  overridable: string[];
+  latency: {
+    sessions: number;
+    turns: number;
+    medians: LatencyMedians;
+  };
 }
 
-/** The three fields an operator may override per project; absent means "leave it". */
-export interface PipelineOverride {
+/** The three fields a supervisor may change between calls; anything else is a 422. */
+export interface PipelineUpdate {
   voice?: string;
   tts_model?: string;
   greeting?: string;
@@ -132,7 +196,7 @@ export interface PipelineOverride {
 
 /* ── errors ───────────────────────────────────────────────────────────────── */
 
-/** A control-plane failure with the status and the detail the API gave, for the UI to show. */
+/** A control-plane refusal with the status and the sentence the API gave, for the UI to show. */
 export class ApiError extends Error {
   readonly status: number;
 
@@ -155,64 +219,82 @@ export async function listTenants(signal?: AbortSignal): Promise<Tenant[]> {
 
 /** Mint a session ticket: a fresh room joinable by exactly this caller. */
 export async function mintToken(req: TokenRequest): Promise<SessionTicket> {
-  return request<SessionTicket>("/token", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(req),
-  });
+  return request<SessionTicket>("/token", json("POST", req));
 }
 
-/** The call log, newest first, optionally narrowed to one tenant. */
+/** Mint a hidden, listen-only ticket into a room somebody else is already in. */
+export async function observe(room: string): Promise<ObserverTicket> {
+  return request<ObserverTicket>("/observe", json("POST", { room }));
+}
+
+/** The call log, newest first, optionally narrowed to one tenant or project. */
 export async function listSessions(
-  params: { tenant?: string; limit?: number } = {},
+  params: { tenant?: string; project?: string; limit?: number } = {},
   signal?: AbortSignal,
-): Promise<SessionRow[]> {
-  const query = new URLSearchParams();
-  if (params.tenant) query.set("tenant", params.tenant);
-  if (params.limit !== undefined) query.set("limit", String(params.limit));
-  const suffix = query.toString() ? `?${query}` : "";
-  return request<SessionRow[]>(`/sessions${suffix}`, signal ? { signal } : {});
+): Promise<SessionLine[]> {
+  return request<SessionLine[]>(`/sessions${query(params)}`, signal ? { signal } : {});
 }
 
-/** One session in full: row, events in seq order, session report. */
-export async function getSession(id: string, signal?: AbortSignal): Promise<SessionDetail> {
-  return request<SessionDetail>(`/sessions/${encodeURIComponent(id)}`, signal ? { signal } : {});
+/** One session in full. `events` is split into the count and the log so both keep their names. */
+export async function getSession(id: string, signal?: AbortSignal): Promise<SessionView> {
+  const body = await request<SessionViewBody>(
+    `/sessions/${encodeURIComponent(id)}`,
+    signal ? { signal } : {},
+  );
+  const { events, ...line } = body;
+  return { ...line, events: events.length, events_log: events };
 }
 
-/** Subscribe to a live session's events as they append. Returns the unsubscribe. */
-export function watchSession(id: string, onEvent: (event: SessionEvent) => void): () => void {
-  const source = new EventSource(`/sessions/${encodeURIComponent(id)}/live`);
-  source.onmessage = (message: MessageEvent<string>) => {
-    onEvent(JSON.parse(message.data) as SessionEvent);
-  };
-  return () => source.close();
+/** Calls in progress on the SFU, phone calls included. Throws ApiError(503) when it is down. */
+export async function listLiveCalls(signal?: AbortSignal): Promise<LiveCall[]> {
+  return request<LiveCall[]>("/live-calls", signal ? { signal } : {});
 }
 
-/** The three providers this project runs on, with their measured latencies. */
+/** The pipeline the NEXT session of this project will run on, overrides already applied. */
 export async function getPipeline(
   tenant: string,
   project: string,
   signal?: AbortSignal,
-): Promise<Pipeline> {
-  const path = `/pipeline/${encodeURIComponent(tenant)}/${encodeURIComponent(project)}`;
-  return request<Pipeline>(path, signal ? { signal } : {});
+): Promise<PipelineSnapshot> {
+  return request<PipelineSnapshot>(pipelinePath(tenant, project), signal ? { signal } : {});
 }
 
-/** Change voice / tts_model / greeting for the next session — no deploy, no restart. */
+/** Change voice / tts_model / greeting for the next session; the answer is the new snapshot. */
 export async function putPipeline(
   tenant: string,
   project: string,
-  override: PipelineOverride,
-): Promise<Pipeline> {
-  const path = `/pipeline/${encodeURIComponent(tenant)}/${encodeURIComponent(project)}`;
-  return request<Pipeline>(path, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(override),
-  });
+  update: PipelineUpdate,
+): Promise<PipelineSnapshot> {
+  return request<PipelineSnapshot>(pipelinePath(tenant, project), json("PUT", update));
 }
 
-/** Is the control plane answering? Used by the rail's connection dot, never throws. */
+/** Follow one session's log as it appends, from the last seq seen. Returns the unsubscribe. */
+export function watchSession(
+  id: string,
+  after: number,
+  onFrame: (frame: LiveFrame) => void,
+): () => void {
+  const source = new EventSource(`/sessions/${encodeURIComponent(id)}/live?after=${after}`);
+
+  source.addEventListener("open", (event) => {
+    onFrame({ type: "open", session: parse<SessionLine>(event) });
+  });
+  source.addEventListener("append", (event) => {
+    onFrame({ type: "append", event: parse<SessionEvent>(event) });
+  });
+  source.addEventListener("end", (event) => {
+    const { seq, outcome } = parse<{ seq: number; outcome: string | null }>(event);
+    onFrame({ type: "end", seq, outcome });
+    source.close();
+  });
+  source.addEventListener("error", (event) => {
+    onFrame({ type: "error", error: describe(event) });
+  });
+
+  return () => source.close();
+}
+
+/** Is the control plane answering? Used by the rail's connection dot; never throws. */
 export async function probe(signal?: AbortSignal): Promise<{ up: boolean; ms: number }> {
   const started = performance.now();
   try {
@@ -221,6 +303,31 @@ export async function probe(signal?: AbortSignal): Promise<{ up: boolean; ms: nu
   } catch {
     return { up: false, ms: Math.round(performance.now() - started) };
   }
+}
+
+function pipelinePath(tenant: string, project: string): string {
+  return `/pipeline/${encodeURIComponent(tenant)}/${encodeURIComponent(project)}`;
+}
+
+function query(params: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) search.set(key, String(value));
+  }
+  return search.toString() ? `?${search}` : "";
+}
+
+function json(method: string, body: unknown): RequestInit {
+  return { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
+}
+
+function parse<T>(event: Event): T {
+  return JSON.parse((event as MessageEvent<string>).data) as T;
+}
+
+function describe(event: Event): string {
+  const data = (event as MessageEvent<string>).data;
+  return typeof data === "string" ? data : "the live stream closed";
 }
 
 async function request<T>(path: string, init: RequestInit): Promise<T> {

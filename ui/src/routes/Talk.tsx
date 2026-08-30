@@ -9,6 +9,7 @@
 import { useParams } from "react-router";
 
 import { EmptyState } from "../components/EmptyState";
+import { LiveCalls } from "../components/LiveCalls";
 
 import { useShellData } from "./Shell";
 
@@ -23,9 +24,7 @@ export function Talk() {
   return (
     <div className="page">
       <header className="page__head">
-        <div className="page__eyebrow">
-          {tenant} / {project}
-        </div>
+        <div className="page__eyebrow">{tenant}</div>
         <h1 className="page__title">{known?.name ?? project}</h1>
         <p className="page__lede">
           One process runtime, three ways in. Whichever door a caller uses, the same project
@@ -38,42 +37,41 @@ export function Talk() {
         <h2 className="section__title">Channels</h2>
         <div className="grid grid--3">
           <Channel
-            glyph="◉"
             name="Voice"
-            badge="webrtc"
+            kind="webrtc"
             note="Microphone in this tab, over LiveKit. Soniox transcribes, Haiku answers, ElevenLabs speaks — interim words appear as they are heard."
             address="livekit · publish + subscribe"
           />
           <Channel
-            glyph="▤"
             name="Chat"
-            badge="text"
+            kind="text"
             note="No audio tracks at all: the session opens with audio_input and audio_output off. You type on lk.chat, the agent streams back on lk.transcription."
             address="livekit · data only"
           />
           <Channel
-            glyph="☏"
             name="Phone"
-            badge="pstn"
-            note="Inbound over the Twilio Elastic SIP trunk into livekit-sip. The number decides the tenant and project through a dispatch rule — no browser involved."
+            kind="pstn"
+            note="Inbound over the Twilio Elastic SIP trunk into livekit-sip. The number decides the tenant and project, so no browser is involved — the call appears below and POST /observe joins it hidden, publishing nothing."
             address={PHONE_NUMBER}
             live
           />
         </div>
       </section>
 
+      <LiveCalls />
+
       <section className="section">
         <EmptyState
           title="No session open"
           milestone="ms-9"
-          card="tk-48ce8b → the Talk cards"
+          card="the Talk cards"
           command={`curl -s localhost:8090/token -H 'content-type: application/json' -d '{"tenant":"${tenant}","project":"${project}","channel":"chat"}'`}
         >
           <p>
             This shell is the frame only. Connecting the microphone, the chat box and the live
             transcript is the next card of ms-9: raw <code className="mono">livekit-client</code>,
             interim → final transcription, karaoke at audio pace, and the turn/tool timeline down
-            the right-hand side.
+            the right-hand side — the same three for a phone call joined as an observer.
           </p>
           <p>
             The control plane already mints the ticket, so the door is open — the command below
@@ -86,22 +84,19 @@ export function Talk() {
 }
 
 interface ChannelProps {
-  glyph: string;
   name: string;
-  badge: string;
+  kind: string;
   note: string;
   address: string;
   live?: boolean;
 }
 
-function Channel({ glyph, name, badge, note, address, live = false }: ChannelProps) {
+function Channel({ name, kind, note, address, live = false }: ChannelProps) {
   return (
     <article className="channel">
       <div className="channel__top">
-        <span className="channel__name">
-          <span className="channel__glyph">{glyph}</span> {name}
-        </span>
-        <span className="badge">{badge}</span>
+        <span className="channel__name">{name}</span>
+        <span className="badge">{kind}</span>
       </div>
       <p className="channel__note">{note}</p>
       <div className={live ? "channel__addr channel__addr--live" : "channel__addr"}>{address}</div>
