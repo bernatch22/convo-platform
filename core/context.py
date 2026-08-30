@@ -13,6 +13,7 @@ from core.tools.catalog import ToolCatalog
 
 if TYPE_CHECKING:  # avoid import cycles; these are filled in by later milestones
     from core.adapters.base import Adapter
+    from core.confirm import ConfirmationToken
     from core.state.log import EventLog
     from core.tools.executor import ToolExecutor
 
@@ -74,6 +75,7 @@ class TenantContext:
     adapters: dict[str, "Adapter"] = field(default_factory=dict)
     tools: "ToolExecutor | None" = None
     log: "EventLog | None" = None
+    confirmation_token: "ConfirmationToken | None" = None
     customer: dict[str, Any] | None = None
     prev_agent: Any = None
 

@@ -64,6 +64,7 @@ class LocalExecutor:
         log.info("tool.call %s %s args=%s", self.tc.label(), spec.name, safe_args)
         self._record("tool.call", spec, args=safe_args)
         result = await self._execute(spec, adapter, args, safe_args)
+        guard.consume(spec, self.tc)
         self._record("tool.result", spec, shape=_shape(result))
         log.info("tool.result %s %s ok", self.tc.label(), spec.name)
         return result

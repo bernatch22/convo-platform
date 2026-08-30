@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from core.testing import deepeval as bridge
-from core.testing.harness import Conversation, fake_context
+from core.testing.harness import Conversation, Exchange, PlatformCall, fake_context
 
 pytestmark = pytest.mark.unit
 
@@ -70,6 +70,12 @@ def call(name: str, arguments: str, call_id: str = "call-1") -> FakeEvent:
 def output(text: str, call_id: str = "call-1") -> FakeEvent:
     item = FakeOutput(output=text, call_id=call_id)
     return FakeEvent(type="function_call_output", item=item)
+
+
+def conversation_of(greeting: str, *results: FakeResult, said: str = "hola") -> Conversation:
+    """A run of one turn per result, all answering the same line."""
+    exchanges = [Exchange(input=said, result=result) for result in results]
+    return Conversation(greeting=greeting, exchanges=exchanges)
 
 
 GOLDEN = {
@@ -185,7 +191,7 @@ def test_the_case_judges_the_whole_turn_and_not_its_first_message() -> None:
         ]
     )
 
-    case = bridge.test_case_for(GOLDEN, Conversation(greeting="Clínica Norte.", results=[result]))
+    case = bridge.test_case_for(GOLDEN, conversation_of("Clínica Norte.", result))
 
     assert "Un momento" in case.actual_output
     assert "¿Cuál prefiere?" in case.actual_output
@@ -194,7 +200,7 @@ def test_the_case_judges_the_whole_turn_and_not_its_first_message() -> None:
 def test_the_case_carries_the_expected_tools_by_name_and_the_behaviour_as_context() -> None:
     result = FakeResult([call("find_availability", '{"date": "el jueves"}')])
 
-    case = bridge.test_case_for(GOLDEN, Conversation(greeting="", results=[result]))
+    case = bridge.test_case_for(GOLDEN, conversation_of("", result))
 
     assert case.input == GOLDEN["input"]
     assert [t.name for t in case.expected_tools] == ["find_availability"]
@@ -222,7 +228,7 @@ def test_a_golden_that_must_not_call_still_reports_what_the_turn_did_call() -> N
         "expected_tools": [],
     }
 
-    case = bridge.test_case_for(golden, Conversation(greeting="", results=[result]))
+    case = bridge.test_case_for(golden, conversation_of("", result))
 
     assert case.expected_tools == []
     assert [t.name for t in case.tools_called] == ["find_availability"]
@@ -254,3 +260,62 @@ def test_every_call_returns_a_fresh_metric() -> None:
     metrics = bridge.project_metrics("clinica-norte", "reagendamiento")
 
     assert metrics.tool_correctness() is not metrics.tool_correctness()
+
+
+# --- conversational_test_case_for -------------------------------------------
+
+
+def test_a_run_becomes_a_transcript_that_opens_with_the_line_the_agent_opened_on() -> None:
+    """The greeting happens in on_enter: a transcript starting with the caller is not the call."""
+    conversation = conversation_of("Clínica Norte, ¿en qué le ayudo?", FakeResult([message("Ya.")]))
+
+    case = bridge.conversational_test_case_for(conversation)
+
+    assert [(t.role, t.content) for t in case.turns] == [
+        ("assistant", "Clínica Norte, ¿en qué le ayudo?"),
+        ("user", "hola"),
+        ("assistant", "Ya."),
+    ]
+
+
+def test_an_assistant_turn_carries_the_model_s_calls_and_then_the_platform_s_writes() -> None:
+    """`book_appointment` is the model asking for a yes; `book_slot` is the appointment moving."""
+    result = FakeResult([call("book_appointment", '{"time": "11:00"}')])
+    exchange = Exchange(
+        input="sí",
+        result=result,
+        platform_calls=[
+            PlatformCall(
+                name="book_slot",
+                args={"slot_id": "sl-1"},
+                ok=True,
+                result={"appointment_id": "ap-1"},
+            )
+        ],
+    )
+
+    case = bridge.conversational_test_case_for(Conversation(greeting="", exchanges=[exchange]))
+
+    assert [t.name for t in case.turns[1].tools_called] == ["book_appointment", "book_slot"]
+    assert case.turns[1].tools_called[1].output == "{'appointment_id': 'ap-1'}"
+
+
+def test_a_platform_write_the_customer_s_system_rejected_says_so_to_the_judge() -> None:
+    exchange = Exchange(
+        input="sí",
+        result=FakeResult([]),
+        platform_calls=[PlatformCall(name="book_slot", args={}, ok=False)],
+    )
+
+    case = bridge.conversational_test_case_for(Conversation(greeting="", exchanges=[exchange]))
+
+    assert case.turns[1].tools_called[0].output == bridge.REFUSED
+
+
+def test_the_scenario_of_the_golden_that_drove_the_call_travels_onto_the_case() -> None:
+    conversation = conversation_of("", FakeResult([message("Ya.")]))
+
+    case = bridge.conversational_test_case_for(conversation, scenario="Cambia su cita", name="uno")
+
+    assert case.scenario == "Cambia su cita"
+    assert case.name == "uno"

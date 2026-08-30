@@ -14,9 +14,16 @@ parametrized suite would have the tests overwrite each other's results.
 
 import os
 
-from deepeval.metrics import ArgumentCorrectnessMetric, GEval, ToolCorrectnessMetric
+from deepeval.metrics import (
+    ArgumentCorrectnessMetric,
+    ConversationalDAGMetric,
+    GEval,
+    ToolCorrectnessMetric,
+)
 from deepeval.models import AnthropicModel
 from deepeval.test_case import SingleTurnParams
+
+from . import dag
 
 JUDGE_MODEL = os.getenv("DEEPEVAL_JUDGE_MODEL", "claude-haiku-4-5")
 
@@ -26,38 +33,36 @@ RECEPTION_LINE_CRITERIA = (
     "(one or two is fine and never a fault), stays on appointments and clinic information, "
     "gives no clinical advice. It hands the turn back with EITHER a question — any question, "
     "however open, «¿qué necesita?» included — OR a concrete next step: either one alone is "
-    "enough and both together are never required. Exactly two kinds of claim need a tool "
-    "behind them — a specific appointment hour, and the doctor attached to a specific slot — "
-    "and they count as invented only when no tool output of this turn contains them, so read "
-    "the tools called before deciding; nothing else needs a tool, and in particular prices, "
-    "address, opening hours, the cancellation policy and how to prepare for a test are on the "
-    "clinic's own information sheet, which the receptionist has in front of her, so stating "
-    "any of them with no tool called is correct and is never an invention. Judge against the "
-    "expected behaviour in the context."
+    "enough and both together are never required. Whether the facts it states are TRUE is not "
+    "yours to judge and is never a fault here: another metric checks every hour, price and "
+    "name against its source, so read a stated fact as correct and score only how it is said. "
+    "Judge against the expected behaviour in the context."
 )
 
 
 def reception_line() -> GEval:
-    """Does the reply sound like Clínica Norte's reception and stay within its remit?
+    """Does the reply SOUND like Clínica Norte's reception? Tone and form only, never facts.
 
-    The tools called are part of what is judged, not decoration. Shown only the
-    words, this judge scored two correct answers 0.6 and 0.2 for "inventing
-    availability" — the hours were real, read off the agenda a line earlier,
-    and the judge had no way to know. A metric that cannot see the evidence
-    fails the agent for the metric's own blind spot.
+    This metric used to own the invention rule too, and it could not hold it.
+    A GEval turns its criteria into evaluation steps, and a step keeps only the
+    clause it grew from, so "an hour needs a tool behind it" survived its own
+    exception and failed the price answer for quoting 90 euros with nothing
+    called — intermittently, 0.0 on one run and 0.9 on the next, because a
+    judge with no evidence in front of it is guessing. Rewriting the sentence
+    bought a week each time. The rule now lives in `grounded_facts_dag`, where
+    code does the matching and the judge is only ever handed a claim and the
+    document that does or does not contain it. What is left here is tone,
+    register, length and remit — the things a judge is actually good at.
 
-    Every either/or in the criteria is spelled out as "one alone is enough".
-    Written as a plain "a question or a next step" the judge read it as a
-    demand for a SPECIFIC next step and scored an ideal de-escalation 0.5 for
-    ending on "¿qué necesita?". A judge parses a disjunction as a checklist
-    unless told twice, and that is a property of judges, not of this criterion.
+    Every either/or is still spelled out as "one alone is enough". Written as a
+    plain "a question or a next step" the judge read it as a demand for a
+    SPECIFIC next step and scored an ideal de-escalation 0.5 for ending on
+    "¿qué necesita?". A judge parses a disjunction as a checklist unless told
+    twice, and that is a property of judges, not of this criterion.
 
-    For the same reason the tool rule and its exception are ONE sentence. GEval
-    turns criteria into evaluation steps, and a step keeps only the clause it
-    grew from: split across two sentences, "hours need a tool" became a step of
-    its own and failed the price answer for quoting 90 euros with nothing
-    called — twice, intermittently, which is how a step that lost its exception
-    behaves.
+    The tools called stay in the evaluation params: several goldens describe a
+    turn that must not consult the agenda, and a judge that cannot see whether
+    it did has to guess at that too.
     """
     return GEval(
         name="Reception line",
@@ -105,3 +110,44 @@ def argument_correctness() -> ArgumentCorrectnessMetric:
     opposite of what the docstring the model reads asks for.
     """
     return ArgumentCorrectnessMetric(threshold=0.8, model=AnthropicModel(model=JUDGE_MODEL))
+
+
+def never_book_before_yes() -> ConversationalDAGMetric:
+    """Did the clinic's agenda ever hear about a change the patient had not agreed to?
+
+    The one metric in this project with no partial credit, which is why it is a
+    DAG and not a GEval: `threshold=1.0` and the graph only ever scores 1.0 or
+    0.0, so "mostly asked for consent" is a failure and reads like one. The
+    graph, the wording of each node and why the metric watches `book_slot`
+    rather than `book_appointment` are all in `dag.py`.
+    """
+    return ConversationalDAGMetric(
+        name="Never book before yes",
+        dag=dag.booking_consent_graph(),
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=1.0,
+    )
+
+
+def grounded_facts_dag() -> ConversationalDAGMetric:
+    """Does every hour, price, name, phone and address the agent stated have a source?
+
+    The evidence-gated pattern, and the reason this is a DAG and not a GEval:
+    code extracts the claims and matches them against the clinic's sheet, what
+    the caller said and what the tools returned, and only what survives that is
+    shown to a judge — one binary question, with the evidence attached. A reply
+    whose every fact matches costs zero judge calls, which is why it can run on
+    every golden of the suite instead of on the two somebody remembered.
+
+    `include_reason=False` on purpose: DeepEval's reason is a generated summary,
+    and it would be the only model call in a metric built to have none. Every
+    node writes its own one-line reason into `verbose_logs` instead — run the
+    suite with `-v` (or `verbose_mode=True`) to read which claim was left over.
+    """
+    return ConversationalDAGMetric(
+        name="Grounded facts",
+        dag=dag.grounded_facts_graph(),
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=1.0,
+        include_reason=False,
+    )
