@@ -1,6 +1,6 @@
 tmp/
-.taskops/board.json
-.taskops/board/
+.taskops/*
+!.taskops/reports/
 .env
 .env.*
 !.env.example
@@ -22,4 +22,3 @@ eval-runs/
 .taskops/ui.json
 .taskops/board.local-*/
 .deepeval/
-reports/deepeval/*.html

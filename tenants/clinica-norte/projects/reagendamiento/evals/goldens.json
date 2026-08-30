@@ -1,7 +1,8 @@
 [
   {
-    "input": "hola, buenos días",
-    "expected_behaviour": "Saluda, se presenta como la recepción de Clínica Norte y pregunta en qué puede ayudar."
+    "input": "(llamada entrante: el agente abre la conversación)",
+    "turn": "greeting",
+    "expected_behaviour": "La línea de apertura saluda, se presenta como la recepción de Clínica Norte y pregunta en qué puede ayudar."
   },
   {
     "input": "quiero cambiar mi cita del martes a otro día",

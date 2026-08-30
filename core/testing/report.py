@@ -2,7 +2,7 @@
 
 `deepeval test run` is the CI gate (pass/fail); this module is the reviewer's
 view: it runs the same goldens through `evaluate()` and writes a self-contained
-HTML under reports/deepeval/. Usage:
+HTML under tmp/reports/deepeval/. Usage:
 
     uv run python -m core.testing.report clinica-norte reagendamiento
 """
@@ -19,9 +19,9 @@ from deepeval.models import AnthropicModel
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 from dotenv import load_dotenv
 
-from core.testing.harness import fake_context, run_turns, text_of
+from core.testing.harness import fake_context, run_conversation, text_of
 
-REPORT_DIR = pathlib.Path("reports/deepeval")
+REPORT_DIR = pathlib.Path("tmp/reports/deepeval")  # generated artifact, not versioned
 
 
 def reception_line_metric(judge_model: str = "claude-haiku-4-5") -> GEval:
@@ -45,6 +45,14 @@ def reception_line_metric(judge_model: str = "claude-haiku-4-5") -> GEval:
     )
 
 
+async def actual_output(tc, golden: dict) -> str:
+    """The text the golden judges: the opening line for `turn: greeting`, else the reply."""
+    if golden.get("turn") == "greeting":
+        return (await run_conversation(tc, [])).greeting
+    conversation = await run_conversation(tc, [golden["input"]])
+    return text_of(conversation.results[0])
+
+
 async def build_cases(tenant_id: str, project_id: str) -> list[LLMTestCase]:
     """Run every golden of the project once and wrap the replies as test cases."""
     goldens_path = pathlib.Path("tenants") / tenant_id / "projects" / project_id / "evals"
@@ -52,11 +60,10 @@ async def build_cases(tenant_id: str, project_id: str) -> list[LLMTestCase]:
     cases: list[LLMTestCase] = []
     for golden in goldens:
         tc = fake_context(tenant_id, project_id)
-        (result,) = await run_turns(tc, [golden["input"]])
         cases.append(
             LLMTestCase(
                 input=golden["input"],
-                actual_output=text_of(result),
+                actual_output=await actual_output(tc, golden),
                 context=[f"Expected behaviour: {golden['expected_behaviour']}"],
             )
         )
@@ -64,7 +71,7 @@ async def build_cases(tenant_id: str, project_id: str) -> list[LLMTestCase]:
 
 
 def main(argv: list[str]) -> None:
-    """CLI: tenant and project ids; writes reports/deepeval/<name>_<timestamp>.html."""
+    """CLI: tenant and project ids; writes tmp/reports/deepeval/<name>_<timestamp>.html."""
     load_dotenv(".env")
     tenant_id, project_id = argv[1], argv[2]
     cases = asyncio.run(build_cases(tenant_id, project_id))

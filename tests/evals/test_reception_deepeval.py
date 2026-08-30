@@ -14,12 +14,20 @@ from deepeval.metrics import GEval
 from deepeval.models import AnthropicModel
 from deepeval.test_case import LLMTestCase, SingleTurnParams
 
-from core.testing import fake_context, run_turns, text_of
+from core.testing import fake_context, run_conversation, text_of
 
 pytestmark = pytest.mark.evals
 
 GOLDENS = pathlib.Path("tenants/clinica-norte/projects/reagendamiento/evals/goldens.json")
 JUDGE_MODEL = os.getenv("DEEPEVAL_JUDGE_MODEL", "claude-haiku-4-5")
+
+
+async def actual_output(tc, golden: dict) -> str:
+    """The text the golden judges: the opening line for `turn: greeting`, else the reply."""
+    if golden.get("turn") == "greeting":
+        return (await run_conversation(tc, [])).greeting
+    conversation = await run_conversation(tc, [golden["input"]])
+    return text_of(conversation.results[0])
 
 
 def load_goldens() -> list[dict]:
@@ -51,10 +59,9 @@ def reception_line_metric() -> GEval:
 @pytest.mark.parametrize("golden", load_goldens(), ids=lambda g: g["input"][:32])
 async def test_reception_keeps_its_line(golden: dict) -> None:
     tc = fake_context("clinica-norte", "reagendamiento")
-    (result,) = await run_turns(tc, [golden["input"]])
     case = LLMTestCase(
         input=golden["input"],
-        actual_output=text_of(result),
+        actual_output=await actual_output(tc, golden),
         context=[f"Expected behaviour: {golden['expected_behaviour']}"],
     )
     assert_test(case, [reception_line_metric()])
