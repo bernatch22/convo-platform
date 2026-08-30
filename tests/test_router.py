@@ -74,13 +74,15 @@ async def test_a_number_without_a_route_is_unroutable(store) -> None:
         await router.resolve(ctx, store)
 
 
-async def test_the_console_falls_back_to_the_environment(store, monkeypatch) -> None:
+async def test_the_console_falls_back_to_the_environment_as_a_voice_session(
+    store, monkeypatch
+) -> None:
     monkeypatch.setenv("TENANT", "clinica-norte")
     monkeypatch.setenv("PROJECT", "reagendamiento")
 
     tc = await router.resolve(fake_job_context(), store)
 
-    assert tc.tenant.id == "clinica-norte" and tc.channel == "chat"
+    assert tc.tenant.id == "clinica-norte" and tc.channel == "voice"
 
 
 async def test_an_unknown_tenant_is_refused_with_the_known_list(store) -> None:
