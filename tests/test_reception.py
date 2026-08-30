@@ -20,14 +20,20 @@ async def test_the_reply_moves_the_reschedule_forward(tc, judge_llm):
     reply: the agent has already said who it is and does not repeat it, which is
     right on a phone call. Asking it to present the clinic again made this golden
     a coin flip (3 failures in 6 runs) on a reply that was perfectly good.
+
+    The list of steps is spelled out as "any ONE of these is enough". Written as
+    a plain "a, b or c" the judge read it as a checklist and failed "¿para qué
+    día le vendría bien?" for not also asking the name — the same standard, and
+    the same reply, scored both ways depending on how the sentence parsed.
     """
     (result,) = await run_turns(tc, ["hola, quiero cambiar mi cita del martes"])
     message = final_message(result)
     await message.judge(
         judge_llm,
-        intent="responde en español, como la recepción de una clínica, y da un paso concreto "
-        "hacia el cambio de cita: pide el nombre del paciente, los datos de la cita actual o "
-        "el día que prefiere, u ofrece horas libres",
+        intent="responde en español, como la recepción de una clínica, y da UN paso concreto "
+        "hacia el cambio de cita. Basta con uno cualquiera de estos cuatro, y no hacen falta "
+        "los demás: preguntar qué día prefiere; ofrecer horas libres; pedir el nombre del "
+        "paciente; pedir los datos de la cita actual",
     )
 
 
