@@ -2,24 +2,32 @@
 
 `session.run()` is what the console uses; here it runs headless so a test can
 assert on the exact events (messages, tool calls, handoffs) and DeepEval can
-score the text. Nothing here touches audio or a LiveKit server.
+score the text. Nothing here needs a LiveKit server.
 
 Two ways in, one machine underneath. `run_conversation` plays a script that was
 written before the call — the ms-2 and ms-3 goldens. `live_conversation` holds
 the same session open and lets the caller decide the next line after hearing the
 last one, which is what a simulated patient (ms-3 evals) does.
+
+Since ms-6 it has a third mode. `live_conversation(..., record=path)` still
+types the caller's lines, but the agent's are SPOKEN by the project's TTS into
+the stereo OGG the framework writes for a real call — the file the offline
+voice metrics score. The audio machinery lives in `core.testing.speaker`; this
+module only decides when to switch it on.
 """
 
 import asyncio
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 from livekit.agents import AgentSession
 from livekit.agents.metrics import AgentSessionUsage, LLMModelUsage
+from livekit.agents.utils import http_context
 from livekit.agents.voice import Agent
 from livekit.agents.voice.run_result import ChatMessageAssert, RunResult
 
@@ -27,7 +35,9 @@ from core.context import TenantContext
 from core.registry import load_registry
 from core.session import build_session
 from core.state.attach import attach_log
+from core.state.log import record as record_event
 from core.state.store import MemoryStore
+from core.testing.speaker import open_recording
 from core.tools.executor import ToolExecutor, attach_local_tools
 
 GREETING_WAIT_S = 6.0
@@ -163,7 +173,7 @@ class RecordingExecutor:
 
 @asynccontextmanager
 async def live_conversation(
-    tc: TenantContext, agent: Agent | None = None
+    tc: TenantContext, agent: Agent | None = None, record: str | Path | None = None
 ) -> AsyncIterator[LiveCall]:
     """Open a headless call and hold it there until the caller hangs up.
 
@@ -171,11 +181,27 @@ async def live_conversation(
     one. Replaying the script from scratch on every turn would cost n(n+1)/2
     turns instead of n and — worse — re-generate the replies that line was
     answering, so the transcript scored afterwards is one nobody ever had.
+
+    `record=<path>` speaks the replies through the project's TTS into the
+    stereo OGG the framework writes for a real call, with the caller's channel
+    silent because the caller typed. `audio.start` is appended at the moment
+    sample 0 is written, so every later `t_ms` in the log is also an offset
+    into that file — see `core.testing.audio`.
     """
     recorder = _recording(tc)
     session: AgentSession[TenantContext] = build_session(tc)
-    async with session:
+    async with AsyncExitStack() as stack:
+        audio = None
+        if record:
+            # the TTS plugin borrows the worker's aiohttp session, and outside a
+            # worker there is none to borrow: this is that session, for this call
+            await stack.enter_async_context(http_context.open())
+            audio = await open_recording(session, record)
+            record_event(tc, "audio.start", {"path": str(audio.path)})
+        await stack.enter_async_context(session)
         await session.start(agent or tc.project.entry_agent(tc))
+        if audio is not None:
+            audio.adopt()
         await _wait_for_greeting(session)
         recorder.take()  # anything the opening line ran belongs to no turn
         call = LiveCall(
@@ -188,6 +214,8 @@ async def live_conversation(
         finally:
             # read before the context manager closes: leaving it resets the usage collector
             call.conversation.usage = session.usage
+            if audio is not None:
+                await audio.aclose()
 
 
 async def run_conversation(
