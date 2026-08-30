@@ -22,7 +22,7 @@ Run the suite with `deepeval test run tests/evals -n 3`; read the HTML with
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
 | **2** | Voice conversations against a real LiveKit room, with personas | nightly (ms-13) | planned |
-| **3** | **Stored real sessions** replayed through the same metrics | on demand, `convo sessions eval <id>` (ms-4) | in progress |
+| **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; grounding is blind to tool results — §3.6 |
 
 The metrics are the same in every ring. A ring changes where the conversation
 comes from, never how it is judged.
@@ -49,6 +49,8 @@ The platform (`core/testing/`) owns the plumbing, never the criteria:
   (single turn) or a `ConversationalTestCase` (whole call), attaching to every
   tool call its **full contract** (both halves of the docstring) and its
   **output**.
+- `replay.py` — ring 3: the same `ConversationalTestCase`, rebuilt from a
+  stored session's append-only log instead of from a run held in memory (§3.6).
 - `report.py` — the same goldens and the same metrics rendered to HTML.
 
 A threshold is a business decision (a clinic's tolerance for tuteo is not a
@@ -195,6 +197,58 @@ Verified both ways: 10/10 goldens score 1.0 with zero judge calls, and an
 injected "500 euros" produces exactly one judge call and 0.0 with the reason
 "the clinic's price list says 90 euros, not 500 euros".
 
+### 3.6 Replay (ring 3) — the same metrics on a call that really happened
+
+`core/testing/replay.py` rebuilds a `ConversationalTestCase` from the
+append-only log of a stored session, and `python -m convo sessions eval <id>`
+runs the project's `never_book_before_yes` and `grounded_facts_dag` on it.
+Nothing about the metrics changes: ring 3 changes where the conversation comes
+from, and only that.
+
+**How the log becomes turns.** `turn.user` / `turn.agent` are the turns in
+`seq` order; the `tool.call` / `tool.result` pairs between two agent turns
+become `tools_called` on the **following** assistant turn — Haiku says "un
+momento, le consulto la agenda", the tools run, and the answer is what they
+produced. A `tool.call` with no result (the process was killed in between)
+keeps `output=None`, which is exactly what happened. `tool.refused` and
+`tool.error` come through as calls whose output says so.
+
+**What ring 3 sees better than ring 1.** The log holds the calls the PLATFORM
+executor ran, not the ones the model asked for, so `book_slot` is there and
+`book_appointment` is not. The confusion node 1 of the consent graph is worded
+against (§3.4) cannot arise here at all.
+
+**What ring 3 cannot see.** `tool.result` stores a SHAPE — `list[3]`,
+`dict[2]` — never the payload, because a log that kept what the agenda returned
+would keep the patient's hours, doctor and phone next to their masked DNI.
+So in a replayed case:
+
+| Metric | Ring 3 | Why |
+|---|---|---|
+| Never book before yes | **works in full** | reads tool NAMES only |
+| Grounded facts | **cannot ground a fact that came from a tool** | node 2's evidence is the clinic sheet and what the caller said; the agenda's rows are not in the log |
+
+A leftover claim therefore reaches the judge with evidence that could not
+contain it, and the judge — correctly, on what it was shown — says no. Read
+that 0.0 as *not verifiable from the log*, never as an invention.
+`replay.missing_tool_outputs(case)` names the calls this applies to and the CLI
+prints it above the score, so nobody has to work it out from a red number.
+
+Measured on a real booking (`test-37d67860`, 40 events, 7 turns): consent 1.0,
+grounding 0.0 with a single leftover — «las diez de la mañana», the appointment
+the patient already had, which comes from `find_patient` in the Identify stage
+and whose output the log does not store. The two hours the agenda offered
+matched, but by luck: hours are compared as `HH:MM` and 09:00 and 14:00 are
+also in the clinic's opening hours in `<clinic_knowledge>`.
+
+**The field that would close it** (proposed, not built): a `summary` on
+`tool.result` — a redacted rendering of the result, filtered by the same
+`pii_scope` that already masks the arguments and capped in length. It is a
+change to `ToolSpec` and to the executor, so it belongs to a card of its own;
+see §8. A cheaper half-step exists too: the masked ARGUMENTS are already in the
+log (`send_sms` carries the whole confirmation text), and a project's
+`evidence_of` could read `input_parameters` as well as outputs.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
@@ -298,4 +352,14 @@ and about two minutes; the five simulated calls are most of it.
   same ms-7 card.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
-- Ring 3 (stored sessions) lands with ms-4; ring 2 (voice) with ms-13.
+- Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2 (voice) with ms-13.
+- **Ring 3 cannot ground facts against tool results.** The log stores the shape
+  of a result, never its contents, so `grounded_facts_dag` on a replayed
+  session escalates every datum that came off the agenda and scores it 0.0 on
+  evidence that could not contain it. Proposed fix, not built here: a
+  `summary` field on `tool.result` — the result rendered through the same
+  `pii_scope` masking the arguments get, length-capped — written by
+  `LocalExecutor._record` and declared on `ToolSpec`. It is a change to the
+  contract and the executor and needs its own card. Until then the CLI prints
+  `missing_tool_outputs` next to the score and the suite asserts consent, not
+  grounding, on stored sessions.

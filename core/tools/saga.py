@@ -13,13 +13,16 @@ and adapter capability. Declare them `write`, not `irreversible`: the platform
 is undoing on the caller's behalf, and asking for a second yes to put things
 back the way they were is not a conversation anyone wants.
 
-Open source note: framework-agnostic; the only contract is `tc.tools.call`.
+Open source note: framework-agnostic; the contract is `tc.tools.call` and, for
+the audit trail, `tc.log` — which may be absent, and then the saga is silent.
 """
 
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
+
+from core.state.log import record
 
 log = logging.getLogger("platform.saga")
 
@@ -72,7 +75,17 @@ class Saga:
                 step.done = True
             except Exception as cause:
                 log.warning("saga.fail %s step=%s cause=%s", self.tc.label(), step.name, cause)
+                record(self.tc, "saga.fail", {"step": step.name, "cause": str(cause)})
                 compensated = await self._compensate()
+                record(
+                    self.tc,
+                    "saga.rolled_back",
+                    {
+                        "failed_at": step.name,
+                        "compensated": compensated,
+                        "steps": [s.name for s in self.steps],
+                    },
+                )
                 raise SagaFailed(step.name, cause, compensated) from cause
         return [step.result for step in self.steps]
 
@@ -83,13 +96,16 @@ class Saga:
             undo = spec.compensation if spec else None
             if not undo:
                 log.warning("saga.no_undo %s step=%s", self.tc.label(), step.name)
+                record(self.tc, "saga.no_undo", {"step": step.name})
                 continue
             args = step.undo_args(step.result) if step.undo_args else step.args
             try:
                 await self.tc.tools.call(undo, args)
                 compensated.append(step.name)
+                record(self.tc, "saga.compensated", {"step": step.name, "undo": undo})
             except Exception:
                 log.exception(
                     "saga.undo_failed %s step=%s undo=%s", self.tc.label(), step.name, undo
                 )
+                record(self.tc, "saga.undo_failed", {"step": step.name, "undo": undo})
         return compensated

@@ -9,6 +9,8 @@ from livekit.agents import JobContext
 from core.context import TenantContext
 from core.contracts import SessionMeta
 from core.registry import load_registry
+from core.state.attach import attach_log
+from core.state.store import SQLiteStore
 from core.tools.executor import attach_local_tools
 
 
@@ -40,7 +42,7 @@ async def resolve(ctx: JobContext) -> TenantContext:
         project_version=meta.project_version or f"git:{git_sha()}",
         today=date.today(),
     )
-    return attach_local_tools(tc)
+    return attach_log(attach_local_tools(tc), SQLiteStore())
 
 
 def git_sha() -> str:

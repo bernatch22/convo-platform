@@ -12,6 +12,7 @@ from livekit.agents import Agent
 from livekit.agents.llm import ChatContext
 
 from core.context import TenantContext
+from core.state.log import record
 
 log = logging.getLogger("platform.agents")
 
@@ -29,6 +30,7 @@ class TenantAgent(Agent):
         """Inherit the previous stage's summary, announce the stage, let the model open the turn."""
         await self._inherit_summary()
         log.info("stage.enter %s agent=%s", self.tc.label(), self.stage_name())
+        record(self.tc, "stage.enter", {"stage": self.stage_name()})
         self.tc.prev_agent = self
         self.session.generate_reply()
 
@@ -54,6 +56,11 @@ class TenantAgent(Agent):
             self.tc.label(),
             self.stage_name(),
             next_agent.stage_name(),
+        )
+        record(
+            self.tc,
+            "stage.handoff",
+            {"from": self.stage_name(), "to": next_agent.stage_name(), "said": said is not None},
         )
         return (next_agent, said) if said is not None else next_agent
 

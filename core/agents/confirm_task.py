@@ -20,14 +20,16 @@ from livekit.agents import RunContext, function_tool
 from livekit.agents.voice import AgentTask
 
 from core import confirm
+from core.state.log import record
 
 log = logging.getLogger("platform.confirm")
 
 INSTRUCTIONS = (
-    "Estás confirmando una acción que no se puede deshacer. Pregunta exactamente "
-    "esto, con estas palabras, y nada más: «{question}». Si la persona dice que sí "
-    "con claridad, llama a confirm. Si dice que no, duda, cambia de tema o pide otra "
-    "cosa, llama a decline. No des por hecho un sí: un silencio o un «mmm» no lo es."
+    "Estás confirmando una acción que no se puede deshacer. Ya has hecho la pregunta, "
+    "con estas palabras exactas: «{question}». Ahora solo escuchas la respuesta. Si la "
+    "persona dice que sí con claridad, llama a confirm. Si dice que no, duda, cambia de "
+    "tema o pide otra cosa, llama a decline. No des por hecho un sí: un silencio o un "
+    "«mmm» no lo es. No repitas la pregunta ni saludes: la llamada ya está en curso."
 )
 
 
@@ -53,19 +55,36 @@ class ConfirmTask(AgentTask[bool]):
         self.question = question
 
     async def on_enter(self) -> None:
-        """Ask the question as soon as the task takes over."""
+        """Speak the rendered question verbatim as soon as the task takes over.
+
+        `say`, never `generate_reply`: the task's own chat context is empty
+        when it starts, and asked to "generate" from nothing the model once
+        opened with "Disculpe, he recibido una llamada sin contenido…" instead
+        of the question (ms-4 demo recording, seq 20). The platform rendered
+        the sentence — day, spoken hour, professional — so it is read as is;
+        the model's only job here is to classify the answer.
+        """
         log.info("confirm.ask %s tool=%s", self.tc.label(), self.tool)
-        self.session.generate_reply()
+        # The audience digest, never the arguments: it names the exact call the
+        # caller is being asked about without putting a phone number in the log.
+        record(self.tc, "confirm.request", self._audit(question=self.question))
+        self.session.say(self.question, allow_interruptions=True)
 
     @function_tool
     async def confirm(self, ctx: RunContext) -> None:
         """La persona ha dicho que sí, claramente, a la pregunta que le has hecho."""
         confirm.mint(self.tc, self.tool, self.args)
         log.info("confirm.yes %s tool=%s", self.tc.label(), self.tool)
+        record(self.tc, "confirm.granted", self._audit())
         self.complete(True)
 
     @function_tool
     async def decline(self, ctx: RunContext) -> None:
         """La persona no ha dicho que sí: ha dicho que no, duda, o quiere otra cosa."""
         log.info("confirm.no %s tool=%s", self.tc.label(), self.tool)
+        record(self.tc, "confirm.declined", self._audit())
         self.complete(False)
+
+    def _audit(self, **extra: Any) -> dict[str, Any]:
+        """What every confirm event says: which call, by tool and audience digest."""
+        return {"tool": self.tool, "audience": confirm.audience(self.tool, self.args), **extra}
