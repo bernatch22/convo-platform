@@ -23,15 +23,28 @@ pytest -m unit                  # fast tests, no keys needed
 python worker.py --help         # the LiveKit Agents CLI (console/dev/start)
 ```
 
-From ms-1: `python worker.py console --text` talks to the agent in the terminal.
+Talk to either demo business in the terminal — one worker, one codebase, two
+tenants; what differs is a folder under `tenants/`:
+
+```bash
+TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --text
+TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
+```
+
+A third business is a copy of [`tenants/_template/`](tenants/_template/README.md),
+which walks a stranger through it in ten minutes;
+[`docs/tenants.md`](docs/tenants.md) is the table of what a tenant owns and what
+the platform owns.
 
 Evals (ring 1, needs `ANTHROPIC_API_KEY`; the judge is Claude Haiku, set
 `DEEPEVAL_JUDGE_MODEL` to change it):
 
 ```bash
-uv run pytest -m unit                # includes LLM-judged tests when the key is present
-uv run deepeval test run tests/evals # per-project goldens; HTML under tmp/reports/deepeval/
+uv run pytest -m unit                     # includes LLM-judged tests when the key is present
+uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-tenant leakage pair
 ```
+
+[`docs/evals.md`](docs/evals.md) explains every metric and how to add one.
 
 ## Layout
 
@@ -41,6 +54,7 @@ api.py        control plane (ms-8+): tokens, dispatch, tools hub, call log
 core/         runtime: contracts, agents, tools, adapters, state, observability
 tenants/      one folder per customer: adapters + projects (agents, prompts, evals)
 tests/        unit tests and ring-1 evals
+docs/         how the platform is meant to be used: tenants, prompts, evals
 .taskops/reports/  per-milestone learning reports (Markdown)
 presentation/ self-narrating deck engine
 ```

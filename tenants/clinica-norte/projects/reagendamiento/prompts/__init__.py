@@ -19,7 +19,8 @@ the expensive one:
   timestamp in there and every stage pays full price on every turn.
 """
 
-from .. import knowledge
+from core.context import TenantContext
+
 from .choose_slot import (
     CHOOSE_SLOT_EXAMPLES,
     CHOOSE_SLOT_INSTRUCTIONS,
@@ -38,14 +39,14 @@ __all__ = [
 ]
 
 
-def identify_prompt() -> str:
+def identify_prompt(tc: TenantContext) -> str:
     """The stage that opens the call and finds out whose appointment this is."""
-    return stage_prompt(IDENTIFY_ROLE, IDENTIFY_INSTRUCTIONS, IDENTIFY_EXAMPLES)
+    return stage_prompt(tc, IDENTIFY_ROLE, IDENTIFY_INSTRUCTIONS, IDENTIFY_EXAMPLES)
 
 
-def choose_slot_prompt() -> str:
+def choose_slot_prompt(tc: TenantContext) -> str:
     """The stage that reads the agenda, offers real hours and books the one chosen."""
-    return stage_prompt(CHOOSE_SLOT_ROLE, CHOOSE_SLOT_INSTRUCTIONS, CHOOSE_SLOT_EXAMPLES)
+    return stage_prompt(tc, CHOOSE_SLOT_ROLE, CHOOSE_SLOT_INSTRUCTIONS, CHOOSE_SLOT_EXAMPLES)
 
 
 def confirm_instructions() -> str:
@@ -53,17 +54,17 @@ def confirm_instructions() -> str:
     return CONFIRM_INSTRUCTIONS
 
 
-def farewell_prompt() -> str:
+def farewell_prompt(tc: TenantContext) -> str:
     """The stage that closes the call once the change is done."""
-    return stage_prompt(FAREWELL_ROLE, FAREWELL_INSTRUCTIONS, FAREWELL_EXAMPLES)
+    return stage_prompt(tc, FAREWELL_ROLE, FAREWELL_INSTRUCTIONS, FAREWELL_EXAMPLES)
 
 
-def stage_prompt(role: str, instructions: str, examples: str = "") -> str:
-    """One stage's system prompt: the shared knowledge first, then who this stage is."""
+def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str = "") -> str:
+    """One stage's system prompt: the project's knowledge first, then who this stage is."""
     return "\n".join(
         [
             "<clinic_knowledge>",
-            knowledge.CLINIC,
+            tc.project.knowledge(tc),
             "</clinic_knowledge>",
             "",
             role,

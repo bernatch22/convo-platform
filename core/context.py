@@ -52,6 +52,16 @@ class Project:
     keyterms: list[str] = field(default_factory=list)
     tools: ToolCatalog = field(default_factory=ToolCatalog)
     messages: dict[str, str] = field(default_factory=dict)
+    knowledge_seed: str = ""
+
+    def knowledge(self, tc: "TenantContext") -> str:
+        """The stable knowledge block a prompt opens with: the pinned override, else git's seed.
+
+        Git is the seed every deploy carries; a row in `project_versions` can
+        override it without a deploy, and the version the session ran with is
+        in its first log event either way.
+        """
+        return tc.knowledge_override or self.knowledge_seed
 
 
 @dataclass
@@ -81,6 +91,7 @@ class TenantContext:
     tools: "ToolExecutor | None" = None
     log: "EventLog | None" = None
     confirmation_token: "ConfirmationToken | None" = None
+    knowledge_override: str | None = None
     customer: dict[str, Any] | None = None
     pii_values: set[str] = field(default_factory=set)
     prev_agent: Any = None

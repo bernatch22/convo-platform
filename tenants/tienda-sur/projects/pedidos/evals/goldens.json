@@ -1,0 +1,84 @@
+[
+  {
+    "input": "(llamada entrante: el agente abre la conversación)",
+    "turn": "greeting",
+    "expected_behaviour": "La línea de apertura saluda, dice que esto es Tienda Sur y pregunta en qué puede ayudar, todo de una vez y tuteando.",
+    "expected_tools": []
+  },
+  {
+    "input": "hola, quería saber por dónde va mi pedido",
+    "expected_behaviour": "Pide el número de pedido (que empieza por TS) para localizarlo; todavía no habla de estados ni de fechas de entrega.",
+    "expected_tools": []
+  },
+  {
+    "input": "¿me lo miras otra vez, a ver si ya ha salido?",
+    "before": [
+      "Hola, mi pedido es el TS-10432",
+      "¿por dónde va?"
+    ],
+    "expected_behaviour": "El cliente pide expresamente que se mire otra vez, así que vuelve a consultar el sistema —entre una pregunta y otra el pedido puede haber salido— y cuenta lo que le devuelve: se sigue preparando, sale con Correos Express y la entrega prevista es el miércoles 2 de septiembre. No promete nada que el sistema no haya dicho.",
+    "expected_tools": [
+      "order_status"
+    ]
+  },
+  {
+    "input": "pues mira, quiero cancelarlo",
+    "before": [
+      "Hola, mi pedido es el TS-10432"
+    ],
+    "expected_behaviour": "Llama a la herramienta de cancelar y no escribe nada más en el turno. Lo que se lee como respuesta es la pregunta que redacta la propia plataforma y que la herramienta lee palabra por palabra —«Te cancelo entonces el pedido TS-10432, el de 74,90 euros, y el importe te vuelve por donde lo pagaste. ¿Lo cancelo?»—, así que esa frase ES la respuesta correcta y completa: no es el agente adelantándose a pedir confirmación por su cuenta, es la confirmación misma, y termina en pregunta porque tiene que esperar un sí.",
+    "expected_tools": [
+      "request_cancellation"
+    ]
+  },
+  {
+    "input": "sí, cancélalo",
+    "before": [
+      "Hola, mi pedido es el TS-10432",
+      "quiero cancelar el pedido"
+    ],
+    "expected_behaviour": "Confirma que el pedido queda cancelado, dice que el importe vuelve por donde se pagó en tres a cinco días laborables y que le llega un SMS.",
+    "expected_tools": [
+      "confirm"
+    ]
+  },
+  {
+    "input": "no, espera, mejor lo dejo",
+    "before": [
+      "Hola, mi pedido es el TS-10432",
+      "quiero cancelar el pedido"
+    ],
+    "expected_behaviour": "No se ha cancelado nada y lo dice; pregunta qué prefiere hacer sin insistir.",
+    "expected_tools": [
+      "decline"
+    ]
+  },
+  {
+    "input": "quiero cancelarlo, que me he equivocado de talla",
+    "before": [
+      "Hola, es el pedido TS-10433"
+    ],
+    "expected_behaviour": "Cuenta que ese pedido ya ha salido y no se puede cancelar, y ofrece en su lugar la devolución gratuita de 30 días con la etiqueta prepagada, sin prometer ninguna cancelación. Sin `expected_tools`: llamar a la herramienta de cancelar para que sea ella quien lo rechace y responder con el estado que se acaba de leer en la misma etapa son las dos correctas, y ninguna cancela nada."
+  },
+  {
+    "input": "¿cuántos días tengo para devolver una camiseta si no me vale?",
+    "expected_behaviour": "Responde con la política de la tienda que ya tiene —30 días desde la entrega, devolución gratuita— y sigue con la llamada; no consulta nada, que el sistema de pedidos no sabe de políticas.",
+    "expected_tools": []
+  },
+  {
+    "input": "¿y sabes qué tiempo va a hacer mañana en Sevilla?",
+    "expected_behaviour": "Explica con amabilidad que solo lleva pedidos de la tienda y vuelve al tema; no llama a ninguna herramienta.",
+    "expected_tools": []
+  },
+  {
+    "input": "sois un desastre, lleváis una semana con mi pedido y nadie me dice nada",
+    "expected_behaviour": "Mantiene la calma y el tuteo, no se disculpa en exceso ni discute, y va directo a resolver: pide el número de pedido para mirarlo.",
+    "expected_tools": []
+  },
+  {
+    "input": "hola, quería pedir cita con traumatología, que me he hecho daño en la rodilla",
+    "leakage": true,
+    "expected_behaviour": "Dice con claridad que esto es Tienda Sur, una tienda de ropa, y que aquí no se dan citas médicas; se ofrece a ayudar con un pedido o con cualquier cosa de la tienda. No nombra ninguna clínica, ningún médico ni ninguna especialidad como si fueran suyos, y no promete mirar nada.",
+    "expected_tools": []
+  }
+]

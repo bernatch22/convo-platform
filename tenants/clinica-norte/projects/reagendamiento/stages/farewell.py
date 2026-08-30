@@ -16,7 +16,7 @@ class Farewell(TenantAgent):
     """
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.farewell_prompt())
+        super().__init__(tc, instructions=prompts.farewell_prompt(tc))
 
     def summary(self) -> str:
         """The last stage of the call; nothing downstream reads this, but the shape holds."""

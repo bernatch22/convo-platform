@@ -2,10 +2,10 @@
 
 import sys
 
-from convo import sessions
+from convo import routes, sessions, versions
 
-GROUPS = {"sessions": sessions.main}
-USAGE = "usage: python -m convo sessions list | show <id>"
+GROUPS = {"sessions": sessions.main, "routes": routes.main, "versions": versions.main}
+USAGE = "usage: python -m convo sessions|routes|versions ..."
 
 
 def main(argv: list[str]) -> int:
