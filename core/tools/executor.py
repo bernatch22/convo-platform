@@ -59,6 +59,7 @@ class LocalExecutor:
         safe_args = guard.mask(spec, args)
         log.info("tool.call %s %s args=%s", self.tc.label(), spec.name, safe_args)
         result = await self._execute(spec, adapter, args, safe_args)
+        guard.consume(spec, self.tc)
         log.info("tool.result %s %s ok", self.tc.label(), spec.name)
         return result
 
