@@ -32,10 +32,12 @@ jobs:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+      # No cache here: when the key is absent every step below skips, nothing is
+      # installed, and setup-uv's post-step fails the job over an empty cache dir.
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
-          enable-cache: true
+          enable-cache: false
       - name: Install
         if: env.ANTHROPIC_API_KEY != ''
         run: uv sync --extra dev
