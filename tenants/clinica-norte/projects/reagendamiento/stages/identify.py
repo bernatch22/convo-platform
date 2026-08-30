@@ -16,7 +16,7 @@ class Identify(TenantAgent):
     """Greets, asks for the name and the phone, and looks the existing appointment up."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.identify_prompt())
+        super().__init__(tc, instructions=prompts.identify_prompt(tc))
 
     def summary(self) -> str:
         """What ChooseSlot needs from this stage: who is calling and what they already have."""

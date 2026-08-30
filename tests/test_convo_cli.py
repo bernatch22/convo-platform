@@ -66,3 +66,25 @@ def test_eval_of_an_unknown_session_says_so_without_loading_a_judge(
 def test_usage_on_anything_else(store: MemoryStore, capsys) -> None:
     assert sessions.main(["frobnicate"], store) == 2
     assert "eval <id>" in capsys.readouterr().out
+
+
+def test_routes_add_and_list(capsys) -> None:
+    from convo import routes
+
+    store = MemoryStore()
+    assert routes.main(["add", "cc", "+34910000000", "clinica-norte", "reagendamiento"], store) == 0
+    assert routes.main(["list"], store) == 0
+    out = capsys.readouterr().out
+    assert "+34910000000" in out and "clinica-norte/reagendamiento" in out and "voice" in out
+
+
+def test_versions_pin_and_list(tmp_path, capsys) -> None:
+    from convo import versions
+
+    store = MemoryStore()
+    sheet = tmp_path / "ficha.txt"
+    sheet.write_text("FICHA")
+    assert versions.main(["pin", "clinica-norte", "reagendamiento", "v3", str(sheet)], store) == 0
+    assert versions.main(["list"], store) == 0
+    out = capsys.readouterr().out
+    assert "pinned to v3 with override" in out and "5 chars" in out

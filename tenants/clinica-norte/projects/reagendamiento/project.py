@@ -18,6 +18,8 @@ from core.tools.catalog import ToolCatalog, platform_specs
 from core.tools.contract import SideEffect, ToolSpec
 from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
+from . import knowledge
+
 FIND_PATIENT = ToolSpec(
     name="find_patient",
     side_effect=SideEffect.READ,
@@ -93,4 +95,5 @@ PROJECT = ReagendamientoProject(
         ToolCatalog.of(FIND_PATIENT, CANCEL_SLOT, BOOK_SLOT, REBOOK_SLOT, SEND_SMS)
     ),
     messages=MESSAGES,
+    knowledge_seed=knowledge.CLINIC,
 )

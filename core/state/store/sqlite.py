@@ -1,22 +1,23 @@
-"""Store: where session logs live. A Protocol, an in-memory store for tests, SQLite for the box.
+"""SQLiteStore: one file, durable per append, append-only by trigger — the laptop's control plane.
 
-The SQLite store is built to survive the one failure that matters for an
-audit log — the process dying mid-call. WAL journaling with `synchronous=FULL`
-makes every `append` durable when it returns, and two triggers refuse UPDATE
-and DELETE on `events`, so the table cannot be edited even by a well-meaning
-migration. Postgres later is this same interface over a pool in `api.py`;
-the job process never opens a database of its own in production (it talks to
-the control plane), but on a laptop the file is the control plane.
+Built to survive the one failure that matters for an audit log: the process
+dying mid-call. WAL journaling with `synchronous=FULL` makes every `append`
+durable when it returns, and two triggers refuse UPDATE and DELETE on
+`events`. `routes` and `project_versions` are the two small tables the router
+reads before a session starts. Postgres later is this same interface over a
+pool in `api.py`; the job process never opens a database of its own in
+production, but on a laptop the file is the control plane.
 """
 
 import json
 import os
 import sqlite3
-from dataclasses import dataclass, field
+import time
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
 from core.state.events import Event
+from core.state.store.protocol import ProjectVersion, Route, SessionRow
 
 DEFAULT_DB = "tmp/convo.db"
 DB_ENV = "CONVO_DB"
@@ -34,85 +35,19 @@ CREATE TRIGGER IF NOT EXISTS events_append_only_update BEFORE UPDATE ON events
   BEGIN SELECT RAISE(ABORT, 'events is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS events_append_only_delete BEFORE DELETE ON events
   BEGIN SELECT RAISE(ABORT, 'events is append-only'); END;
+CREATE TABLE IF NOT EXISTS routes (
+  fleet TEXT NOT NULL, key TEXT NOT NULL, tenant TEXT NOT NULL, project TEXT NOT NULL,
+  channel TEXT NOT NULL, PRIMARY KEY (fleet, key)
+);
+CREATE TABLE IF NOT EXISTS project_versions (
+  tenant TEXT NOT NULL, project TEXT NOT NULL, version TEXT NOT NULL,
+  knowledge_override TEXT, created_at REAL NOT NULL, PRIMARY KEY (tenant, project)
+);
 """
 
 
-@dataclass
-class SessionRow:
-    """What the store knows about one session besides its events."""
-
-    id: str
-    tenant: str
-    project: str
-    channel: str
-    started_at: float
-    ended_at: float | None = None
-    outcome: str | None = None
-    report: dict[str, Any] | None = None
-    event_count: int = 0
-
-
-class Store(Protocol):
-    """The five verbs every backend implements; nothing above them knows SQL."""
-
-    def open_session(self, row: SessionRow) -> None:
-        """Register a session before its first event."""
-        ...
-
-    def append(self, session_id: str, event: Event) -> None:
-        """Persist one event durably; must not return before it is safe."""
-        ...
-
-    def close_session(self, session_id: str, outcome: str, report: dict[str, Any] | None) -> None:
-        """Mark the end: outcome and the framework's session report."""
-        ...
-
-    def sessions(self) -> list[SessionRow]:
-        """Every session, newest first, with its event count."""
-        ...
-
-    def session(self, session_id: str) -> SessionRow | None:
-        """One session's row, or None."""
-        ...
-
-    def events(self, session_id: str) -> list[Event]:
-        """The session's events in seq order."""
-        ...
-
-
-@dataclass
-class MemoryStore:
-    """Dicts and lists: the store tests and the harness use; nothing survives the process."""
-
-    rows: dict[str, SessionRow] = field(default_factory=dict)
-    log: dict[str, list[Event]] = field(default_factory=dict)
-
-    def open_session(self, row: SessionRow) -> None:
-        self.rows[row.id] = row
-        self.log.setdefault(row.id, [])
-
-    def append(self, session_id: str, event: Event) -> None:
-        self.log.setdefault(session_id, []).append(event)
-
-    def close_session(self, session_id: str, outcome: str, report: dict[str, Any] | None) -> None:
-        row = self.rows[session_id]
-        row.outcome, row.report = outcome, report
-
-    def sessions(self) -> list[SessionRow]:
-        rows = sorted(self.rows.values(), key=lambda r: r.started_at, reverse=True)
-        for row in rows:
-            row.event_count = len(self.log.get(row.id, []))
-        return rows
-
-    def session(self, session_id: str) -> SessionRow | None:
-        return self.rows.get(session_id)
-
-    def events(self, session_id: str) -> list[Event]:
-        return list(self.log.get(session_id, []))
-
-
 class SQLiteStore:
-    """The laptop's and dev box's store: one file, durable per append, append-only by trigger."""
+    """Every Store verb over one SQLite file; the path comes from CONVO_DB or tmp/convo.db."""
 
     def __init__(self, path: str | os.PathLike[str] | None = None) -> None:
         self.path = Path(path or os.getenv(DB_ENV, DEFAULT_DB))
@@ -167,6 +102,54 @@ class SQLiteStore:
             (session_id,),
         )
         return [Event(seq=s, kind=k, t_ms=t, payload=json.loads(p)) for s, k, t, p in cursor]
+
+    def route(self, fleet: str, key: str) -> Route | None:
+        row = self.db.execute(
+            "SELECT fleet, key, tenant, project, channel FROM routes WHERE fleet=? AND key=?",
+            (fleet, key),
+        ).fetchone()
+        return Route(*row) if row else None
+
+    def add_route(self, route: Route) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO routes (fleet, key, tenant, project, channel) "
+            "VALUES (?,?,?,?,?)",
+            (route.fleet, route.key, route.tenant, route.project, route.channel),
+        )
+
+    def routes(self) -> list[Route]:
+        cursor = self.db.execute(
+            "SELECT fleet, key, tenant, project, channel FROM routes ORDER BY fleet, key"
+        )
+        return [Route(*row) for row in cursor]
+
+    def pinned_version(self, tenant: str, project: str) -> ProjectVersion | None:
+        row = self.db.execute(
+            "SELECT tenant, project, version, knowledge_override, created_at "
+            "FROM project_versions WHERE tenant=? AND project=?",
+            (tenant, project),
+        ).fetchone()
+        return ProjectVersion(*row) if row else None
+
+    def pin_version(self, version: ProjectVersion) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO project_versions "
+            "(tenant, project, version, knowledge_override, created_at) VALUES (?,?,?,?,?)",
+            (
+                version.tenant,
+                version.project,
+                version.version,
+                version.knowledge_override,
+                version.created_at or time.time(),
+            ),
+        )
+
+    def versions(self) -> list[ProjectVersion]:
+        cursor = self.db.execute(
+            "SELECT tenant, project, version, knowledge_override, created_at "
+            "FROM project_versions ORDER BY tenant, project"
+        )
+        return [ProjectVersion(*row) for row in cursor]
 
 
 def _dumps(payload: Any) -> str:
