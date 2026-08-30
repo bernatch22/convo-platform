@@ -53,3 +53,14 @@ class EventLog:
 
     def _elapsed_ms(self) -> int:
         return int((self.clock() - self.started_at) * 1000)
+
+
+def record(tc: Any, kind: str, payload: dict[str, Any] | None = None) -> None:
+    """Append one fact to a context's log, for callers that may not have one.
+
+    A stage, a confirmation and a saga all run in tests and in the console with
+    a context that was never given a log, and none of them should carry an
+    `if` about it. This is that `if`, written once.
+    """
+    if getattr(tc, "log", None) is not None:
+        tc.log.append(kind, payload or {})

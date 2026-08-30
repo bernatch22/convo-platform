@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from livekit.agents.llm import ToolError
 
+from core import confirm
 from core.context import Project, Tenant, TenantContext
 from core.tools.catalog import ToolCatalog, platform_specs
 from core.tools.contract import SideEffect, ToolSpec
@@ -113,9 +114,8 @@ async def test_an_irreversible_tool_with_a_confirmation_token_passes_the_guard()
     adapter = FakeAdapter()
     tc = context(adapter)
 
-    await tc.tools.call(
-        "cancel_appointment", {"phone": "600123456", "confirmation_token": "ct-abc123"}
-    )
+    confirm.mint(tc, "cancel_appointment", {"phone": "600123456"})
+    await tc.tools.call("cancel_appointment", {"phone": "600123456"})
 
     assert adapter.calls[0][0] == "cancel_appointment"
 
@@ -145,10 +145,9 @@ async def test_pii_arguments_are_masked_before_they_reach_the_log(
 ) -> None:
     tc = context(FakeAdapter())
 
+    confirm.mint(tc, "cancel_appointment", {"phone": "600123456"})
     with caplog.at_level(logging.INFO, logger="platform.tools"):
-        await tc.tools.call(
-            "cancel_appointment", {"phone": "600123456", "confirmation_token": "ct-abc123"}
-        )
+        await tc.tools.call("cancel_appointment", {"phone": "600123456"})
 
     assert "60*******" in caplog.text
     assert "600123456" not in caplog.text
@@ -194,10 +193,10 @@ async def test_a_call_leaves_call_and_result_events_with_pii_masked() -> None:
     from core.state.store import MemoryStore
 
     tc = attach_log(context(FakeAdapter()), MemoryStore())
+    args = {"phone": "600123456"}
+    confirm.mint(tc, "cancel_appointment", args)  # irreversible: the guard needs a real yes
 
-    await tc.tools.call(
-        "cancel_appointment", {"phone": "600123456", "confirmation_token": "ct-abc123"}
-    )
+    await tc.tools.call("cancel_appointment", args)
 
     kinds = [k for k, _ in logged(tc)]
     assert kinds == ["session.start", "tool.call", "tool.result"]

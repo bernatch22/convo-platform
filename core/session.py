@@ -5,14 +5,22 @@ import logging
 from livekit.agents import AgentSession, TurnHandlingOptions
 
 from core.context import TenantContext
+from core.observability.observers import observe
 from core.providers import llm_for, stt_for, tts_for
 
 log = logging.getLogger("platform.session")
 
 
 def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
-    """One session per job: providers chosen by the tenant, the context as userdata."""
-    return AgentSession[TenantContext](
+    """One session per job: providers chosen by the tenant, the context as userdata.
+
+    The observers are wired here and nowhere else. They have to be subscribed
+    before the session starts — the entry agent's `on_enter` runs inside
+    `session.start`, so a handler attached afterwards misses the greeting that
+    opened the call — and building the session is the one moment every caller
+    (worker, console, harness) passes through.
+    """
+    session = AgentSession[TenantContext](
         llm=llm_for(tc.tenant),
         stt=stt_for(tc.tenant),
         tts=tts_for(tc.tenant, tc.project),
@@ -21,6 +29,8 @@ def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
         userdata=tc,
         max_tool_steps=4,
     )
+    observe(session, tc)
+    return session
 
 
 async def start_session(session: AgentSession[TenantContext], agent, room=None) -> None:

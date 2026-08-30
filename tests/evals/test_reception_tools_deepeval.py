@@ -44,9 +44,13 @@ def load_goldens() -> list[dict]:
 
 
 async def run_golden(tc, golden: dict):
-    """The conversation a golden produces: the opening line alone, or one full turn."""
-    inputs = [] if golden.get("turn") == bridge.GREETING_TURN else [golden["input"]]
-    return await run_conversation(tc, inputs)
+    """The conversation a golden produces: the opening line alone, or the turn it judges.
+
+    A golden that judges a later stage replays the turns under `before` first —
+    identifying the patient is what gets a rescheduling call as far as the
+    agenda — and only the last turn is scored.
+    """
+    return await run_conversation(tc, bridge.inputs_for(golden))
 
 
 @pytest.mark.parametrize("golden", load_goldens(), ids=lambda g: g["input"][:32])
