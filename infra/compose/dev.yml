@@ -1,0 +1,23 @@
+# The local dev stack: one LiveKit SFU + the redis it coordinates through.
+#
+#   docker compose -f infra/compose/dev.yml up
+#
+# Keys are the dev pair (devkey/secret) — matching .env.example, never
+# production. The worker and api.py run on the HOST (uv run ...), talking to
+# ws://localhost:7880; only the server is containerised.
+services:
+  redis:
+    image: redis:7-alpine
+    # no published port: only livekit talks to it, inside the compose network
+    # (publishing 6379 collided with a redis already running on this laptop)
+  livekit:
+    image: livekit/livekit-server:v1.9.1
+    command: --config /etc/livekit.yml
+    depends_on:
+      - redis
+    volumes:
+      - ./livekit.yml:/etc/livekit.yml:ro
+    ports:
+      - "7880:7880"       # signalling (WS)
+      - "7881:7881"       # WebRTC over TCP (fallback)
+      - "7882:7882/udp"   # WebRTC media, muxed on one UDP port
