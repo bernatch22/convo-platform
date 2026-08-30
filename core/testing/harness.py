@@ -12,7 +12,7 @@ from datetime import date
 
 from livekit.agents import AgentSession
 from livekit.agents.metrics import AgentSessionUsage, LLMModelUsage
-from livekit.agents.voice.run_result import RunResult
+from livekit.agents.voice.run_result import ChatMessageAssert, RunResult
 
 from core.context import TenantContext
 from core.registry import load_registry
@@ -103,6 +103,22 @@ def text_of(result: RunResult) -> str:
         if e.type == "message" and e.item.role == "assistant"
     ]
     return " ".join(p.strip() for p in parts if p.strip())
+
+
+def final_message(result: RunResult) -> ChatMessageAssert:
+    """The turn's LAST assistant message, ready to assert on or hand to a judge.
+
+    One turn can hold several: Haiku often says "un momento, le consulto la
+    agenda" before calling a tool and only answers once the result is back.
+    Judging the first message would be judging the filler, so a golden about
+    what the agent ANSWERS reads this one; a golden about the order of events
+    (a tool call before the answer) still walks `result.expect` itself.
+    """
+    for index in reversed(range(len(result.events))):
+        event = result.events[index]
+        if event.type == "message" and event.item.role == "assistant":
+            return result.expect[index].is_message(role="assistant")
+    raise AssertionError("the turn produced no assistant message at all")
 
 
 def greeting_of(session: AgentSession) -> str:

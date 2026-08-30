@@ -11,13 +11,14 @@ import json
 
 import pytest
 
-from core.testing import TODAY, fake_context, run_conversation
+from core.testing import TODAY, fake_context, final_message, run_conversation
 from tests.conftest import needs_llm
 
 pytestmark = pytest.mark.unit
 
 PROJECT = "tenants.clinica-norte.projects.reagendamiento"
 dates = importlib.import_module(f"{PROJECT}.dates")
+tools_module = importlib.import_module(f"{PROJECT}.tools")
 agenda_module = importlib.import_module("tenants.clinica-norte.adapters.agenda")
 FakeAgenda = agenda_module.FakeAgenda
 
@@ -110,6 +111,24 @@ async def test_a_date_the_agenda_cannot_read_is_a_value_error() -> None:
         await FakeAgenda().execute("find_availability", {"date": "el jueves"})
 
 
+def test_the_model_is_handed_two_hours_even_when_the_agenda_returns_three() -> None:
+    slots = [
+        {"id": "a", "when": "2026-09-03T09:00", "doctor": "Dr. Alberto Navarro"},
+        {"id": "b", "when": "2026-09-03T14:00", "doctor": "Dra. Irene Campos"},
+        {"id": "c", "when": "2026-09-03T17:00", "doctor": "Dr. Hugo Ferrer"},
+    ]
+
+    offer = tools_module._offer(THURSDAY, slots)
+
+    assert offer.count("\n- ") == 2
+    assert "Hugo Ferrer" not in offer
+    assert tools_module.MORE_LEFT in offer
+
+
+def test_a_day_with_nothing_free_says_so_instead_of_offering_nothing() -> None:
+    assert tools_module._offer(THURSDAY, []) == "Sin huecos libres el jueves 3 de septiembre."
+
+
 async def test_the_tool_reaches_the_adapter_through_the_platform_executor(tc) -> None:
     slots = await tc.tools.call("find_availability", {"date": THURSDAY.isoformat()})
 
@@ -140,9 +159,10 @@ async def test_asking_for_thursday_calls_the_tool_with_the_day_the_patient_said(
 
 @needs_llm
 async def test_the_reply_offers_the_hours_the_agenda_returned(tc, judge_llm) -> None:
+    """The answer, not the filler: `final_message` skips the "un momento" said before the call."""
     conversation = await run_conversation(tc, ["¿qué turnos hay el jueves?"])
 
-    message = conversation.results[0].expect.contains_message(role="assistant")
+    message = final_message(conversation.results[0])
     await message.judge(
         judge_llm,
         intent="ofrece al menos una hora concreta para el jueves y pregunta cuál prefiere el "

@@ -18,6 +18,8 @@ from core.context import TenantContext
 from . import dates
 
 UNREADABLE_DATE = "No he entendido para qué día lo quiere. ¿Me dice el día de la semana o la fecha?"
+OFFER_LIMIT = 2
+MORE_LEFT = "(Ese día queda algún hueco más: ofrécelo solo si ninguno de estos dos le sirve.)"
 
 
 @function_tool
@@ -59,7 +61,15 @@ async def find_availability(
 
 
 def _offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
-    """What the model reads back: one line per free slot, or a plain 'no hay' for that day.
+    """What the model reads back: the two hours to offer, or a plain 'no hay' for that day.
+
+    Two, not the three the agenda returns, because how many options a caller can
+    hold in their head on a phone call is a decision this project makes once —
+    not arithmetic the model has to do under pressure every turn. Asking it in
+    the prompt to name two out of a list of three produced exactly the sentence
+    you would expect: three hours read out, then "¿cuál de las dos primeras?".
+    The rest of the day is not lost; the last line says so, and the model asks
+    again if neither works.
 
     The agenda's slot id is deliberately left out. Everything in here is text a
     voice agent may read aloud, and `sl-20260903-1100-trau` is not a sentence;
@@ -67,5 +77,6 @@ def _offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
     """
     if not slots:
         return f"Sin huecos libres el {dates.spanish_day(day)}."
-    lines = [f"- {dates.spanish_moment(s['when'])}, {s['doctor']}" for s in slots]
-    return f"Huecos libres el {dates.spanish_day(day)}:\n" + "\n".join(lines)
+    lines = [f"- {dates.spanish_moment(s['when'])}, {s['doctor']}" for s in slots[:OFFER_LIMIT]]
+    offer = f"Huecos libres el {dates.spanish_day(day)}:\n" + "\n".join(lines)
+    return f"{offer}\n{MORE_LEFT}" if len(slots) > OFFER_LIMIT else offer
