@@ -26,6 +26,7 @@ from typing import Any
 
 from core.state.events import Event
 from core.state.store import Store
+from core.tools import guard
 
 Clock = Callable[[], float]
 
@@ -56,11 +57,16 @@ class EventLog:
 
 
 def record(tc: Any, kind: str, payload: dict[str, Any] | None = None) -> None:
-    """Append one fact to a context's log, for callers that may not have one.
+    """Append one fact to a context's log, masked, for callers that may not have one.
 
     A stage, a confirmation and a saga all run in tests and in the console with
     a context that was never given a log, and none of them should carry an
     `if` about it. This is that `if`, written once.
+
+    It is also the one place their payloads are scrubbed: none of them has a
+    `ToolSpec` to mask by name, and a confirmation question or a saga cause is
+    free text that can easily repeat the caller's name. Everything the session
+    already knows to be PII (`tc.pii_values`) is blanked here.
     """
     if getattr(tc, "log", None) is not None:
-        tc.log.append(kind, payload or {})
+        tc.log.append(kind, guard.scrub(payload or {}, getattr(tc, "pii_values", ())))
