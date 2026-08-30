@@ -26,7 +26,7 @@ from deepeval.test_case import LLMTestCase
 from dotenv import load_dotenv
 
 from core.testing.deepeval import (
-    GREETING_TURN,
+    inputs_for,
     project_metrics,
     test_case_for,
     tool_descriptions,
@@ -43,8 +43,7 @@ async def build_cases(tenant_id: str, project_id: str) -> list[LLMTestCase]:
     cases: list[LLMTestCase] = []
     for golden in goldens:
         tc = fake_context(tenant_id, project_id)
-        inputs = [] if golden.get("turn") == GREETING_TURN else [golden["input"]]
-        conversation = await run_conversation(tc, inputs)
+        conversation = await run_conversation(tc, inputs_for(golden))
         cases.append(test_case_for(golden, conversation, tool_descriptions(tc)))
     return cases
 

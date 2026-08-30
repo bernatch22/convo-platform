@@ -23,15 +23,75 @@ pytest -m unit                  # fast tests, no keys needed
 python worker.py --help         # the LiveKit Agents CLI (console/dev/start)
 ```
 
-From ms-1: `python worker.py console --text` talks to the agent in the terminal.
+Talk to either demo business in the terminal — one worker, one codebase, two
+tenants; what differs is a folder under `tenants/`:
+
+```bash
+TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --text
+TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
+```
+
+### Talking to it out loud
+
+Drop `--text` and the console runs in **audio mode**: it opens the laptop
+microphone and speaks back through the speakers. Soniox transcribes, ElevenLabs
+answers in the project's voice, and a local turn detector decides when you have
+finished — no LiveKit server, no GPU, nothing to deploy.
+
+```bash
+TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console
+uv run python worker.py console --record          # also leaves the stereo OGG
+uv run python worker.py console --list-devices    # pick a microphone
+RECORD=1 uv run python worker.py dev              # same recording, against a server
+```
+
+While it runs: **Ctrl+T** switches between speaking and typing, **?** lists the
+shortcuts, **Ctrl+C** exits.
+`--record` writes `console-recordings/session-<stamp>/` — `audio.ogg` (you on
+one channel, the agent on the other) and the framework's `session_report.json`.
+
+Interrupting it works, and murmuring at it does not: an interruption needs two
+words (`InterruptionOptions.min_words`), and a turn that is nothing but Spanish
+backchannel — *vale*, *ajá*, *sí sí*, *mm*, *de acuerdo* — never becomes a
+reply. The list is project data (`Project.backchannels`); why there are two
+filters instead of one is written in [`core/barge_in.py`](core/barge_in.py).
+
+Then read the call back:
+
+```bash
+uv run python -m convo sessions list
+uv run python -m convo sessions show <id>
+```
+
+The log is append-only and written during the call, so it survives a kill:
+
+```
+   5    3767  tts.word     Buenos@0.30 días,@0.11 le@0.21 atiende@0.06 recepción@0.61
+   8    5480  stt.final    {"text": "quiero cambiar mi cita", "language": "es"}
+   9    5678  turn.user    transcription_delay=0.12s end_of_turn_delay=0.30s {...}
+  14   11647  turn.agent   ttft=0.94s e2e=1.87s {"text": "Claro, ¿me dice su DNI?"}
+  24   25783  session.end  {"outcome": "completed", "cost": {...}, "audio": "console-recordings/…/audio.ogg"}
+```
+
+`stt.final` is the transcript (interim hypotheses are never logged),
+`tts.word` the agent's own words with the provider's alignment,
+`interruption.false` and `speech.overlap` the barge-in decisions, and the `t_ms`
+column is milliseconds since the call started.
+
+A third business is a copy of [`tenants/_template/`](tenants/_template/README.md),
+which walks a stranger through it in ten minutes;
+[`docs/tenants.md`](docs/tenants.md) is the table of what a tenant owns and what
+the platform owns.
 
 Evals (ring 1, needs `ANTHROPIC_API_KEY`; the judge is Claude Haiku, set
 `DEEPEVAL_JUDGE_MODEL` to change it):
 
 ```bash
-uv run pytest -m unit                # includes LLM-judged tests when the key is present
-uv run deepeval test run tests/evals # per-project goldens; HTML under tmp/reports/deepeval/
+uv run pytest -m unit                     # includes LLM-judged tests when the key is present
+uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-tenant leakage pair
 ```
+
+[`docs/evals.md`](docs/evals.md) explains every metric and how to add one.
 
 ## Layout
 
@@ -41,6 +101,7 @@ api.py        control plane (ms-8+): tokens, dispatch, tools hub, call log
 core/         runtime: contracts, agents, tools, adapters, state, observability
 tenants/      one folder per customer: adapters + projects (agents, prompts, evals)
 tests/        unit tests and ring-1 evals
+docs/         how the platform is meant to be used: tenants, prompts, evals
 .taskops/reports/  per-milestone learning reports (Markdown)
 presentation/ self-narrating deck engine
 ```

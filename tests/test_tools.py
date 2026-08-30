@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from livekit.agents.llm import ToolError
 
+from core import confirm
 from core.context import Project, Tenant, TenantContext
 from core.tools.catalog import ToolCatalog, platform_specs
 from core.tools.contract import SideEffect, ToolSpec
@@ -113,9 +114,8 @@ async def test_an_irreversible_tool_with_a_confirmation_token_passes_the_guard()
     adapter = FakeAdapter()
     tc = context(adapter)
 
-    await tc.tools.call(
-        "cancel_appointment", {"phone": "600123456", "confirmation_token": "ct-abc123"}
-    )
+    confirm.mint(tc, "cancel_appointment", {"phone": "600123456"})
+    await tc.tools.call("cancel_appointment", {"phone": "600123456"})
 
     assert adapter.calls[0][0] == "cancel_appointment"
 
@@ -145,10 +145,9 @@ async def test_pii_arguments_are_masked_before_they_reach_the_log(
 ) -> None:
     tc = context(FakeAdapter())
 
+    confirm.mint(tc, "cancel_appointment", {"phone": "600123456"})
     with caplog.at_level(logging.INFO, logger="platform.tools"):
-        await tc.tools.call(
-            "cancel_appointment", {"phone": "600123456", "confirmation_token": "ct-abc123"}
-        )
+        await tc.tools.call("cancel_appointment", {"phone": "600123456"})
 
     assert "60*******" in caplog.text
     assert "600123456" not in caplog.text
@@ -180,3 +179,44 @@ async def test_a_project_speaks_its_own_register_when_a_tool_fails() -> None:
 
     assert str(failure.value) == usted
     assert str(failure.value) != DEFAULTS[FAILURE]
+
+
+# --- the session log --------------------------------------------------------
+
+
+def logged(tc) -> list[tuple[str, dict]]:
+    return [(e.kind, e.payload) for e in tc.log.events()]
+
+
+async def test_a_call_leaves_call_and_result_events_with_pii_masked() -> None:
+    from core.state.attach import attach_log
+    from core.state.store import MemoryStore
+
+    tc = attach_log(context(FakeAdapter()), MemoryStore())
+    args = {"phone": "600123456"}
+    confirm.mint(tc, "cancel_appointment", args)  # irreversible: the guard needs a real yes
+
+    await tc.tools.call("cancel_appointment", args)
+
+    kinds = [k for k, _ in logged(tc)]
+    assert kinds == ["session.start", "tool.call", "tool.result"]
+    call = logged(tc)[1][1]
+    assert call["args"]["phone"] == "60*******" and call["side_effect"] == "irreversible"
+    assert logged(tc)[2][1]["shape"] == "dict[2]"
+
+
+async def test_a_refusal_and_a_failure_are_logged_without_payloads() -> None:
+    from core.state.attach import attach_log
+    from core.state.store import MemoryStore
+
+    tc = attach_log(context(FakeAdapter()), MemoryStore())
+
+    with pytest.raises(ToolRefused):
+        await tc.tools.call("cancel_appointment", {"phone": "600123456"})
+    with pytest.raises(ToolError):
+        await tc.tools.call("broken_lookup", {"date": "2026-09-01"})
+
+    kinds = [k for k, _ in logged(tc)]
+    assert kinds == ["session.start", "tool.refused", "tool.call", "tool.error"]
+    assert "10.0.0.7" not in str(logged(tc))
+    assert logged(tc)[3][1]["key"] == FAILURE

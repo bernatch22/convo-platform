@@ -10,6 +10,7 @@ node_modules/
 dist/
 *.ogg
 *.wav
+console-recordings/
 .deepeval/
 eval-runs/
 

@@ -23,21 +23,28 @@ jobs:
         run: uv run pytest -m unit -q
 
   evals:
-    name: DeepEval ring 1 (needs ANTHROPIC_API_KEY)
+    # The key check is a STEP condition, not a job one: the `secrets` context is not
+    # available in `jobs.<id>.if`, so the old job-level guard evaluated to empty and the
+    # whole eval ring was silently skipped on every run, key or no key.
+    name: DeepEval ring 1 — every tenant (needs ANTHROPIC_API_KEY)
     runs-on: ubuntu-latest
-    if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --extra dev
+      - name: Install
+        if: env.ANTHROPIC_API_KEY != ''
+        run: uv sync --extra dev
       - name: Unit tests that call the model
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        if: env.ANTHROPIC_API_KEY != ''
         run: uv run pytest -m unit -q
-      - name: DeepEval
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: uv run deepeval test run tests/evals -n 2
+      # One command, every suite: tests/evals holds clinica-norte's and tienda-sur's
+      # goldens plus the cross-tenant leakage pair, and a new tenant is collected by
+      # dropping its suite in the same folder.
+      - name: DeepEval — clinica-norte, tienda-sur and cross-tenant leakage
+        if: env.ANTHROPIC_API_KEY != ''
+        run: uv run deepeval test run tests/evals -n 3
