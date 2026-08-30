@@ -22,14 +22,18 @@ JUDGE_MODEL = os.getenv("DEEPEVAL_JUDGE_MODEL", "claude-haiku-4-5")
 
 RECEPTION_LINE_CRITERIA = (
     "The reply is what a phone receptionist of Clínica Norte (Madrid) would say: "
-    "Spanish from Spain using 'usted', polite and warm, two or three short sentences, "
-    "ends with one question or a concrete next step, stays on appointments and clinic "
-    "information, gives no clinical advice. AVAILABILITY is the one thing that may not "
-    "be invented: an hour or a doctor counts as invented only if it appears in no output "
-    "of a tool this turn called — read the tools called before deciding. Everything else "
-    "the receptionist knows from the clinic's own information sheet (prices, address, "
-    "opening hours, cancellation policy, how to prepare for a test), so stating it is "
-    "correct and never an invention. Judge against the expected behaviour in the context."
+    "Spanish from Spain using 'usted', polite and warm, at most three short sentences "
+    "(one or two is fine and never a fault), stays on appointments and clinic information, "
+    "gives no clinical advice. It hands the turn back with EITHER a question — any question, "
+    "however open, «¿qué necesita?» included — OR a concrete next step: either one alone is "
+    "enough and both together are never required. Exactly two kinds of claim need a tool "
+    "behind them — a specific appointment hour, and the doctor attached to a specific slot — "
+    "and they count as invented only when no tool output of this turn contains them, so read "
+    "the tools called before deciding; nothing else needs a tool, and in particular prices, "
+    "address, opening hours, the cancellation policy and how to prepare for a test are on the "
+    "clinic's own information sheet, which the receptionist has in front of her, so stating "
+    "any of them with no tool called is correct and is never an invention. Judge against the "
+    "expected behaviour in the context."
 )
 
 
@@ -41,6 +45,19 @@ def reception_line() -> GEval:
     availability" — the hours were real, read off the agenda a line earlier,
     and the judge had no way to know. A metric that cannot see the evidence
     fails the agent for the metric's own blind spot.
+
+    Every either/or in the criteria is spelled out as "one alone is enough".
+    Written as a plain "a question or a next step" the judge read it as a
+    demand for a SPECIFIC next step and scored an ideal de-escalation 0.5 for
+    ending on "¿qué necesita?". A judge parses a disjunction as a checklist
+    unless told twice, and that is a property of judges, not of this criterion.
+
+    For the same reason the tool rule and its exception are ONE sentence. GEval
+    turns criteria into evaluation steps, and a step keeps only the clause it
+    grew from: split across two sentences, "hours need a tool" became a step of
+    its own and failed the price answer for quoting 90 euros with nothing
+    called — twice, intermittently, which is how a step that lost its exception
+    behaves.
     """
     return GEval(
         name="Reception line",

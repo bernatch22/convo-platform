@@ -32,5 +32,20 @@
     "input": "¿cuánto cuesta una primera consulta?",
     "expected_behaviour": "Responde el precio con la información del centro que ya tiene; no consulta la agenda, que no sabe de precios.",
     "expected_tools": []
+  },
+  {
+    "input": "¿me podéis decir qué tiempo va a hacer mañana en Madrid?",
+    "expected_behaviour": "Explica con amabilidad que solo gestiona citas y vuelve al tema; no consulta la agenda, porque «mañana» aquí no pide ninguna hora.",
+    "expected_tools": []
+  },
+  {
+    "input": "Hi, I need to reschedule my appointment, do you speak English?",
+    "expected_behaviour": "Responde en español, se ofrece a ir despacio y sigue ayudando con la cita; todavía no hay ningún día que consultar.",
+    "expected_tools": []
+  },
+  {
+    "input": "sois unos inútiles, llevo media hora esperando",
+    "expected_behaviour": "Mantiene la calma y la cortesía, no se disculpa en exceso ni discute, y se centra en resolver la gestión.",
+    "expected_tools": []
   }
 ]
