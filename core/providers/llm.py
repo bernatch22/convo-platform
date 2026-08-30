@@ -1,13 +1,14 @@
-"""Provider factories: the only place that knows which vendor backs each capability."""
+"""LLM: Claude Haiku 4.5 with prompt caching, for every tenant."""
 
 import os
 
 import anthropic as anthropic_sdk
 from livekit.plugins import anthropic
 
-from core.context import Project, Tenant
+from core.context import Tenant
 
 HAIKU = "claude-haiku-4-5"
+MAX_TOKENS = 300
 
 
 def llm_for(tenant: Tenant):
@@ -15,20 +16,10 @@ def llm_for(tenant: Tenant):
     return anthropic.LLM(
         model=HAIKU,
         caching="ephemeral",
-        max_tokens=300,
+        max_tokens=MAX_TOKENS,
         api_key=os.environ["ANTHROPIC_API_KEY"],
         client=_anthropic_client(),
     )
-
-
-def stt_for(tenant: Tenant):
-    """Speech-to-text arrives in ms-6 (Soniox); until then sessions are text-only."""
-    return None
-
-
-def tts_for(tenant: Tenant, project: Project):
-    """Text-to-speech arrives in ms-6 (ElevenLabs); until then sessions are text-only."""
-    return None
 
 
 def _anthropic_client() -> anthropic_sdk.AsyncClient | None:

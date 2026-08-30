@@ -46,6 +46,7 @@ class Project:
     id: str
     name: str
     voice: str | None = None
+    tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
     language: str = "es"
     keyterms: list[str] = field(default_factory=list)
     tools: ToolCatalog = field(default_factory=ToolCatalog)
