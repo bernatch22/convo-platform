@@ -48,6 +48,25 @@ NEXT_WEEK_PHRASES = (
 )
 ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 MONDAY = 0
+HALF = 30
+MORNING = 6
+AFTERNOON = 13
+NIGHT = 21
+NUMBERS = (
+    "",
+    "una",
+    "dos",
+    "tres",
+    "cuatro",
+    "cinco",
+    "seis",
+    "siete",
+    "ocho",
+    "nueve",
+    "diez",
+    "once",
+    "doce",
+)
 
 
 def resolve(text: str, today: datetime.date) -> datetime.date:
@@ -87,6 +106,39 @@ def spanish_moment(when: str) -> str:
     """`jueves 3 de septiembre a las 10:30` from the ISO timestamp the agenda returned."""
     moment = datetime.datetime.fromisoformat(when)
     return f"{spanish_day(moment.date())} a las {moment:%H:%M}"
+
+
+def spoken_moment(when: str) -> str:
+    """`martes 8 de septiembre a la una de la tarde` — the hour as a person says it, not a clock.
+
+    Used for the one sentence the platform makes the agent read verbatim, the
+    confirmation. Everywhere else the model is handed `spanish_moment`, whose
+    `13:00` is what `book_appointment` takes as an argument: the precise form is
+    for the machine, this one is for the ear. A TTS reading "las 13:00" says
+    "las trece cero cero", which nobody has ever said on a phone.
+    """
+    moment = datetime.datetime.fromisoformat(when)
+    return f"{spanish_day(moment.date())} a {spanish_hour(moment.hour, moment.minute)}"
+
+
+def spanish_hour(hour: int, minute: int = 0) -> str:
+    """`la una de la tarde`, `las nueve y media de la mañana` — a 24h time said out loud."""
+    twelve = hour % 12 or 12
+    said = "la una" if twelve == 1 else f"las {NUMBERS[twelve]}"
+    if minute:
+        said += " y media" if minute == HALF else f" y {minute}"
+    return f"{said} {_part_of_day(hour)}"
+
+
+def _part_of_day(hour: int) -> str:
+    """Spanish splits the day at meals, not at noon: 13:00 is already «de la tarde»."""
+    if hour < MORNING:
+        return "de la madrugada"
+    if hour < AFTERNOON:
+        return "de la mañana"
+    if hour < NIGHT:
+        return "de la tarde"
+    return "de la noche"
 
 
 def _normalise(text: str) -> str:

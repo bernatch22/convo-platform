@@ -10,5 +10,6 @@ from livekit.agents import RunContext, function_tool
 from livekit.agents.llm import ToolError
 
 from core.agents.base import TenantAgent
+from core.agents.confirm_task import ConfirmTask
 
-__all__ = ["RunContext", "TenantAgent", "ToolError", "function_tool"]
+__all__ = ["ConfirmTask", "RunContext", "TenantAgent", "ToolError", "function_tool"]

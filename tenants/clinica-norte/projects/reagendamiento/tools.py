@@ -1,19 +1,16 @@
-"""The tools the reagendamiento project puts in the model's hands.
+"""What the stages hand the model, and what they hand the clinic's systems.
 
-A tool docstring here is not documentation for a developer: it is the schema
-Claude reads before deciding whether to call, so it is written in Spanish, for
-the model, and it says when to use the tool and exactly what to put in each
-argument. The body stays thin — resolve the caller's words into a date, hand
-the call to `tc.tools.call`, turn the result into a line the model can read
-aloud — because guard, timeout, logging and failure sentences all live in the
-platform's executor, never here.
+The tools themselves are methods of the stage that owns them (`stages/`), so a
+reader opens one file and sees the model's whole surface for that step of the
+call. This module holds the pieces those tools share: turning the caller's
+words into a date, turning the agenda's rows into a line the model can read
+aloud, and writing the SMS a rebooking ends with.
+
+Pure functions, no context and no I/O, which is why every rule below is a
+one-line unit test.
 """
 
 import datetime
-from typing import Any
-
-from core.agents import RunContext, ToolError, function_tool
-from core.context import TenantContext
 
 from . import dates
 
@@ -21,47 +18,52 @@ UNREADABLE_DATE = "No he entendido para qué día lo quiere. ¿Me dice el día d
 OFFER_LIMIT = 2
 MORE_LEFT = "(Ese día queda algún hueco más: ofrécelo solo si ninguno de estos dos le sirve.)"
 
+NO_SUCH_HOUR = (
+    "Esa hora no es una de las que le he ofrecido. Vuelve a mirar la agenda de ese día "
+    "y ofrécele las horas que te devuelva."
+)
+BOOKING_FAILED = (
+    "El sistema de citas ha rechazado esa hora y no se ha guardado nada: la cita que el "
+    "paciente ya tenía sigue en pie, tal cual estaba. Díselo con estas dos ideas —no ha "
+    "podido reservarse y su cita anterior no se ha tocado— y ofrécele otra hora."
+)
+NOT_CONFIRMED = (
+    "El paciente no ha confirmado, así que no se ha reservado nada. Pregúntale qué prefiere "
+    "hacer y ofrécele otra hora si la quiere."
+)
 
-@function_tool
-async def find_availability(
-    ctx: RunContext[TenantContext],
-    date: str,
-    specialty: str | None = None,
-) -> str:
-    """Consulta la agenda de la clínica y devuelve hasta tres huecos libres de un día.
 
-    Llámala en cuanto el paciente nombre un día, aunque no sepas nada más de él:
-    siempre que pregunte por disponibilidad, quiera cambiar una cita a otro día o
-    mencione una fecha. Nunca digas que hay hueco, ni que no lo hay, sin haberla
-    llamado antes: tú no ves la agenda, ella sí.
+def resolve_day(text: str, today: datetime.date) -> datetime.date:
+    """The day the caller means, or ValueError; the stage turns that into a spoken sentence."""
+    return dates.resolve(text, today)
 
-    Args:
-        date: el día tal y como lo ha dicho el paciente, con sus mismas palabras
-            ("el jueves", "mañana", "pasado mañana", "la semana que viene"), o en
-            formato AAAA-MM-DD si ha dado una fecha exacta. No calcules tú la
-            fecha ni preguntes qué día es hoy.
-        specialty: la especialidad, solo si el paciente ya la ha dicho
-            ("traumatología", "pediatría", "cardiología"). Omítela mientras no la
-            sepas y no se la preguntes para poder llamar a esta herramienta: sin
-            especialidad la agenda responde igual, con los huecos del centro.
 
-    Devuelve un texto con hasta tres huecos (día, hora y profesional), o la
-    indicación de que ese día no queda ninguno.
-    """
-    tc = ctx.userdata
-    try:
-        day = dates.resolve(date, tc.today)
-    except ValueError:
-        raise ToolError(UNREADABLE_DATE) from None
-    args: dict[str, Any] = {"date": day.isoformat()}
-    if specialty:
-        args["specialty"] = specialty
-    slots = await tc.tools.call("find_availability", args)
+def offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
+    """What the model reads back after a lookup: the hours to offer, or a plain 'no hay'."""
     return _offer(day, slots)
 
 
+def sms_text(patient: str, slot: dict[str, str]) -> str:
+    """The message the clinic sends when a change is done; short enough for one SMS."""
+    return (
+        f"Clínica Norte: {patient}, su cita queda el {dates.spanish_moment(slot['when'])} "
+        f"con {slot['doctor']}. Para cambiarla llame al 910 000 000."
+    )
+
+
+def confirmation_question(slot: dict[str, str]) -> str:
+    """The sentence the caller has to say yes to, rendered by us and never by the model.
+
+    A confirmation the model writes is a confirmation the model can soften, and
+    "¿le va bien el jueves?" is not consent to move an appointment. The words
+    are built here from the row the agenda returned, so what the caller agrees
+    to and what the platform books are the same thing by construction.
+    """
+    return f"{dates.spoken_moment(slot['when'])} con {slot['doctor']}, ¿lo confirmo?"
+
+
 def _offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
-    """What the model reads back: the two hours to offer, or a plain 'no hay' for that day.
+    """The two hours to offer, or a plain 'no hay' for that day.
 
     Two, not the three the agenda returns, because how many options a caller can
     hold in their head on a phone call is a decision this project makes once —
@@ -72,11 +74,12 @@ def _offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
     again if neither works.
 
     The agenda's slot id is deliberately left out. Everything in here is text a
-    voice agent may read aloud, and `sl-20260903-1100-trau` is not a sentence;
-    it comes back the day the model can actually book with it (ms-3).
+    voice agent may read aloud, and `sl-20260903-1100-trau` is not a sentence.
+    The stage keeps the ids for itself and the model chooses by the hour it
+    just offered, which is also what the patient says out loud.
     """
     if not slots:
         return f"Sin huecos libres el {dates.spanish_day(day)}."
     lines = [f"- {dates.spanish_moment(s['when'])}, {s['doctor']}" for s in slots[:OFFER_LIMIT]]
-    offer = f"Huecos libres el {dates.spanish_day(day)}:\n" + "\n".join(lines)
-    return f"{offer}\n{MORE_LEFT}" if len(slots) > OFFER_LIMIT else offer
+    text = f"Huecos libres el {dates.spanish_day(day)}:\n" + "\n".join(lines)
+    return f"{text}\n{MORE_LEFT}" if len(slots) > OFFER_LIMIT else text

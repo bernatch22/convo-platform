@@ -17,4 +17,7 @@ def judge_llm():
     """A Claude Haiku instance used only to judge intents in tests."""
     from livekit.plugins import anthropic
 
-    return anthropic.LLM(model="claude-haiku-4-5", max_tokens=200)
+    # 400, not 200: the judge answers by CALLING check_intent(success, reason), and a
+    # reason written in Spanish about a three-sentence reply runs past 200 tokens — the
+    # call never closes and the failure reads "LLM did not return any arguments".
+    return anthropic.LLM(model="claude-haiku-4-5", max_tokens=400)
