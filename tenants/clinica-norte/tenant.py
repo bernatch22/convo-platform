@@ -10,13 +10,19 @@ from .projects.reagendamiento.project import PROJECT
 
 @dataclass
 class ClinicaNorteTenant(Tenant):
-    """The clinic and the systems it runs; today the agenda is a fake, the seam is real."""
+    """The clinic and the systems it runs; today they are fakes, the seam is real."""
 
     def build_adapters(self) -> dict[str, Adapter]:
-        """One adapter per system the clinic owns, built fresh for each session."""
-        from .adapters.agenda import FakeAgenda
+        """One adapter per system the clinic owns, built fresh for each session.
 
-        return {"agenda": FakeAgenda()}
+        Two of them from ms-3 on: the appointment book and the SMS gateway. The
+        executor picks whichever one declares the capability a tool asks for, so
+        adding a system is adding a line here — no stage and no tool changes.
+        """
+        from .adapters.agenda import FakeAgenda
+        from .adapters.sms import FakeSms
+
+        return {"agenda": FakeAgenda(), "sms": FakeSms()}
 
 
 TENANT = ClinicaNorteTenant(

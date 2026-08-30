@@ -43,10 +43,10 @@ class ConfirmTask(AgentTask[bool]):
         args: dict[str, Any],
         instructions: str | None = None,
     ) -> None:
-        super().__init__(
-            instructions=(instructions or INSTRUCTIONS).format(question=question),
-            tools=[self.confirm, self.decline],
-        )
+        # No `tools=` argument: an Agent collects its own @function_tool methods, and
+        # passing them as well registers each one twice — which LiveKit refuses with
+        # "duplicate function name: confirm" the moment the task takes over the session.
+        super().__init__(instructions=(instructions or INSTRUCTIONS).format(question=question))
         self.tc = tc
         self.tool = tool
         self.args = args

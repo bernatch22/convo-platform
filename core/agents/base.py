@@ -36,15 +36,26 @@ class TenantAgent(Agent):
         """One prose line the next stage reads about what happened here; stages override it."""
         return f"Etapa anterior: {self.stage_name()}."
 
-    def hand_off(self, next_agent: "TenantAgent", said: str) -> tuple[Agent, str]:
-        """What a tool returns to move the conversation on: the next stage and what to say."""
+    def hand_off(
+        self, next_agent: "TenantAgent", said: str | None = None
+    ) -> "Agent | tuple[Agent, str]":
+        """What a tool returns to move the conversation on: the next stage, and optionally a line.
+
+        Default to no line. A tool that returns text alongside the next stage
+        makes the stage that is LEAVING answer with it, and the stage arriving
+        then speaks in its own `on_enter` — two turns, one after the other, and
+        on a phone call that is the same thing said twice. What the next stage
+        needs to know travels in `summary()`, not in a farewell sentence.
+
+        Pass `said` only when the leaving stage genuinely has the last word.
+        """
         log.info(
             "stage.handoff %s %s -> %s",
             self.tc.label(),
             self.stage_name(),
             next_agent.stage_name(),
         )
-        return next_agent, said
+        return (next_agent, said) if said is not None else next_agent
 
     def stage_name(self) -> str:
         """The stage as it appears in logs and, from ms-4, in the event log."""

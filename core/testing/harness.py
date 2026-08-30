@@ -12,6 +12,7 @@ from datetime import date
 
 from livekit.agents import AgentSession
 from livekit.agents.metrics import AgentSessionUsage, LLMModelUsage
+from livekit.agents.voice import Agent
 from livekit.agents.voice.run_result import ChatMessageAssert, RunResult
 
 from core.context import TenantContext
@@ -72,15 +73,22 @@ class Conversation:
         )
 
 
-async def run_conversation(tc: TenantContext, inputs: list[str]) -> Conversation:
-    """Start the project's entry agent headless, capture its greeting, run each input as a turn.
+async def run_conversation(
+    tc: TenantContext, inputs: list[str], agent: Agent | None = None
+) -> Conversation:
+    """Start a stage headless, capture its greeting, run each input as a turn.
 
     The greeting comes from `on_enter` before any user input, exactly as on a
     real call; goldens that judge the opening line read `Conversation.greeting`.
+
+    `agent` defaults to the project's entry agent, which is what a real call
+    starts with. A test passes a later stage when what it is pinning belongs to
+    that stage and driving the conversation there through the model would only
+    add turns, cost and variance to an assertion about something else.
     """
     session: AgentSession[TenantContext] = build_session(tc)
     async with session:
-        await session.start(tc.project.entry_agent(tc))
+        await session.start(agent or tc.project.entry_agent(tc))
         await _wait_for_greeting(session)
         conversation = Conversation(greeting=greeting_of(session))
         for text in inputs:
@@ -90,9 +98,11 @@ async def run_conversation(tc: TenantContext, inputs: list[str]) -> Conversation
     return conversation
 
 
-async def run_turns(tc: TenantContext, inputs: list[str]) -> list[RunResult]:
+async def run_turns(
+    tc: TenantContext, inputs: list[str], agent: Agent | None = None
+) -> list[RunResult]:
     """Convenience: only the per-input results of `run_conversation`."""
-    return (await run_conversation(tc, inputs)).results
+    return (await run_conversation(tc, inputs, agent)).results
 
 
 def text_of(result: RunResult) -> str:

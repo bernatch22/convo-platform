@@ -43,7 +43,12 @@ GREETING_TURN = "greeting"
 
 
 def tool_descriptions(tc: TenantContext) -> dict[str, str]:
-    """Every tool of the project's entry agent, by name, described as the MODEL sees it.
+    """Every tool of every stage of the project, by name, described as the MODEL sees it.
+
+    Every stage, not just the entry one: from ms-3 a conversation moves through
+    several agents and the turn a golden judges may be answered by any of them.
+    A project that declares no stages is asked for its entry agent, which is the
+    same thing when there is only one.
 
     A tool docstring in this codebase is the schema Claude reads before
     deciding whether to call — so it is also the only fair thing to show a
@@ -58,8 +63,24 @@ def tool_descriptions(tc: TenantContext) -> dict[str, str]:
     half that says "the day in the patient's own words". A judge shown only the
     first half made the same mistake twice.
     """
-    agent = tc.project.entry_agent(tc)
-    return {tool_context.get_function_info(tool).name: _described(tool) for tool in agent.tools}
+    return {
+        tool_context.get_function_info(tool).name: _described(tool)
+        for agent in _stages(tc)
+        for tool in agent.tools
+    }
+
+
+def inputs_for(golden: Mapping[str, Any]) -> list[str]:
+    """The user turns a golden needs: what has to be said first, then the turn it judges.
+
+    A golden about a later stage carries the turns that get the call there under
+    `before`. They are run, never judged: a rescheduling call cannot ask about
+    free hours before it knows whose appointment it is, so the alternative to
+    replaying the identification is a golden that judges the wrong stage.
+    """
+    if golden.get("turn") == GREETING_TURN:
+        return []
+    return [*golden.get("before", []), golden["input"]]
 
 
 def tool_calls_of(
@@ -107,6 +128,11 @@ def test_case_for(
     """
     expected = [ToolCall(name=name) for name in golden.get("expected_tools", [])]
     context = [f"Expected behaviour: {golden['expected_behaviour']}"]
+    # What the agent already knew when the judged turn arrived. Without it a judge scores
+    # the turn as if the call had started there and reads every argument the model learnt
+    # earlier — the patient's specialty, their name — as invented out of nothing.
+    if golden.get("before"):
+        context.append("Earlier in the call the patient said: " + " / ".join(golden["before"]))
     if golden.get("turn") == GREETING_TURN:
         return LLMTestCase(
             input=golden["input"],
@@ -115,7 +141,7 @@ def test_case_for(
             expected_tools=expected,
             context=context,
         )
-    result = conversation.results[0]
+    result = conversation.results[-1]  # the judged turn; `before` turns only get the call there
     return LLMTestCase(
         input=golden["input"],
         actual_output=text_of(result),
@@ -134,6 +160,13 @@ def project_metrics(tenant_id: str, project_id: str) -> ModuleType:
     time — so core still compiles with no customer folder on disk.
     """
     return importlib.import_module(f"tenants.{tenant_id}.projects.{project_id}.evals.metrics")
+
+
+def _stages(tc: TenantContext) -> list[Any]:
+    """Every stage the project declares, or its entry agent when it declares none."""
+    if hasattr(tc.project, "stages"):
+        return tc.project.stages(tc)
+    return [tc.project.entry_agent(tc)]
 
 
 def _described(tool: Any) -> str:

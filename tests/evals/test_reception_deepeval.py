@@ -40,8 +40,7 @@ def load_goldens() -> list[dict]:
 @pytest.mark.parametrize("golden", load_goldens(), ids=lambda g: g["input"][:32])
 async def test_reception_keeps_its_line(golden: dict) -> None:
     tc = fake_context(TENANT, PROJECT)
-    inputs = [] if golden.get("turn") == bridge.GREETING_TURN else [golden["input"]]
-    conversation = await run_conversation(tc, inputs)
+    conversation = await run_conversation(tc, bridge.inputs_for(golden))
     case = bridge.test_case_for(golden, conversation, bridge.tool_descriptions(tc))
 
     assert_test(case, [metrics.reception_line()])
