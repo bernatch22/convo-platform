@@ -56,7 +56,7 @@ class Project:
     voice: str | None = None
     tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
     language: str = "es"
-    greeting: str = ""  # "" = the entry stage's prompt opens the call, as it always has
+    greeting: str = ""  # spoken verbatim on session start (no LLM turn); "" = the model opens
     keyterms: list[str] = field(default_factory=list)
     backchannels: list[str] = field(default_factory=list)  # [] = the Spanish default
     tools: ToolCatalog = field(default_factory=ToolCatalog)

@@ -87,6 +87,7 @@ PROJECT = PedidosProject(
     id="pedidos",
     name="Estado y cancelación de pedidos",
     language="es-ES",
+    greeting="¡Hola! Soy la asistente de Tienda Sur. ¿En qué te ayudo?",
     voice="gD1IexrzCvsXPHUuT0s3",  # ElevenLabs "Sara Martin - 3": the shop's own voice
     tools=ToolCatalog.of(FIND_ORDER, CANCEL_ORDER, RESTORE_ORDER, SEND_SMS),
     messages=MESSAGES,

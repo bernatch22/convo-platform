@@ -31,7 +31,6 @@ log = logging.getLogger("platform.session")
 ENDPOINT_MIN_DELAY_S = 0.3
 ENDPOINT_MAX_DELAY_S = 2.5
 INTERRUPTION_MIN_WORDS = 2
-PREEMPTIVE_MAX_RETRIES = 1
 
 
 def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
@@ -78,7 +77,12 @@ def voice_turn_handling() -> TurnHandlingOptions:
         interruption=InterruptionOptions(
             min_words=INTERRUPTION_MIN_WORDS, resume_false_interruption=True
         ),
-        preemptive_generation={"max_retries": PREEMPTIVE_MAX_RETRIES},
+        # OFF by the human's decision (2026-08-31, call AJ_rt86KogpPxDa): with
+        # Soniox closing a turn in ~0.33s there is no window for speculation to
+        # hide Haiku's ttft — it appeared whole in the gap regardless — so the
+        # extra cache-read calls bought nothing. Generation starts only when the
+        # end of turn is confirmed.
+        preemptive_generation={"enabled": False},
     )
 
 

@@ -55,7 +55,8 @@ def test_the_snapshot_names_every_provider_the_next_call_will_use(client) -> Non
     }
     assert view["llm"]["model"] == "claude-haiku-4-5" and view["llm"]["caching"] == "ephemeral"
     assert view["llm"]["cache_minimum_tokens"] == 4096, "below it, caching is a silent no-op"
-    assert view["tts"]["model"] == tts.DEFAULT_MODEL and view["tts"]["sync_alignment"] is True
+    assert view["tts"]["model"] == "eleven_flash_v2_5"  # the clinic's latency profile
+    assert view["tts"]["sync_alignment"] is True
     assert set(view["tts"]["forbidden_models"]) == set(tts.FORBIDDEN_MODELS)
     assert view["tts"]["voice"], "voice is project data and the console shows it"
     reasons = view["tts"]["forbidden_reasons"]
@@ -98,7 +99,8 @@ async def test_a_put_changes_what_the_next_session_resolves_to(client, store) ->
 async def test_a_project_with_no_override_resolves_exactly_as_git_deployed_it(store) -> None:
     tc = await router.resolve(fake_job_context(metadata=META), store)
 
-    assert tc.project.greeting == "" and tc.project.tts_model is None
+    assert tc.project.greeting.startswith("Clínica Norte")  # git ships one since ms-10
+    assert tc.project.tts_model == "eleven_flash_v2_5"
 
 
 def test_a_forbidden_tts_model_is_refused_with_the_rule_that_refuses_it(client, store) -> None:
@@ -158,7 +160,10 @@ async def test_the_stored_greeting_is_the_sentence_the_call_opens_with(store) ->
 
 
 async def test_without_a_greeting_the_entry_stage_still_generates_its_opening(store) -> None:
+    import dataclasses
+
     tc = await router.resolve(fake_job_context(metadata=META), store)
+    tc.project = dataclasses.replace(tc.project, greeting="")  # git ships one; blank it here
     session = _FakeSession()
 
     await _Stage(tc, session).on_enter()
@@ -173,7 +178,7 @@ class _FakeSession:
         self.said: str | None = None
         self.generated = False
 
-    def say(self, text: str) -> None:
+    def say(self, text: str, **kwargs) -> None:
         self.said = text
 
     def generate_reply(self) -> None:
