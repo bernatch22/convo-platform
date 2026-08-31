@@ -29,7 +29,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from core import control_plane, pipeline, recordings, rooms
+from core import business, control_plane, pipeline, recordings, rooms
 from core import outcomes as core_outcomes
 from core.auth import (
     SupervisorCapability,
@@ -288,6 +288,54 @@ async def outcomes(
     return core_outcomes.outcomes(
         store, tenant=tenant, project=project, days=days, limit=limit
     )
+
+
+@app.get("/reservations")
+async def reservations(
+    store: Reader,
+    tenant: str,
+    project: str,
+    days: Annotated[int, Query(ge=1, le=business.MAX_DAYS)] = business.DEFAULT_DAYS,
+    limit: Annotated[int, Query(ge=1, le=business.MAX_ROWS)] = business.DEFAULT_ROWS,
+) -> dict[str, Any]:
+    """The reservations THEMSELVES, read off the customer's own system — not off our log.
+
+    → `{"tenant": str, "project": str, "days": int, "shape": str|null,
+         "labels": {str: str|null}, "systems": [str],
+         "rows": [{"id": str, "who": str, "contact": str|null, "when": str|null,
+                   "handled_by": str|null, "state": str,
+                   "tone": "new"|"changed"|"gone"|"plain",
+                   "detail": str|null, "at": float|null, "session": str|null,
+                   "verb": str|null, "confirmed": bool, "channel": str|null}]}`
+
+    `/outcomes` counts what the platform DID, off the append-only log whose
+    summaries are PII-filtered by design. This is the other reading and the one
+    an operator asked for: who is coming, when, with whom, and whether that
+    booking still stands. A patient's name is not in our log and must not be —
+    it is in the clinic's booking system, which is where this goes to get it
+    (`core.registry` → the tenant's adapters → `list_records`).
+
+    `shape` is the business's own word for its records (`appointments`,
+    `orders`) and `labels` its own column headings: a project whose systems
+    offer no such view answers `shape: null` with no rows, and the console says
+    so rather than drawing an agenda nobody has. Nothing in `core` or in the UI
+    holds a list of shapes, columns or state words.
+
+    `state` is the business's word for how a record stands and `tone` the only
+    presentational field, decided by the adapter that knows what its own words
+    mean. `session`, `verb` and `confirmed` are the join with `/outcomes`: the
+    call that last touched this record inside the window, matched on the
+    identifier the log's summary carries verbatim. Null means no call in the
+    window touched it — see `core/business.py` for why that join is on an id
+    and not on a name.
+    """
+    known = load_registry().get(tenant)
+    if known is None:
+        raise HTTPException(404, f"unknown tenant {tenant!r}; known: {sorted(load_registry())}")
+    if project not in known.projects:
+        detail = f"tenant {tenant!r} has no project {project!r}; known: {sorted(known.projects)}"
+        raise HTTPException(404, detail)
+    return await business.records(known, project, store, days=days, limit=limit)
 
 
 @app.get("/sessions/{session_id}")

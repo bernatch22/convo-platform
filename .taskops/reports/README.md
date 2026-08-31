@@ -29,3 +29,4 @@ sheets) live under `tmp/reports/` and are not versioned.
 | ms-13 voice evals — callers who speak, nights that judge, a model that talks back | landed | [ms-13.md](ms-13.md) |
 | ms-17 the operator hears and sees — recordings, orientation, datasets | landed | [ms-17.md](ms-17.md) |
 | ms-18 reserva de cita — the missing verb, and the board that proves it | landed | [ms-18.md](ms-18.md) |
+| ms-19 console polish — the number where you look, the reservations you can read | landed | [ms-19.md](ms-19.md) |

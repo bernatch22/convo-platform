@@ -12,6 +12,8 @@ import os
 import pytest
 from dotenv import load_dotenv
 
+from core.adapters.ledger import PATH_ENV as LEDGER_ENV
+
 load_dotenv(".env")
 
 # Not deleted but replaced: constructing a client still works (plenty of unit
@@ -48,6 +50,18 @@ def unit_ring_is_offline(request, monkeypatch):
     if "voice" not in request.keywords:
         for key in VOICE_KEYS:
             monkeypatch.delenv(key, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def ledger_is_the_test_s_own(tmp_path, monkeypatch):
+    """Point the demo adapters' business file at this test's tmp dir, never at the box's.
+
+    `core.adapters.ledger` is how a fake agenda survives the process that wrote
+    it, which is the only reason the console can show an appointment a call
+    booked. It is also a file two tests would otherwise share, so every test
+    gets its own and the box's `tmp/business.json` is left to the box.
+    """
+    monkeypatch.setenv(LEDGER_ENV, str(tmp_path / "business.json"))
 
 
 @pytest.fixture
