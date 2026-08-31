@@ -63,7 +63,16 @@ and, when a decision was made, a short essay in its thread.
   afterwards arrives as the caller speaking. Haiku answers it (`tk-097125`: the
   session date opened 5 of 6 calls). Context the model must READ but nobody
   said goes in as a paired tool call + result (`core.dates_note.clock_reading`);
-  a `tool_use.id` must match `^[a-zA-Z0-9_-]+$` or the request 400s.
+  a `tool_use.id` must match `^[a-zA-Z0-9_-]+$` or the request 400s, and the
+  tool must be DECLARED on the agent or `update_chat_ctx` drops the pair.
+- **Context to be READ is a tool result; context to be OBEYED is an
+  instruction.** A supervisor's whisper stays in the mid-conversation
+  instruction channel (`role="system"` → a user `<instructions>` turn on the
+  wire): as a tool result the same note is filed and not acted on (1/3 vs 3/3,
+  `tk-bc0122`). And a whisper only outranks the stage script because every
+  project's prefix ends with `core.security.protocol.SUPERVISOR_PROTOCOL` —
+  without it, 0/3. `inject` bends the next answer; a note the supervisor wants
+  SAID needs `inject_and_speak`.
 - STT: Soniox `stt-rt-v5`, `language_hints=["es","en"]`, endpointing
   `level=2 / sensitivity=0.3 / max_endpoint_delay_ms≈1000`, `context=` (Soniox
   silently ignores `keyterms`). Keep `sample_rate=16000` even on PSTN.
