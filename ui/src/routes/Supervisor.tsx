@@ -33,6 +33,7 @@ import { useTimeline } from "../lib/useTimeline";
 interface Watched {
   caller: string;
   tenant: string;
+  project: string;
 }
 
 export function Supervisor() {
@@ -46,7 +47,11 @@ export function Supervisor() {
   const me = useMemo(() => Math.random().toString(36).slice(2, 10), []);
 
   const monitor = (call: LiveCall) => {
-    setWatched({ caller: call.phone ?? "web", tenant: call.tenant ?? "" });
+    setWatched({
+      caller: call.phone ?? "web",
+      tenant: call.tenant ?? "",
+      project: call.project ?? "",
+    });
     void live.open("supervise", call.room, { capability: "listen", userId: me });
   };
 
@@ -80,7 +85,11 @@ export function Supervisor() {
               {live.phase === "live" && <WhisperDesk live={live} me={me} />}
               {live.error && <p className="note note--warn">{live.error}</p>}
             </div>
-            <Timeline log={log} tenant={watched?.tenant ?? ""} />
+            <Timeline
+              log={log}
+              tenant={watched?.tenant ?? ""}
+              project={watched?.project ?? ""}
+            />
           </div>
         </section>
       )}

@@ -188,6 +188,13 @@
   text-transform: uppercase;
 }
 
+/* The section group is labelled with the path it acts on: an identifier, not a heading. */
+.rail__label--path {
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
 .rail__tenant {
   padding: var(--s3) var(--s5) var(--s1);
   color: var(--text-dim);
