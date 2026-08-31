@@ -2,23 +2,107 @@
   <div class="slide-body">
 
     <div class="head-block" data-anim="1">
-      <div class="eyebrow">10 <span class="sep">·</span> Completa el entregable 5 y alimenta el 10</div>
-      <h2 class="head">Handoff a un humano</h2>
+      <div class="eyebrow">10 <span class="sep">·</span> Completa el entregable 5 <span class="sep">·</span> alimenta el 10</div>
+      <h2 class="head" style="max-width:38ch">La autoridad viaja en el ticket, no en la pantalla</h2>
+      <p class="lede">
+        Un humano entra en una llamada viva con un ticket firmado de quince minutos, y la capacidad
+        va <b>dentro</b> del token: <code>listen</code> escucha, <code>whisper</code> escribe al
+        agente, <code>takeover</code> abre un micrófono. La consola no concede nada: ofrece lo que el
+        ticket ya permite. La alternativa, un botón que autoriza hablar, deja el permiso en el
+        cliente que lo dibuja.
+      </p>
     </div>
 
-    <div class="todo" data-anim="2">
-      <div class="who">Sin escribir <span class="sep">·</span> card tk-06abff <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
-      <ul>
-        <li>Tres capacidades, una escalera: listen (oculto, sólo suscripción) → whisper (sigue oculto, texto al agente por RPC) → takeover (micrófono real y un participante que el llamante ve).</li>
-        <li>La autoridad es un token firmado y de vida corta, no un control en una pantalla: la consola sólo puede ofrecer lo que el ticket ya permite.</li>
-        <li>Cada verbo se anexa al log de la sesión del llamante con su propio seq: una llamada sigue siendo una historia aunque la hayan tocado dos humanos.</li>
-        <li>Qué se le dice y qué no se le dice al llamante, y por qué eso es una decisión de producto.</li>
-      </ul>
-      <div class="note"><b>Figura:</b> screenshots/supervisor.png.</div>
-      <div class="note">
-        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
-        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+    <div class="grid-7-5 fill">
+
+      <div style="display:flex;flex-direction:column;gap:20px;min-height:0">
+
+        <figure class="fig" data-anim="2">
+          <svg viewBox="0 0 800 248" role="img" aria-label="Capacidad pedida, grants firmados en el ticket y la única puerta que los admite">
+            <defs>
+              <marker id="arw10" viewBox="0 0 8 8" refX="7.5" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L8 4 L0 8 z" fill="#D6D2C7"/>
+              </marker>
+            </defs>
+
+            <text class="lbl-sm" x="0" y="10">CAPACIDAD PEDIDA</text>
+            <text class="lbl-sm" x="186" y="10">LO QUE FIRMA EL TICKET · TTL 15 MIN</text>
+            <text class="lbl-sm" x="556" y="10">LA PUERTA, UNA SOLA</text>
+
+            <!-- listen -->
+            <rect class="box" x="0" y="24" width="150" height="52" rx="2"/>
+            <text class="lbl" x="16" y="46">listen</text>
+            <text class="lbl-sm" x="16" y="66">oculto, escucha</text>
+            <rect class="box" x="186" y="24" width="330" height="52" rx="2"/>
+            <text class="lbl-sm" x="202" y="46">publish no · data no · hidden sí</text>
+            <text class="lbl-sm" x="202" y="66">→ supervisor.join</text>
+            <path class="edge" d="M150 50 H180" marker-end="url(#arw10)"/>
+            <path class="edge" d="M516 50 H550" marker-end="url(#arw10)"/>
+
+            <!-- whisper -->
+            <rect class="box" x="0" y="94" width="150" height="52" rx="2"/>
+            <text class="lbl" x="16" y="116">whisper</text>
+            <text class="lbl-sm" x="16" y="136">oculto, escribe</text>
+            <rect class="box" x="186" y="94" width="330" height="52" rx="2"/>
+            <text class="lbl-sm" x="202" y="116">publish no · data sí · hidden sí</text>
+            <text class="lbl-sm" x="202" y="136">→ supervisor.steer</text>
+            <path class="edge" d="M150 120 H180" marker-end="url(#arw10)"/>
+            <path class="edge" d="M516 120 H550" marker-end="url(#arw10)"/>
+
+            <!-- takeover -->
+            <rect class="box" x="0" y="164" width="150" height="52" rx="2"/>
+            <text class="lbl" x="16" y="186">takeover</text>
+            <text class="lbl-sm" x="16" y="206">toma la línea</text>
+            <rect class="box" x="186" y="164" width="330" height="52" rx="2"/>
+            <text class="lbl-sm" x="202" y="186">publish sí · data sí · hidden no</text>
+            <text class="lbl-sm" x="202" y="206">→ supervisor.takeover</text>
+            <path class="edge" d="M150 190 H180" marker-end="url(#arw10)"/>
+            <path class="edge" d="M516 190 H550" marker-end="url(#arw10)"/>
+
+            <!-- the gate -->
+            <rect class="box-accent" x="556" y="24" width="244" height="192" rx="2"/>
+            <text class="lbl" x="576" y="48">is_supervisor(identity)</text>
+            <text class="lbl" x="576" y="74">La identidad la pone el SFU</text>
+            <text class="lbl" x="576" y="93">en cada paquete y en cada</text>
+            <text class="lbl" x="576" y="112">RPC. Ningún payload puede</text>
+            <text class="lbl" x="576" y="131">reclamarla, sólo un token</text>
+            <text class="lbl" x="576" y="150">que firmamos nosotros.</text>
+            <text class="lbl-sm" x="576" y="172">sup:&lt;uid&gt; · {role, cap}</text>
+            <text class="lbl-sm" x="576" y="188">una conexión por identidad:</text>
+            <text class="lbl-sm" x="576" y="202">listen→takeover asciende</text>
+
+            <text class="lbl" x="0" y="240">Cada verbo se anexa al log del llamante con su propio seq: una llamada, una sola historia.</text>
+          </svg>
+          <figcaption>Capacidad → grants firmados → una única puerta · core/auth.py · core/security/supervisor.py</figcaption>
+        </figure>
+
+        <dl class="kv" data-anim="3">
+          <dt>oculto</dt>
+          <dd><code>listen</code> y <code>whisper</code> no aparecen en la lista de participantes del llamante.</dd>
+          <dt>visible</dt>
+          <dd><code>takeover</code> publica micrófono y aparece: cuando contesta una persona, se presenta como tal.</dd>
+          <dt>política</dt>
+          <dd>El aviso de escucha se decide por tenant; los cinco <code>supervisor.*</code> ya están en el registro.</dd>
+        </dl>
+
       </div>
+
+      <figure class="fig" data-anim="4" style="min-height:0">
+        <div class="shot-frame fill"><img src="screenshots/supervisor.png" alt="La consola de supervisión: llamadas en curso y qué permite cada ticket"></div>
+        <figcaption>lk.bernardocastro.dev/supervisor — la pantalla enumera capacidades, no las concede</figcaption>
+      </figure>
+
+    </div>
+
+    <div class="proof" data-anim="5">
+      <b>Validación.</b> Los tres tickets se acuñan en <b>core/auth.py:mint_supervisor</b> y todos
+      los verbos, por RPC del navegador o por el plano de control, terminan en el mismo
+      <b>is_supervisor()</b>; <span class="n">16</span> pruebas en
+      <b>tests/test_supervisor_desk.py</b> fijan que la capacidad se lee del token firmado en el SFU
+      y que un llamante no puede apuntar un verbo al agente. El aislamiento de audio se midió
+      contando tramas, no escuchando eventos: <b>scripts/isolation_probe.py</b> mide una cola de
+      <span class="n">~220 ms</span> por stream al revocar. En vivo: llamar al
+      <span class="n">+1 417 674 3169</span> y abrir <b>/supervisor</b>.
     </div>
 
   </div>

@@ -3,23 +3,89 @@
 
     <div class="head-block" data-anim="1">
       <div class="eyebrow">11 <span class="sep">·</span> Entregable 10 — seguridad y privacidad</div>
-      <h2 class="head">Seguridad y privacidad</h2>
+      <h2 class="head" style="max-width:31ch">Cada permiso es una concesión firmada que dice qué alcanza</h2>
+      <p class="lede">
+        Cuatro propiedades sostienen el resto: la PII se enmascara <b>por valor</b>, la tenencia es
+        una cadena exacta dentro de la firma, la superficie es la mínima que deja pasar una llamada
+        legítima y todo permiso caduca. Ninguna pide honestidad al lado no confiable.
+      </p>
     </div>
 
-    <div class="todo" data-anim="2">
-      <div class="who">Sin escribir <span class="sep">·</span> card tk-06abff <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
-      <ul>
-        <li>Escribirla EN POSITIVO: lo que la plataforma concede, no lo que prohíbe.</li>
-        <li>Cuatro propiedades: PII tratada por valor y con alcance por tool, segregación de tenants por construcción, superficie mínima, tokens de vida corta.</li>
-        <li>El modelo de tokens de punta a punta: JWT por tenant, prefijo de sala, metadatos de dispatch, el ticket del supervisor. Una tabla, sin diagrama.</li>
-        <li>Secretos sólo por entorno; qué no se escribe nunca en el log y cómo se cripto-destruye una sesión.</li>
-        <li>El ataque que ya pagamos en otro sitio y contra el que se diseñó aquí: exposición SIP/PSTN — la troncal acepta las IPs del carrier y nada más.</li>
-      </ul>
-      <div class="note"><b>Figura:</b> Una tabla, sin captura. La fuente es .taskops/reports/security.md — citarla. Lámina profunda.</div>
-      <div class="note">
-        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
-        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+    <div class="grid-7-5 fill">
+
+      <div data-anim="2">
+        <table class="plain">
+          <thead>
+            <tr>
+              <th style="width:19%">Concesión</th>
+              <th style="width:33%">Qué lleva la firma</th>
+              <th>Lo que concede</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>mint_session</code></td>
+              <td>sala <code>tenant-project-&lt;uuid8&gt;</code> exacta + <code>RoomAgentDispatch(metadata)</code> firmado</td>
+              <td>Un token entra en una sala y sólo en ésa; el chat se acuña con el audio cerrado.</td>
+            </tr>
+            <tr>
+              <td><code>mint_supervisor</code></td>
+              <td>identidad <code>sup:&lt;uid&gt;</code>, atributo <code>{role, cap}</code>, TTL de 15 minutos</td>
+              <td>Escuchar y hablar son dos concesiones distintas, y el ticket dura lo que dura entrar en una llamada.</td>
+            </tr>
+            <tr>
+              <td><code>ConfirmTask</code></td>
+              <td>audiencia <code>sha256(tool + args canónicos)</code>, de un solo uso</td>
+              <td>Un «sí» autoriza esa llamada exacta, una vez, y se consume al usarse.</td>
+            </tr>
+            <tr>
+              <td>troncal SIP</td>
+              <td>señalización desde los <b>8</b> rangos del carrier + <code>hide_inbound_port</code></td>
+              <td>El teléfono atiende a quien contrata la línea; sin sala no hay job ni gasto.</td>
+            </tr>
+            <tr>
+              <td><code>RECORDINGS_TOKEN</code></td>
+              <td>lectura por id de sesión, validado contra <code>^[A-Za-z0-9_-]{1,128}$</code></td>
+              <td>El audio se pide por identificador, nunca por una ruta de un payload. Fuera de git.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:12px">
+          Los secretos llegan sólo por entorno; el único <code>.env</code> versionado es
+          <code>.env.example</code>.
+        </div>
       </div>
+
+      <div style="display:flex;flex-direction:column;gap:18px;min-height:0" data-anim="3">
+
+        <pre class="code">tool.call <b>send_sms</b>        ToolSpec.pii_scope = {"phone"}
+
+  args.phone  "60*******"
+  args.text   "Clínica Norte: <b>An*************</b>, su cita
+               queda el jueves 3 a las 11:00 con…"
+
+el gateway recibe "600123456" y el nombre entero:
+la máscara es propiedad de la COPIA en el log</pre>
+
+        <dl class="kv">
+          <dt>por valor</dt>
+          <dd>El contrato marca el argumento; la sesión recuerda el valor y lo tapa allí donde reaparezca, texto libre incluido. De más largo a más corto: el nombre entero cae antes que su primera palabra.</dd>
+          <dt>por tenant</dt>
+          <dd>La segregación es la firma misma, no una comprobación del SFU: un token de un negocio no nombra la sala de otro.</dd>
+          <dt>demostrable</dt>
+          <dd>Registro append-only con <code>seq</code>; SQLite rechaza <code>UPDATE</code> y <code>DELETE</code> sobre la tabla de eventos.</dd>
+        </dl>
+
+      </div>
+
+    </div>
+
+    <div class="proof" data-anim="4">
+      <b>Validación.</b> <span class="n">13</span> pruebas en <b>tests/test_pii.py</b>, sobre las
+      tools reales de un tenant, fijan que el nombre dentro del cuerpo del SMS no llega al log y que
+      el gateway sí recibe el valor entero; corren en <b>pytest -m unit</b>. Los tokens los cubren
+      <b>tests/test_api_tokens.py</b> y <b>tests/test_supervisor_desk.py</b>; el mapa de superficies,
+      <b>.taskops/reports/security.md</b>.
     </div>
 
   </div>
