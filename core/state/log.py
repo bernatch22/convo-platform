@@ -15,6 +15,7 @@ Kinds are plain dotted strings so a reader needs no enum to grep a log:
   saga.fail · saga.compensated            what was undone, last first
   turn.user · turn.agent                  text + metrics (ttft, e2e) from the framework
   stt.final · state · tts.word            the audio path (ms-6)
+  stt.phantom                             a transcript refused: no audio behind it
   audio.start                             sample 0 of the recording, in log time
 
 Open source note: framework-agnostic; `Store` is a Protocol, `MemoryStore`
