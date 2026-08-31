@@ -46,15 +46,16 @@ class Project:
     `backchannels` overrides the murmurs a barge-in filter ignores
     (`core.barge_in.SPANISH_BACKCHANNELS`) — data, so core knows one language.
 
-    `voice`, `tts_model` and `greeting` are the three fields a supervisor may
-    change from the console without a deploy: `core.state.overrides` replaces
-    them on the way out of the router (`core.state.store.PipelineOverride`).
+    The fields named in `core.state.overrides.OVERRIDABLE` are the ones a
+    supervisor may change from the console without a deploy: `core.state.overrides`
+    replaces them on the way out of the router (`core.state.store.PipelineOverride`).
     """
 
     id: str
     name: str
     voice: str | None = None
     tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
+    stt_provider: str = "soniox"  # soniox | deepgram; see core/providers/stt.py
     llm_model: str | None = None  # None = the platform default; see core/providers/llm.py
     language: str = "es"
     greeting: str = ""  # spoken verbatim on session start (no LLM turn); "" = the model opens

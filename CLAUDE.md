@@ -58,7 +58,9 @@ and, when a decision was made, a short essay in its thread.
 - STT: Soniox `stt-rt-v5`, `language_hints=["es","en"]`, endpointing
   `level=2 / sensitivity=0.3 / max_endpoint_delay_ms≈1000`, `context=` (Soniox
   silently ignores `keyterms`). Keep `sample_rate=16000` even on PSTN.
-  Fallback: Deepgram `nova-3` multi.
+  The provider is a slot (`Project.stt_provider`, overridable from the console):
+  the alternative is Deepgram Flux `flux-general-multi` via the plugin's `STTv2`
+  (`/v2/listen`) — never `flux-general-en`, which 400s on a `language_hint`.
 - TTS: ElevenLabs `eleven_v3_conversational` (primary) / `eleven_flash_v2_5`
   (latency profile), `sync_alignment=True`. Never `eleven_turbo_v2_5`
   (deprecated) and never `eleven_v3` (non-realtime). On interruption the

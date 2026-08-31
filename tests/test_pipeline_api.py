@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from api import app, open_store
 from core import router
 from core.agents import TenantAgent
-from core.providers import llm, tts
+from core.providers import llm, stt, tts
 from core.state.events import Event
 from core.state.store import MemoryStore, PipelineOverride, SessionRow, SQLiteStore
 from core.testing.fake_job import fake_job_context
@@ -46,6 +46,7 @@ def console_env(monkeypatch):
 def test_the_snapshot_names_every_provider_the_next_call_will_use(client) -> None:
     view = client.get(PIPELINE).json()
 
+    assert view["stt"]["provider"] == "soniox"
     assert view["stt"]["model"] == "stt-rt-v5"
     assert view["stt"]["language_hints"] == ["es", "en"]
     assert view["stt"]["endpointing"] == {
@@ -63,6 +64,40 @@ def test_the_snapshot_names_every_provider_the_next_call_will_use(client) -> Non
     assert set(reasons) == set(tts.FORBIDDEN_MODELS)
     for model, why in reasons.items():
         assert model in why and tts.DEFAULT_MODEL in why, "the console greys it out and says why"
+
+
+async def test_a_put_switches_the_ear_the_next_session_opens(client, store) -> None:
+    reply = client.put(PIPELINE, json={"stt_provider": "deepgram"}).json()
+
+    assert reply["stt"]["provider"] == "deepgram"
+    assert reply["stt"]["model"] == "flux-general-multi"
+    assert reply["stt"]["endpointing"] == {
+        "eot_threshold": 0.7,
+        "eot_timeout_ms": 1000,
+        "eager_eot_threshold": None,
+    }, "Flux's own dials, not Soniox's under Flux's name"
+    tc = await router.resolve(fake_job_context(metadata=META), store)
+    assert tc.project.stt_provider == "deepgram", "the next session hears through Flux"
+    assert stt.provider_for(tc.project) == "deepgram"
+
+
+def test_the_snapshot_names_the_ears_a_supervisor_may_switch_between(client) -> None:
+    view = client.get(PIPELINE).json()
+
+    assert view["stt"]["providers"] == ["soniox", "deepgram"]
+    assert view["stt"]["requested_provider"] == "soniox"
+    assert "stt_provider" in view["overridable"]
+
+
+def test_an_stt_provider_the_platform_does_not_run_is_refused_with_both_names(
+    client, store
+) -> None:
+    reply = client.put(PIPELINE, json={"stt_provider": "whisper"})
+
+    assert reply.status_code == 422
+    detail = reply.json()["detail"]
+    assert "whisper" in detail and "soniox" in detail and "deepgram" in detail
+    assert store.pipeline_overrides(TENANT, PROJECT) == [], "nothing unknown reaches the store"
 
 
 def test_medians_are_measured_over_the_project_s_stored_voice_calls(client, store) -> None:

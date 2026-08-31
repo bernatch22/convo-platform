@@ -78,6 +78,7 @@ class PipelineUpdate(BaseModel):
     voice: str | None = None
     tts_model: str | None = None
     greeting: str | None = None
+    stt_provider: str | None = None
     llm_model: str | None = None
 
 
@@ -223,22 +224,24 @@ def observe(req: ObserveRequest) -> dict[str, str]:
 async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, Any]:
     """The three providers as data, plus what the console changed and what calls measured.
 
-    → `{"tenant", "project", "name", "language", "greeting",
-        "stt": {"provider", "model", "language_hints", "sample_rate",
-                "endpointing": {"max_endpoint_delay_ms", "latency_adjustment_level",
-                                "sensitivity"}, "keyterms"},
-        "llm": {"provider", "model", "requested_model", "default_model", "allowed_models",
-                "caching", "max_tokens", "cache_minimum_tokens", "cache_note"},
-        "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
-                "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
-        "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
-        "latency": {"sessions": int, "turns": int,
-                    "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",
-                                "tts_node_ttfb", "e2e_latency"}}}`
+        → `{"tenant", "project", "name", "language", "greeting",
+            "stt": {"provider", "requested_provider", "providers", "model", "language_hints",
+                    "sample_rate", "endpointing": "<the CHOSEN provider's own knobs>", "keyterms"},
+            "llm": {"provider", "model", "requested_model", "default_model", "allowed_models",
+                    "caching", "max_tokens", "cache_minimum_tokens", "cache_note"},
+            "llm": {"provider", "model", "caching", "max_tokens",
+                    "cache_minimum_tokens", "cache_note"},
+    >>>>>>> ms/ms-10-box-core-on-gcp-self-hoste
+            "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
+                    "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
+            "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
+            "latency": {"sessions": int, "turns": int,
+                        "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",
+                                    "tts_node_ttfb", "e2e_latency"}}}`
 
-    Every value is what the NEXT session will use: the overrides are already
-    applied to `greeting`, `tts.model` and `tts.voice`. A median is null when
-    no stored voice session measured it.
+        Every value is what the NEXT session will use: the overrides are already
+        applied to `greeting`, `tts.model` and `tts.voice`. A median is null when
+        no stored voice session measured it.
     """
     known, effective = _effective(tenant, project, store)
     return pipeline.snapshot(known, effective, store)
@@ -253,8 +256,9 @@ async def pipeline_set(
     Returns the same object as `GET /pipeline/{tenant}/{project}`, already
     reflecting the change, so the console renders one response instead of
     refetching. A TTS model the platform refuses to run (`eleven_v3`,
-    `eleven_turbo_v2_5`) is a 422 naming the rule, and an `llm_model` outside
-    the allow-list is a 422 naming the list; an unknown field is a 422 from the
+    `eleven_turbo_v2_5`) is a 422 naming the rule, an `llm_model` outside the
+    allow-list is a 422 naming the list, and an STT provider that is not
+    `soniox` or `deepgram` is a 422 too; an unknown field is a 422 from the
     body itself; a body that sets nothing is a 422 too.
     """
     edits = update.model_dump(exclude_none=True)

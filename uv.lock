@@ -485,7 +485,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "fastapi" },
-    { name = "livekit-agents", extra = ["anthropic", "elevenlabs", "openai", "silero", "soniox"] },
+    { name = "livekit-agents", extra = ["anthropic", "deepgram", "elevenlabs", "openai", "silero", "soniox"] },
     { name = "pydantic" },
     { name = "python-dotenv" },
     { name = "uvicorn" },
@@ -504,7 +504,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.41,<1" },
     { name = "deepeval", marker = "extra == 'dev'", specifier = ">=3.0" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "livekit-agents", extras = ["anthropic", "elevenlabs", "openai", "silero", "soniox"], specifier = "~=1.7" },
+    { name = "livekit-agents", extras = ["anthropic", "deepgram", "elevenlabs", "openai", "silero", "soniox"], specifier = "~=1.7" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.24" },
@@ -967,6 +967,9 @@ anthropic = [
 codecs = [
     { name = "numpy" },
 ]
+deepgram = [
+    { name = "livekit-plugins-deepgram" },
+]
 elevenlabs = [
     { name = "livekit-plugins-elevenlabs" },
 ]
@@ -1060,6 +1063,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/0b/10/a04d8512d5bf34bf03bdeccba764bfcd5ae147edd7a9540c1527b1ee1ee3/livekit_plugins_anthropic-1.7.1.tar.gz", hash = "sha256:56c29947362c0be1c00bb449a932fd5cd16a028d300fd0b0d933b7d5cfbc6cbc", size = 9367, upload-time = "2026-08-27T03:33:30.489Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/2c/e4/b53b2d1ca77721e389f87dc47abfa5a7098cd19601803d4ca4d97817f436/livekit_plugins_anthropic-1.7.1-py3-none-any.whl", hash = "sha256:9a1969c61054608d683c645a82a992d7014998088c5a3b5e9a6c60676428e0e8", size = 11131, upload-time = "2026-08-27T03:33:29.432Z" },
+]
+
+[[package]]
+name = "livekit-plugins-deepgram"
+version = "1.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "livekit-agents", extra = ["codecs"] },
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b3/72/2a10b12accbf88a5b22680377120ad6d0867d2b5ea5b99842b9392703576/livekit_plugins_deepgram-1.7.1.tar.gz", hash = "sha256:3789799b9c9e3de90949257baf1a4b08912c89780822cb261eece632489b3337", size = 24697, upload-time = "2026-08-27T03:34:00.789Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d4/f7/648243ecbd3d8edbd69e60e8edae77349548ef2a45b4a4b2b97abb8c914c/livekit_plugins_deepgram-1.7.1-py3-none-any.whl", hash = "sha256:24e7dd473078d61ebebd621b6d066f399355abadca140e0b9c76f27b68d46df5", size = 31800, upload-time = "2026-08-27T03:33:59.583Z" },
 ]
 
 [[package]]

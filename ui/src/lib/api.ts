@@ -124,16 +124,28 @@ export interface LiveCall {
 /* ── /pipeline ────────────────────────────────────────────────────────────── */
 
 /** Soniox as the next session will run it, endpointing knobs included. */
+export interface SonioxEndpointing {
+  max_endpoint_delay_ms: number;
+  latency_adjustment_level: number;
+  sensitivity: number;
+}
+
+export interface DeepgramEndpointing {
+  eot_threshold: number;
+  eot_timeout_ms: number;
+  eager_eot_threshold: number | null;
+}
+
 export interface SttSnapshot {
+  /** The provider that will really run — an unknown `requested_provider` falls back to soniox. */
   provider: string;
+  requested_provider: string;
+  providers: string[];
   model: string;
   language_hints: string[];
   sample_rate: number;
-  endpointing: {
-    max_endpoint_delay_ms: number;
-    latency_adjustment_level: number;
-    sensitivity: number;
-  };
+  /** The CHOSEN provider's own dials: Soniox holds a silence window, Flux scores a turn. */
+  endpointing: SonioxEndpointing | DeepgramEndpointing;
   keyterms: string[];
 }
 
@@ -202,11 +214,12 @@ export interface PipelineSnapshot {
   };
 }
 
-/** The three fields a supervisor may change between calls; anything else is a 422. */
+/** The fields a supervisor may change between calls; anything else is a 422. */
 export interface PipelineUpdate {
   voice?: string;
   tts_model?: string;
   greeting?: string;
+  stt_provider?: string;
   llm_model?: string;
 }
 

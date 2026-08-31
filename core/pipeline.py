@@ -11,8 +11,8 @@ constant from `core.providers`, project data, or a median over stored events.
 Nothing is invented and nothing is defaulted silently — a project that has
 never run answers with `null` medians, never with a zero.
 
-The write half is `overridable`: the three fields the console may set, and the
-one rule that refuses a value the platform will not run.
+The write half is `overridable`: the fields the console may set, and the rules
+that refuse a value the platform will not run.
 """
 
 import statistics
@@ -69,19 +69,18 @@ def snapshot(tenant: Tenant, project: Project, store: Store) -> dict[str, Any]:
 
 
 def stt_view(project: Project) -> dict[str, Any]:
-    """Soniox as configured: model, hints, the three endpointing knobs, the project's terms."""
-    return {
-        "provider": "soniox",
-        "model": stt.MODEL,
-        "language_hints": list(stt.LANGUAGE_HINTS),
-        "sample_rate": stt.SAMPLE_RATE,
-        "endpointing": {
-            "max_endpoint_delay_ms": stt.MAX_ENDPOINT_DELAY_MS,
-            "latency_adjustment_level": stt.ENDPOINT_LATENCY_ADJUSTMENT_LEVEL,
-            "sensitivity": stt.ENDPOINT_SENSITIVITY,
-        },
-        "keyterms": list(project.keyterms),
-    }
+    """The chosen ear as configured — its own model and knobs — and what it could be switched to.
+
+    `endpointing` is the chosen provider's own dial set, not a common
+    denominator: Soniox holds a turn open for a silence window, Flux scores its
+    belief that the sentence closed. Flattening the two into shared keys would
+    invent a knob neither provider has, so the console branches on `provider`.
+    """
+    chosen = stt.provider_for(project)
+    view = _soniox_view(project) if chosen == stt.SONIOX else _deepgram_view(project)
+    view["requested_provider"] = project.stt_provider
+    view["providers"] = list(stt.PROVIDERS)
+    return view
 
 
 def llm_view(project: Project) -> dict[str, Any]:
@@ -161,10 +160,12 @@ def overridable(field: str, value: str) -> str | None:
     Two rules. The TTS one the platform has always enforced: `eleven_v3` is not
     realtime and `eleven_turbo_v2_5` is deprecated, so neither may be stored —
     `tts_model()` would silently ignore them at build time and the console would
-    show a model the caller never hears. And the LLM one, which is an allow-list
-    rather than a deny-list: a model the platform runs is a model somebody
-    priced and measured, so the answer to "may I run X" is no unless X is one of
-    the two, and the refusal names them both.
+    show a model the caller never hears. The LLM one is an allow-list rather
+    than a deny-list: a model the platform runs is one somebody priced and
+    measured, so "may I run X" is no unless X is one of the two, and the
+    refusal names them both. The STT one is the same shape: only the providers
+    in `core.providers.stt.PROVIDERS` have a factory, so any other name would
+    fall back to Soniox and the console would show an ear the caller is not on.
     """
     if field not in OVERRIDABLE:
         return f"{field!r} is not overridable; the console may set {list(OVERRIDABLE)}"
@@ -181,4 +182,42 @@ def overridable(field: str, value: str) -> str | None:
             "(eleven_v3 is not realtime, eleven_turbo_v2_5 is deprecated). "
             f"Use {tts.DEFAULT_MODEL!r} or {tts.LATENCY_MODEL!r}."
         )
+    if field == "stt_provider" and value not in stt.PROVIDERS:
+        return (
+            f"{value!r} is not an STT provider this platform runs: "
+            f"the console may choose {list(stt.PROVIDERS)}."
+        )
     return None
+
+
+def _soniox_view(project: Project) -> dict[str, Any]:
+    """Soniox as configured: model, hints, the three endpointing knobs, the project's terms."""
+    return {
+        "provider": stt.SONIOX,
+        "model": stt.MODEL,
+        "language_hints": list(stt.LANGUAGE_HINTS),
+        "sample_rate": stt.SAMPLE_RATE,
+        "endpointing": {
+            "max_endpoint_delay_ms": stt.MAX_ENDPOINT_DELAY_MS,
+            "latency_adjustment_level": stt.ENDPOINT_LATENCY_ADJUSTMENT_LEVEL,
+            "sensitivity": stt.ENDPOINT_SENSITIVITY,
+        },
+        "keyterms": list(project.keyterms),
+    }
+
+
+def _deepgram_view(project: Project) -> dict[str, Any]:
+    """Deepgram Flux as configured: the multilingual model, its two turn scores, the terms."""
+    options = stt.deepgram_options(project)
+    return {
+        "provider": stt.DEEPGRAM,
+        "model": options["model"],
+        "language_hints": list(options["language_hint"]),
+        "sample_rate": options["sample_rate"],
+        "endpointing": {
+            "eot_threshold": options["eot_threshold"],
+            "eot_timeout_ms": options["eot_timeout_ms"],
+            "eager_eot_threshold": None,  # preemptive generation is off by decision
+        },
+        "keyterms": list(options["keyterm"]),
+    }
