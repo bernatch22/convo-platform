@@ -229,9 +229,6 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
                     "sample_rate", "endpointing": "<the CHOSEN provider's own knobs>", "keyterms"},
             "llm": {"provider", "model", "requested_model", "default_model", "allowed_models",
                     "caching", "max_tokens", "cache_minimum_tokens", "cache_note"},
-            "llm": {"provider", "model", "caching", "max_tokens",
-                    "cache_minimum_tokens", "cache_note"},
-    >>>>>>> ms/ms-10-box-core-on-gcp-self-hoste
             "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
                     "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
             "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
