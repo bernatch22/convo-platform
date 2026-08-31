@@ -421,7 +421,8 @@ def test_a_call_with_no_words_at_all_still_gets_its_free_checks_and_no_judge() -
     TypeError, retrying one silent call forever (found on the box, 2026-08-31)."""
     from core.scoring.runner import build_report
 
-    events = [Event(1, "session.start", 0, {}), Event(2, "session.end", 900, {"outcome": "dropped"})]
+    end = Event(2, "session.end", 900, {"outcome": "dropped"})
+    events = [Event(1, "session.start", 0, {}), end]
     report = build_report("clinica-norte", "reagendamiento", events, "dropped", judge=True)
     assert report.turns == 0
     assert report.judge is None
