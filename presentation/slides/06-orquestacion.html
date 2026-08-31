@@ -3,23 +3,119 @@
 
     <div class="head-block" data-anim="1">
       <div class="eyebrow">06 <span class="sep">·</span> Entregable 5 — orquestación transaccional</div>
-      <h2 class="head">Orquestación transaccional</h2>
+      <h2 class="head" style="max-width:38ch">El consentimiento es un paso de la saga, no una frase del prompt</h2>
+      <p class="lede">
+        El modelo puede <b>pedir</b> el sí; sólo <code>ConfirmTask</code> puede acuñarlo. Confiar en
+        que el modelo no reserve antes de tiempo no sabe fallar: cuando se salta la instrucción no
+        hay excepción, hay una cita que nadie pidió. Un token sí falla, y falla donde se lee.
+      </p>
     </div>
 
-    <div class="todo" data-anim="2">
-      <div class="who">Sin escribir <span class="sep">·</span> card tk-a66bd0 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
-      <ul>
-        <li>Consentimiento en dos fases: el modelo puede pedir, sólo ConfirmTask puede acuñar el confirmation_token, y guard.check rechaza sin él.</li>
-        <li>La autoridad nunca está en el prompt.</li>
-        <li>La saga: pasos, compensación y claves de idempotencia que sobreviven a un reintento.</li>
-        <li>Qué pasa cuando el llamante cuelga entre el «sí» y la escritura.</li>
-        <li>La prueba de consentimiento como artefacto de primera clase: seq 39 asked; seq 46 authorised; seq 51, en una llamada real.</li>
-      </ul>
-      <div class="note"><b>Figura:</b> screenshots/session-detail.png recortada al bloque CONSENT PROOF, o la misma evidencia tipografiada. Lámina profunda.</div>
-      <div class="note">
-        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
-        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+    <div class="grid-7-5 fill">
+
+      <figure class="fig" data-anim="2">
+        <svg viewBox="0 0 820 344" role="img" aria-label="Consentimiento en dos fases: el modelo pide, ConfirmTask acuña el token y el guard deja pasar la escritura irreversible">
+
+          <text class="lbl-sm" x="0" y="10">FASE 1 · PEDIR — LA AUTORIDAD NO SE MUEVE</text>
+
+          <rect class="box" x="0" y="22" width="240" height="72"/>
+          <text class="lbl" x="16" y="50">book_appointment(hora)</text>
+          <text class="lbl-sm" x="16" y="73">LA TOOL QUE LLAMA EL MODELO</text>
+
+          <path class="edge" d="M240 58 H282"/>
+          <path class="edge" d="M276 53 l7 5 -7 5"/>
+
+          <rect class="box" x="290" y="22" width="240" height="72"/>
+          <text class="lbl" x="306" y="50">confirmation_question()</text>
+          <text class="lbl-sm" x="306" y="73">LA REDACTA LA PLATAFORMA</text>
+
+          <path class="edge" d="M530 58 H572"/>
+          <path class="edge" d="M566 53 l7 5 -7 5"/>
+
+          <rect class="box-accent" x="580" y="22" width="240" height="72"/>
+          <text class="lbl" x="596" y="50">ConfirmTask</text>
+          <text class="lbl-sm" x="596" y="73">CONFIRM O DECLINE, NADA MÁS</text>
+
+          <path class="edge-accent" d="M700 94 V126 H120 V162"/>
+          <path class="edge-accent" d="M115 156 l5 7 5 -7"/>
+          <text class="lbl-sm" x="136" y="120">CONFIRM — CON DECLINE NO SE ESCRIBE NADA</text>
+
+          <text class="lbl-sm" x="306" y="154">FASE 2 · AUTORIZAR Y ESCRIBIR</text>
+
+          <rect class="box-accent" x="0" y="162" width="240" height="72"/>
+          <text class="lbl" x="16" y="190">confirm.mint(token)</text>
+          <text class="lbl-sm" x="16" y="213">AUDIENCIA TOOL:SHA · TTL 120 S</text>
+
+          <path class="edge" d="M240 198 H282"/>
+          <path class="edge" d="M276 193 l7 5 -7 5"/>
+
+          <rect class="box" x="290" y="162" width="240" height="72"/>
+          <text class="lbl" x="306" y="190">Saga</text>
+          <text class="lbl-sm" x="306" y="213">CANCEL → BOOK_SLOT → SEND_SMS</text>
+
+          <path class="edge" d="M530 198 H572"/>
+          <path class="edge" d="M566 193 l7 5 -7 5"/>
+
+          <rect class="box-accent" x="580" y="162" width="240" height="72"/>
+          <text class="lbl" x="596" y="190">guard.check → escribe</text>
+          <text class="lbl-sm" x="596" y="213">IRREVERSIBLE, Y AHORA SÍ</text>
+
+          <rect class="box" x="0" y="266" width="820" height="78"/>
+          <text class="lbl-sm" x="20" y="294">EL GUARD RECHAZA DE CUATRO FORMAS</text>
+          <text class="lbl" x="20" y="320">sin token · de otra llamada · caducado · ya gastado → ToolRefused, que el modelo nunca ve</text>
+
+        </svg>
+        <figcaption>El token autoriza una llamada, con esos argumentos, una vez</figcaption>
+      </figure>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+
+        <div class="card" data-anim="3">
+          <div class="label">Prueba de consentimiento · sesión AJ_rdrkYph3FaeS</div>
+          <div class="mono" style="line-height:1.75">
+            <span style="color:var(--ok)">GRANTED</span> book_slot
+            <span style="color:var(--danger)">irreversible</span><br>
+            seq <b>39</b> asked; seq <b>46</b> authorised; seq <b>51</b><br>
+            <span style="color:var(--muted)">book_slot:c02f16c63f86968f</span>
+          </div>
+        </div>
+
+        <div class="rows" style="--row-pad:10px" data-anim="4">
+          <div class="row">
+            <div class="idx">01</div>
+            <div class="txt">Si cuelga entre el «sí» y la escritura
+              <span class="why">El proceso muere con la llamada: no hay escritura a medias porque no
+                hay escritura. Un <code>tool.call</code> sin resultado queda pendiente en el tablero.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="idx">02</div>
+            <div class="txt">La compensación se declara, no se improvisa
+              <span class="why">La saga deshace los pasos completados en orden inverso con el
+                <code>compensation</code> de cada spec. Deshacer es <code>write</code>, nunca
+                <code>irreversible</code>.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="idx">03</div>
+            <div class="txt">El token se gasta al acertar
+              <span class="why">Una llamada fallida deja el sí vivo sus 120 s: la etapa reintenta sin
+                volver a preguntar. <code>idempotency_key</code> nombra el intento.</span>
+            </div>
+          </div>
+        </div>
+
       </div>
+
+    </div>
+
+    <div class="proof" data-anim="5">
+      <b>Validación.</b> Ring de consentimiento: <span class="n">8 de 8</span> llamadas simuladas a
+      <span class="n">1,00</span>, en <b>claude-haiku-4-5</b> y en <b>gpt-5.4-mini</b> (ms-18). Las
+      cuatro negativas del guard —sin token, de otra llamada, caducado, gastado— son
+      <span class="n">7</span> tests en <b>tests/test_confirm.py</b>. En producción,
+      sesión <span class="n">AJ_rdrkYph3FaeS</span>: <span class="n">seq 39</span> pregunta,
+      <span class="n">seq 46</span> concede, <span class="n">seq 51</span> escribe.
     </div>
 
   </div>
