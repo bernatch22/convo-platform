@@ -1,15 +1,21 @@
-/* Board — what the platform DID to the business: created, moved, cancelled, on one screen.
+/* Board — the reservations first, and what the platform did to make them second.
  *
- * Sessions answers "who called". This answers the question an operator asks at
- * the end of a week: how many appointments were booked, moved and cancelled,
- * and can I see the call behind each one. Both come out of the same
- * append-only log — there is no second table and no counter kept beside the
- * write, so a number here and the log it was counted from cannot drift.
+ * This screen used to open with counters, and counters were the wrong answer to
+ * the question an operator actually asks. They wanted the AGENDA: who is
+ * coming, when, with whom, and whether that booking still stands. So the table
+ * of real records leads, the tallies are demoted to one strip of numbers under
+ * it, and the transaction log — which is still the evidence, and still the only
+ * thing an auditor should read — sits at the bottom where it belongs.
  *
- * Nothing on this screen knows what a verb is called. The counters, the bars
- * and the rows are all drawn from whatever `GET /outcomes` returned, and a
- * project that declares a new irreversible tool tomorrow appears here the
- * first time it runs, with no code changed in this file.
+ * Two reads, two sources, and the difference is the point:
+ *
+ *   GET /reservations  the customer's own system, through its adapter. Names,
+ *                      because a booking system is where a name belongs.
+ *   GET /outcomes      our append-only log. Counts, and summaries the PII mask
+ *                      scrubbed on the way in, because that is where it belongs.
+ *
+ * Neither can be derived from the other, and the rows are joined on the one
+ * thing that crosses the mask: the business's own identifier.
  *
  * The window is in the URL (`?days=30`), like every other piece of state in
  * this console: a board is a thing you send somebody, so the link has to carry
@@ -20,7 +26,15 @@ import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
 
 import { EmptyState } from "../components/EmptyState";
 import { OutcomeBars } from "../components/OutcomeBars";
-import { ApiError, getOutcomes, type OutcomeBoard, type OutcomeRow } from "../lib/api";
+import { Reservations } from "../components/Reservations";
+import {
+  ApiError,
+  getOutcomes,
+  getReservations,
+  type BusinessView,
+  type OutcomeBoard,
+  type OutcomeRow,
+} from "../lib/api";
 import { sectionPath } from "../lib/nav";
 import { startedAt } from "../lib/sessions";
 
@@ -30,32 +44,42 @@ const WINDOWS = [7, 14, 30, 90] as const;
 const DEFAULT_DAYS = 14;
 const ROWS = 200;
 
-/** What this screen renders: one project's transactions, or the refusal that replaced them. */
+/** What this screen renders: one project's records, its transactions, and any refusal. */
 export interface BoardData {
   tenant: string;
   project: string;
   days: number;
+  records: BusinessView | null;
+  recordsError: string | null;
   board: OutcomeBoard | null;
   error: string | null;
 }
 
-/** Read one project's outcomes over the window the URL names; a dead API empties the screen. */
+/** Read the business system and the log over the same window; either may fail on its own. */
 export async function boardLoader({ params, request }: LoaderFunctionArgs): Promise<BoardData> {
   const tenant = params["tenant"] ?? "";
   const project = params["project"] ?? "";
   const days = windowOf(new URL(request.url).searchParams.get("days"));
 
-  try {
-    const board = await getOutcomes({ tenant, project, days, limit: ROWS });
-    return { tenant, project, days, board, error: null };
-  } catch (cause) {
-    const error = cause instanceof ApiError ? cause.detail : String(cause);
-    return { tenant, project, days, board: null, error };
-  }
+  const [records, board] = await Promise.all([
+    settle(() => getReservations({ tenant, project, days, limit: ROWS })),
+    settle(() => getOutcomes({ tenant, project, days, limit: ROWS })),
+  ]);
+
+  return {
+    tenant,
+    project,
+    days,
+    records: records.value,
+    recordsError: records.error,
+    board: board.value,
+    error: board.error,
+  };
 }
 
 export function Board() {
-  const { tenant, project, days, board, error } = useLoaderData() as BoardData;
+  const { tenant, project, days, records, recordsError, board, error } =
+    useLoaderData() as BoardData;
   const empty = board === null || board.totals.transactions === 0;
 
   return (
@@ -66,43 +90,26 @@ export function Board() {
         </div>
         <h1 className="page__title">Board</h1>
         <p className="page__lede">
-          Every <strong>irreversible</strong> thing this project did to the business, counted off
-          the same append-only log the sessions are read from — one{" "}
-          <code className="mono">tool.call</code> whose{" "}
-          <code className="mono">side_effect</code> is <code className="mono">irreversible</code> is
-          one transaction, and the <strong>yes</strong> column is the{" "}
-          <code className="mono">confirm.granted</code> that authorised it. Nothing is counted
-          twice and nothing is stored twice: there is no rollup table, the log is the table.
+          The <strong>records themselves</strong>, read off this tenant&apos;s own systems — who,
+          when, with whom, and how each one stands. Names live there and not in our log, whose
+          summaries are PII-filtered on the way in; what the platform DID to produce them is the
+          strip and the table below, counted off that log, where one{" "}
+          <code className="mono">tool.call</code> declared{" "}
+          <code className="mono">irreversible</code> is one transaction. The two are joined on the
+          business&apos;s own identifier — the one thing that crosses the mask.
         </p>
         <Windows tenant={tenant} project={project} days={days} />
       </header>
 
+      <section className="section">
+        <h2 className="section__title">{records?.shape ?? "records"}</h2>
+        <Reservations view={records} error={recordsError} tenant={tenant} project={project} />
+      </section>
+
       {board !== null && !empty && (
         <>
           <section className="section">
-            <div className="counters">
-              {board.verbs.map((tally) => (
-                <div key={tally.verb} className="counter">
-                  <div className="counter__value num">{tally.count}</div>
-                  <div className="counter__name mono">{tally.verb}</div>
-                  <div className="counter__foot">
-                    <span>{tally.confirmed} confirmed</span>
-                    {tally.failed > 0 && <span className="counter__bad">{tally.failed} failed</span>}
-                    {tally.pending > 0 && <span className="faint">{tally.pending} pending</span>}
-                  </div>
-                </div>
-              ))}
-              <div className="counter counter--quiet">
-                <div className="counter__value num">{board.totals.sessions}</div>
-                <div className="counter__name mono">calls</div>
-                <div className="counter__foot">
-                  <span className="faint">
-                    {board.totals.transactions} transaction
-                    {board.totals.transactions === 1 ? "" : "s"} in {board.days} days
-                  </span>
-                </div>
-              </div>
-            </div>
+            <Strip board={board} />
           </section>
 
           <section className="section">
@@ -146,8 +153,8 @@ export function Board() {
         <section className="section">
           <EmptyState
             title={error ? "The control plane did not answer" : "Nothing irreversible yet"}
-            milestone="ms-18"
-            command={`curl -s 'localhost:8090/outcomes?tenant=${tenant}&project=${project}&days=${days}'`}
+            milestone="ms-19"
+            command={`curl -s 'localhost:8090/reservations?tenant=${tenant}&project=${project}'`}
           >
             <p>
               {error ? (
@@ -159,16 +166,38 @@ export function Board() {
               ) : (
                 <>
                   No call in the last {days} days ran a tool declared{" "}
-                  <code className="mono">irreversible</code>. Book, move or cancel something —{" "}
-                  <code className="mono">python worker.py console</code> is enough — and the
-                  transaction lands here the moment the tool returns, because it is the same log
-                  line the call already wrote.
+                  <code className="mono">irreversible</code>, so nothing above has a call behind it
+                  yet. Book, move or cancel something —{" "}
+                  <code className="mono">python worker.py console</code> is enough — and both the
+                  record and the transaction land here the moment the tool returns.
                 </>
               )}
             </p>
           </EmptyState>
         </section>
       )}
+    </div>
+  );
+}
+
+/** The counters, demoted: one line of numbers under the records they explain. */
+function Strip({ board }: { board: OutcomeBoard }) {
+  return (
+    <div className="strip">
+      {board.verbs.map((tally) => (
+        <div key={tally.verb} className="strip__cell">
+          <span className="strip__value num">{tally.count}</span>
+          <span className="strip__name mono">{tally.verb}</span>
+          {tally.failed > 0 && <span className="strip__bad">{tally.failed} failed</span>}
+        </div>
+      ))}
+      <div className="strip__cell strip__cell--quiet">
+        <span className="strip__value num">{board.totals.sessions}</span>
+        <span className="strip__name mono">calls</span>
+        <span className="faint">
+          {board.totals.confirmed} of {board.totals.transactions} confirmed in {board.days} days
+        </span>
+      </div>
     </div>
   );
 }
@@ -226,6 +255,15 @@ function Row({ row }: { row: OutcomeRow }) {
       </td>
     </tr>
   );
+}
+
+/** One read, and the sentence it failed with — so a dead half of the screen never empties the other. */
+async function settle<T>(read: () => Promise<T>): Promise<{ value: T | null; error: string | null }> {
+  try {
+    return { value: await read(), error: null };
+  } catch (cause) {
+    return { value: null, error: cause instanceof ApiError ? cause.detail : String(cause) };
+  }
 }
 
 /** The window the URL asked for, clamped to what the control plane will serve. */

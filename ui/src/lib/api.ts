@@ -469,6 +469,75 @@ export interface OutcomeBoard {
   rows: OutcomeRow[];
 }
 
+/* ── /reservations ────────────────────────────────────────────────────────── */
+
+/* The business view, types and call together, because it is one idea.
+ *
+ * `/outcomes` above is what the PLATFORM did, counted off the append-only log
+ * whose summaries are PII-filtered by design. This is the other reading and
+ * the one the Board leads with: the reservations themselves, read off the
+ * customer's own system through its adapter.
+ *
+ * Nothing in this file holds a list of shapes, columns or state words. The
+ * business names its records (`shape`), heads its own columns (`labels`) and
+ * chooses its own word for how one stands (`state`); the only field this
+ * console interprets is `tone`, which is the adapter saying how to draw the
+ * row and nothing more.
+ */
+
+/** How a record should be drawn: the adapter's call, because it knows what its words mean. */
+export type RecordTone = "new" | "changed" | "gone" | "plain";
+
+/** One record of the customer's own system, with the call that last touched it when there was one. */
+export interface BusinessRecord {
+  /** The business system's own identifier — also the key the log join is made on. */
+  id: string;
+  who: string;
+  contact: string | null;
+  /** ISO moment or date the record is FOR; the business decides which. */
+  when: string | null;
+  handled_by: string | null;
+  /** How it stands, in the business's own word — rendered verbatim, never translated. */
+  state: string;
+  tone: RecordTone;
+  detail: string | null;
+  /** When the business last touched it, epoch seconds; null for a record no call has changed. */
+  at: number | null;
+  session: string | null;
+  verb: string | null;
+  confirmed: boolean;
+  channel: Channel | null;
+}
+
+/** The column headings the business chose. A key that is absent or null is not rendered. */
+export interface RecordLabels {
+  who?: string | null;
+  contact?: string | null;
+  when?: string | null;
+  handled_by?: string | null;
+  detail?: string | null;
+}
+
+/** Everything the Board's table reads. `shape` null = this project's systems offer no such view. */
+export interface BusinessView {
+  tenant: string;
+  project: string;
+  days: number;
+  shape: string | null;
+  labels: RecordLabels;
+  /** Which of the tenant's systems answered, by the name its factory gave it. */
+  systems: string[];
+  rows: BusinessRecord[];
+}
+
+/** The reservations themselves, read off the customer's own system — not off our log. */
+export async function getReservations(
+  params: { tenant: string; project: string; days?: number; limit?: number },
+  signal?: AbortSignal,
+): Promise<BusinessView> {
+  return request<BusinessView>(`/reservations${query(params)}`, signal ? { signal } : {});
+}
+
 /* ── errors ───────────────────────────────────────────────────────────────── */
 
 /** A control-plane refusal with the status and the sentence the API gave, for the UI to show. */

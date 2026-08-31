@@ -28,12 +28,34 @@ the executor turns into a sentence the caller hears — never a stack trace.
 
 import datetime
 import re
+import time
 from typing import Any
 
-from core.adapters.base import Adapter
+from core.adapters.base import CHANGED, GONE, LIST_RECORDS, NEW, PLAIN, Adapter
+from core.adapters.ledger import Ledger
 
 from . import patients, slots
 from .slots import DOCTORS, normalise, specialty_key  # re-exported: the cuadro médico lives there
+
+LEDGER_BOOK = "clinica-norte/agenda"
+
+# How the book itself describes a row to whoever is reading the console. These are
+# the clinic's words about its own records, not the platform's: `moved` is one
+# appointment the patient rescheduled, which the platform only ever saw as a cancel
+# followed by a booking.
+BOOKED = "booked"
+CREATED = "created"
+MOVED = "moved"
+CANCELLED = "cancelled"
+
+SHAPE = "appointments"
+LABELS = {
+    "who": "patient",
+    "contact": "phone",
+    "when": "appointment",
+    "handled_by": "professional",
+    "detail": "specialty",
+}
 
 FIND_AVAILABILITY = "find_availability"
 FIND_PATIENT = "find_patient"
@@ -63,10 +85,12 @@ __all__ = [
 class FakeAgenda(Adapter):
     """The clinic's appointment book: which hours are free, who has a cita, and booking them."""
 
-    def __init__(self, seed: str = "clinica-norte") -> None:
+    def __init__(self, seed: str = "clinica-norte", ledger: Ledger | None = None) -> None:
         self.seed = seed
         self.book = patients.seeded()
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.ledger = ledger or Ledger(LEDGER_BOOK)
+        self.released = False  # this call has already let an hour go: the next write is a move
 
     def capabilities(self) -> list[str]:
         """Everything the booking system can be asked to do, read and write alike."""
@@ -77,6 +101,7 @@ class FakeAgenda(Adapter):
             CREATE_APPOINTMENT,
             CANCEL_SLOT,
             REBOOK_SLOT,
+            LIST_RECORDS,
         ]
 
     async def execute(self, capability: str, args: dict[str, Any]) -> Any:
@@ -89,6 +114,7 @@ class FakeAgenda(Adapter):
             CREATE_APPOINTMENT: self._create_appointment,
             CANCEL_SLOT: self._cancel_slot,
             REBOOK_SLOT: self._rebook_slot,
+            LIST_RECORDS: self._list_records,
         }.get(capability)
         if runner is None:
             raise ValueError(f"FakeAgenda cannot run {capability!r}")
@@ -145,6 +171,8 @@ class FakeAgenda(Adapter):
             "created": "session",
             **({"specialty": specialty} if specialty else {}),
         }
+        moved = self.released  # an hour was let go earlier in this call: this is a rescheduling
+        self._file(appointment_id, MOVED if moved else CREATED, CHANGED if moved else NEW)
         return {"appointment_id": appointment_id, "when": when}
 
     def _cancel_slot(self, args: dict[str, Any]) -> dict[str, str]:
@@ -160,7 +188,48 @@ class FakeAgenda(Adapter):
         if appointment is None:
             raise ValueError(f"unknown appointment {appointment_id!r}")
         appointment["status"] = status
+        gone = status == "cancelled"
+        self.released = self.released or gone
+        self._file(appointment_id, CANCELLED if gone else BOOKED, GONE if gone else PLAIN)
         return {"appointment_id": appointment_id, "status": status}
+
+    def _list_records(self, _args: dict[str, Any]) -> dict[str, Any]:
+        """The appointment book as an operator reads it: every cita, and how each one stands.
+
+        The console's read, never a tool: no stage may call it and no model ever
+        sees it. It answers with the clinic's own shape and the clinic's own
+        words for a state, so `core` renders a table it has no vocabulary for.
+
+        Two sources, in this order. The seeded book is what the clinic held
+        before anyone rang; the ledger is every row a call has written since,
+        across every process, and it wins wherever both hold the same id — a
+        cita cancelled at eleven is cancelled, whatever the seed still says.
+        """
+        rows = {key: self._as_record(key, row) for key, row in self.book.items()}
+        rows.update(self.ledger.rows())
+        return {"shape": SHAPE, "labels": LABELS, "rows": list(rows.values())}
+
+    def _file(self, appointment_id: str, state: str, tone: str) -> None:
+        """Record the row's new standing where another process reads it (`core.adapters.ledger`)."""
+        row = self.book.get(appointment_id)
+        if row is not None:
+            self.ledger.record(appointment_id, self._as_record(appointment_id, row, state, tone))
+
+    def _as_record(
+        self, appointment_id: str, row: dict[str, str], state: str = "", tone: str = ""
+    ) -> dict[str, Any]:
+        """One appointment in the shape the console reads (`core.adapters.base.LIST_RECORDS`)."""
+        return {
+            "id": appointment_id,
+            "who": row.get("patient", ""),
+            "contact": row.get("phone") or None,
+            "when": row.get("when") or None,
+            "handled_by": row.get("doctor") or None,
+            "state": state or (CANCELLED if row.get("status") == "cancelled" else BOOKED),
+            "tone": tone or (GONE if row.get("status") == "cancelled" else PLAIN),
+            "detail": row.get("specialty") or None,
+            "at": time.time() if state else None,
+        }
 
 
 def summarise_availability(slots: list[dict[str, str]] | None) -> str:

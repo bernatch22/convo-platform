@@ -18,9 +18,11 @@ works unchanged. An argument the system cannot read raises `ValueError`, which
 the executor turns into a sentence the caller hears — never a stack trace.
 """
 
+import time
 from typing import Any
 
-from core.adapters.base import Adapter
+from core.adapters.base import CHANGED, GONE, LIST_RECORDS, PLAIN, Adapter
+from core.adapters.ledger import Ledger
 
 from . import orderbook
 from .orderbook import CANCELLED, DELIVERED, PREPARING, SHIPPED  # re-exported: the statuses
@@ -29,19 +31,35 @@ FIND_ORDER = "find_order"
 CANCEL_ORDER = "cancel_order"
 RESTORE_ORDER = "restore_order"
 
+LEDGER_BOOK = "tienda-sur/orders"
+
+# The shop has no agenda and the console must not invent one for it: this project's
+# records are ORDERS, and they answer with an order's own columns and an order's own
+# statuses. That is what `shape` is for — the business names its records, and the
+# console renders whatever it is handed.
+SHAPE = "orders"
+LABELS = {
+    "who": "customer",
+    "contact": "phone",
+    "when": "placed",
+    "handled_by": "carrier",
+    "detail": "order",
+}
+
 __all__ = ["CANCELLED", "DELIVERED", "PREPARING", "SHIPPED", "FakeOrders"]
 
 
 class FakeOrders(Adapter):
     """The shop's order system: where an order is, and whether it can still be stopped."""
 
-    def __init__(self) -> None:
+    def __init__(self, ledger: Ledger | None = None) -> None:
         self.book = orderbook.seeded()
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.ledger = ledger or Ledger(LEDGER_BOOK)
 
     def capabilities(self) -> list[str]:
         """Everything the order system can be asked to do, read and write alike."""
-        return [FIND_ORDER, CANCEL_ORDER, RESTORE_ORDER]
+        return [FIND_ORDER, CANCEL_ORDER, RESTORE_ORDER, LIST_RECORDS]
 
     async def execute(self, capability: str, args: dict[str, Any]) -> Any:
         """Run one capability against the book; ValueError on anything it cannot do."""
@@ -50,6 +68,7 @@ class FakeOrders(Adapter):
             FIND_ORDER: self._find_order,
             CANCEL_ORDER: self._cancel_order,
             RESTORE_ORDER: self._restore_order,
+            LIST_RECORDS: self._list_records,
         }.get(capability)
         if runner is None:
             raise ValueError(f"FakeOrders cannot run {capability!r}")
@@ -68,13 +87,51 @@ class FakeOrders(Adapter):
         if not orderbook.cancellable(order):
             raise ValueError(f"order {order_id} is {order['status']} and can no longer be stopped")
         order["status"] = CANCELLED
+        self._file(order_id, GONE)
         return {"order_id": order_id, "status": CANCELLED, "refund": order["total"]}
 
     def _restore_order(self, args: dict[str, Any]) -> dict[str, str]:
         """Undo a cancel: the order the saga stopped goes back into preparation as it was."""
         order_id, order = self._order(args)
         order["status"] = PREPARING
+        self._file(order_id, CHANGED)
         return {"order_id": order_id, "status": PREPARING}
+
+    def _list_records(self, _args: dict[str, Any]) -> dict[str, Any]:
+        """The order book as an operator reads it: every order, and where each one stands.
+
+        The console's read, never a tool. The shop answers the same question the
+        clinic does and with a different shape — `orders`, with an order's own
+        columns — which is the whole reason nothing in `core` holds a list of
+        columns: a project with no agenda is not an empty agenda.
+
+        The seeded book is what the shop held before anyone rang; the ledger is
+        every order a call has changed since, across processes, and it wins
+        wherever both hold the same number.
+        """
+        rows = {key: self._as_record(key, order) for key, order in self.book.items()}
+        rows.update(self.ledger.rows())
+        return {"shape": SHAPE, "labels": LABELS, "rows": list(rows.values())}
+
+    def _file(self, order_id: str, tone: str) -> None:
+        """Record the order's new standing where a second process can read it."""
+        order = self.book.get(order_id)
+        if order is not None:
+            self.ledger.record(order_id, self._as_record(order_id, order, tone))
+
+    def _as_record(self, order_id: str, order: dict[str, str], tone: str = "") -> dict[str, Any]:
+        """One order in the shape the console reads (`core.adapters.base.LIST_RECORDS`)."""
+        return {
+            "id": order_id,
+            "who": order.get("name", ""),
+            "contact": order.get("phone") or None,
+            "when": order.get("placed") or None,
+            "handled_by": order.get("carrier") or None,
+            "state": order.get("status", ""),
+            "tone": tone or (GONE if order.get("status") == CANCELLED else PLAIN),
+            "detail": order.get("items") or None,
+            "at": time.time() if tone else None,
+        }
 
     def _order(self, args: dict[str, Any]) -> tuple[str, dict[str, str]]:
         order_id = orderbook.normalise(str(args.get("order_id", "")))
