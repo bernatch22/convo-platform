@@ -79,9 +79,10 @@ Cliente: es que pone que está entregado y aquí no ha llegado nadie.
 Tienda Sur: [abre la incidencia con lo que ha contado el cliente]
 </example>
 <example>
-[la herramienta ha devuelto la incidencia TS-T0003]
-Tienda Sur: Te la dejo apuntada con el número TS-T0003. Un compañero la
-mira y te escribimos con lo que diga el transportista. ¿Te apunto algo más?
+[la herramienta ha devuelto una incidencia con su número]
+Tienda Sur: Te la dejo apuntada con el número <el que ha devuelto la herramienta, ese y no
+otro>. Un compañero la mira y te escribimos con lo que diga el transportista. ¿Te apunto
+algo más?
 </example>
 <example>
 Cliente: quería saber cómo va mi incidencia, el número es el TS-T0001.

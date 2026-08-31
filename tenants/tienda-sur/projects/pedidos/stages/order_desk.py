@@ -26,6 +26,7 @@ class OrderDesk(TenantAgent):
     def __init__(self, tc: TenantContext) -> None:
         super().__init__(tc, instructions=prompts.order_desk_prompt(tc))
         self.cancelled: dict[str, str] | None = None
+        self.problem: str | None = None
 
     def summary(self) -> str:
         """What the next stage needs: the cancellation if there is one, the order if there is not.
@@ -53,10 +54,17 @@ class OrderDesk(TenantAgent):
         order = self.tc.customer or {}
         if not order:
             return "Todavía no se ha localizado ningún pedido."
+        said = (
+            f" El cliente YA ha contado qué le pasa: «{self.problem}». No se lo preguntes otra "
+            "vez —acaba de decirlo— y abre la incidencia con eso."
+            if self.problem
+            else ""
+        )
         return (
             f"Pedido localizado: {order['order_id']}, a nombre de {order['name']}. Es el pedido "
             "del que va esta llamada, así que no vuelvas a pedir el número ni el móvil. Nada se "
-            "ha cancelado. Esta nota es para ti: no se lee en voz alta ni se resume al cliente."
+            f"ha cancelado.{said} Esta nota es para ti: no se lee en voz alta ni se resume al "
+            "cliente."
         )
 
     @function_tool
@@ -118,8 +126,15 @@ class OrderDesk(TenantAgent):
         return self.hand_off(Farewell(tc))
 
     @function_tool
-    async def start_ticket_desk(self, ctx: RunContext[TenantContext]) -> "TenantAgent":
+    async def start_ticket_desk(
+        self, ctx: RunContext[TenantContext], problema: str
+    ) -> "TenantAgent":
         """Pasa la llamada al mostrador de incidencias, con el pedido que ya tienes localizado.
+
+        En `problema` pones lo que el cliente ha dicho que le pasa, en sus palabras y en una
+        frase —«me ha llegado la pantalla partida», «consta entregado y no lo tengo»—, para
+        que el mostrador no se lo vuelva a preguntar. Si aún no te lo ha contado, pregúntaselo
+        antes de llamar a esta herramienta.
 
         Llámala cuando lo que le pasa al cliente no se arregla mirando ni cancelando el pedido
         y hay que dejarlo por escrito para que un compañero lo siga: el paquete consta
@@ -130,11 +145,16 @@ class OrderDesk(TenantAgent):
         No la llames para lo que sí sabes hacer aquí: decir por dónde va el pedido, decir
         cuándo llega o cancelarlo mientras esté en el almacén.
 
-        No necesita argumentos: el pedido localizado viaja con la llamada.
+        El pedido localizado viaja solo con la llamada; lo único que le tienes que dar es
+        el problema.
         """
         tc = ctx.userdata
         from .ticket_desk import TicketDesk
 
+        # What the customer already said travels in `summary()`, the platform's own channel
+        # for it: a handoff copies no history, so a problem told here and not carried across
+        # is a problem the customer is asked to tell twice.
+        self.problem = problema.strip() or None
         return self.hand_off(TicketDesk(tc))
 
     async def _reload(self, tc: TenantContext) -> dict[str, str] | None:
