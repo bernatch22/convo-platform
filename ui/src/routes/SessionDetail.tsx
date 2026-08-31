@@ -13,7 +13,7 @@ import { EmptyState } from "../components/EmptyState";
 import { EventRow } from "../components/EventRow";
 import { LatencyStrip } from "../components/LatencyStrip";
 import { ScoreBreakdown } from "../components/ScoreBreakdown";
-import { getSession, type SessionView } from "../lib/api";
+import { getSession, recordingUrl, type SessionView } from "../lib/api";
 import {
   authorisedBy,
   consentLinks,
@@ -88,6 +88,23 @@ export function SessionDetail() {
           {stages.length > 0 && <Fact label="stages" value={stages.join(" → ")} />}
         </div>
       </section>
+
+      {view.audio && (
+        <section className="section">
+          <h2 className="section__title">Listen to this call</h2>
+          <audio className="player" controls preload="none" src={recordingUrl(id)}>
+            <a href={recordingUrl(id)}>Download the recording</a>
+          </audio>
+          <p className="note">
+            Stereo: the caller on the left channel, the agent on the right, on one absolute
+            timeline whose sample zero is the <code className="mono">audio.start</code> row below.
+            The file never leaves the box except through this authenticated route — it is not in
+            git and it is not a static mount. A supervisor who took the line is audible to the
+            caller but <strong>not</strong> in this recording: the tap hears the caller and the
+            agent, and that is the one thing it does not hear.
+          </p>
+        </section>
+      )}
 
       <section className="section">
         <h2 className="section__title">Latency across this call</h2>

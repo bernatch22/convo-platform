@@ -19,6 +19,7 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any
 
+from core import recordings
 from core.rooms import EVAL_PREFIX
 from core.scoring.report import already_scored
 from core.state.events import Event
@@ -152,7 +153,13 @@ def _matches(row: SessionRow, tenant: str | None, project: str | None) -> bool:
 
 
 def _row_view(store: Store, row: SessionRow, events: list[Event] | None = None) -> dict[str, Any]:
-    """The list line: identity, envelope, and the two numbers read off the log itself."""
+    """The list line: identity, envelope, and the two numbers read off the log itself.
+
+    `audio` is a look on disk and not a look in the log on purpose: the log
+    says where the OGG was AIMED, the disk says whether there is anything to
+    play. A killed job, a chat session and a project that opted out all
+    answer false, and the console needs no third state to draw a player.
+    """
     events = store.events(row.id) if events is None else events
     return {
         "id": row.id,
@@ -167,6 +174,7 @@ def _row_view(store: Store, row: SessionRow, events: list[Event] | None = None) 
         "cost_eur": _cost(events),
         "phone": _phone_of(events),
         "score": already_scored(events),
+        "audio": recordings.for_session(row.id) is not None,
     }
 
 

@@ -139,6 +139,8 @@ export interface SessionLine {
   cost_eur: number | null;
   phone: string | null;
   score: SessionScore | null;
+  /** Whether this call left an OGG the console can play — a look on disk, not in the log. */
+  audio: boolean;
 }
 
 /** One fact in the append-only log. A turn's latencies live in `payload.metrics`. */
@@ -431,6 +433,16 @@ export async function getSession(id: string, signal?: AbortSignal): Promise<Sess
   );
   const { events, ...line } = body;
   return { ...line, events: events.length, events_log: events };
+}
+
+/** Where this session's recording is served from — an `<audio src>`, never a fetch.
+ *
+ * The control plane composes the path from the session id on its side; nothing
+ * here knows where an OGG lives on the box, which is the point. A session whose
+ * `audio` is false has no such file and the screen must not ask for one.
+ */
+export function recordingUrl(id: string): string {
+  return `/sessions/${encodeURIComponent(id)}/recording`;
 }
 
 /** Calls in progress on the SFU, phone calls included. Throws ApiError(503) when it is down. */
