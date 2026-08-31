@@ -23,10 +23,10 @@ SILENT_CALLER = (
 )
 
 BLIND_SPOT = (
-    "ring 3 note: the log records the shape of a tool result, never its contents, so nothing "
-    "{tools} returned counts as evidence here. An hour read off the agenda cannot be matched "
-    "and reaches the judge anyway — read a 0.0 as 'not verifiable from the log', not as an "
-    "invention. docs/evals.md §3.6."
+    "ring 3 note: {tools} declares no result summary on its ToolSpec, so the log kept the "
+    "shape of what it returned and not its contents. A fact the agent read off one of them "
+    "reaches the judge with evidence that could not contain it — read a 0.0 on such a claim "
+    "as 'not verifiable from the log', not as an invention. docs/evals.md §3.6."
 )
 
 

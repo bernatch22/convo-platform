@@ -27,7 +27,7 @@ consent, grounded facts, register — and share not one sentence of criteria.
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
 | **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: against a real LiveKit room, with personas | offline on demand; live nightly (ms-13) | offline live since ms-6 — §3.9; live planned |
-| **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; grounding is blind to tool results — §3.6 |
+| **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; for grounding since ms-7, once tool results carried a summary — §3.6 |
 
 The metrics are the same in every ring. A ring changes where the conversation
 comes from, never how it is judged.
@@ -86,8 +86,10 @@ The platform (`core/testing/`) owns the plumbing, never the criteria:
   (single turn) or a `ConversationalTestCase` (whole call), attaching to every
   tool call its **full contract** (both halves of the docstring) and its
   **output**.
-- `replay.py` — ring 3: the same `ConversationalTestCase`, rebuilt from a
-  stored session's append-only log instead of from a run held in memory (§3.6).
+- `replay/` — ring 3: the same `ConversationalTestCase`, rebuilt from a stored
+  session's append-only log instead of from a run held in memory (§3.6).
+  `turns.py` decides which turn a batch of tool events belongs to, `tools.py`
+  pairs those events back into `ToolCall`s, `__init__.py` is the door.
 - `report.py` — the same goldens and the same metrics rendered to HTML.
 
 A threshold is a business decision (a clinic's tolerance for tuteo is not a
@@ -267,36 +269,61 @@ executor ran, not the ones the model asked for, so `book_slot` is there and
 `book_appointment` is not. The confusion node 1 of the consent graph is worded
 against (§3.4) cannot arise here at all.
 
-**What ring 3 cannot see.** `tool.result` stores a SHAPE — `list[3]`,
-`dict[2]` — never the payload, because a log that kept what the agenda returned
-would keep the patient's hours, doctor and phone next to their masked DNI.
-So in a replayed case:
+**What ring 3 could not see until ms-7.** `tool.result` stored a SHAPE —
+`list[3]`, `dict[2]` — and never the payload, because a log that kept what the
+agenda returned would keep the patient's hours, doctor and phone next to their
+masked name. Consent survived that (it reads tool NAMES only); grounding did
+not. Node 2's evidence was the clinic sheet and what the caller said, the
+agenda's rows were nowhere in the log, and so a claim that came off the agenda
+reached the judge with evidence that could not contain it. Measured on a real
+booking (`test-37d67860`, 40 events, 7 turns): consent 1.0, grounding **0.0**
+with a single leftover — «las diez de la mañana», the appointment the patient
+already had, which `find_patient` returned in the Identify stage. The two hours
+the agenda offered matched, but by luck: hours are compared as `HH:MM` and
+09:00 and 14:00 are also in the clinic's opening hours in `<clinic_knowledge>`.
 
-| Metric | Ring 3 | Why |
-|---|---|---|
-| Never book before yes | **works in full** | reads tool NAMES only |
-| Grounded facts | **cannot ground a fact that came from a tool** | node 2's evidence is the clinic sheet and what the caller said; the agenda's rows are not in the log |
+**`result_summary` closed it** (ms-7, `tk-786905`). A `ToolSpec` may declare one
+function, `result_summary: Callable[[Any], str] | None`, that renders its own
+result into a line the log may keep. `LocalExecutor` applies it after the call
+succeeds, writes the line as `summary` on `tool.result`, and:
 
-A leftover claim therefore reaches the judge with evidence that could not
-contain it, and the judge — correctly, on what it was shown — says no. Read
-that 0.0 as *not verifiable from the log*, never as an invention.
-`replay.missing_tool_outputs(case)` names the calls this applies to and the CLI
-prints it above the score, so nobody has to work it out from a red number.
+- **learns the result's identity fields first** (`patient`, `name`, `phone`, in
+  a dict or in a list of them). `find_patient` is asked for a phone and answers
+  with a name no ARGUMENT ever carried, so without this step the mask would not
+  have known it. With it, `record`'s scrub blanks it: the log holds
+  `An*************`.
+- **never lets a renderer fail a call.** A `KeyError` in a summary costs the log
+  one line and the caller nothing.
+- **caps the line at 400 characters.** A summary is evidence that a fact came
+  from a system, not a copy of the system's answer.
 
-Measured on a real booking (`test-37d67860`, 40 events, 7 turns): consent 1.0,
-grounding 0.0 with a single leftover — «las diez de la mañana», the appointment
-the patient already had, which comes from `find_patient` in the Identify stage
-and whose output the log does not store. The two hours the agenda offered
-matched, but by luck: hours are compared as `HH:MM` and 09:00 and 14:00 are
-also in the clinic's opening hours in `<clinic_knowledge>`.
+Who writes the renderer matters: it lives beside the ADAPTER that produced the
+shape (`tenants/clinica-norte/adapters/agenda.py`), so a customer swapping
+`FakeAgenda` for their real agenda changes the rows and the line they render to
+in the same file. Clínica Norte declares one on all six of its tools — hours and
+doctors for `find_availability`, when/doctor plus a masked name for
+`find_patient`, the appointment and its new standing for the three writes, the
+message id and a masked number for `send_sms`.
 
-**The field that would close it** (proposed, not built): a `summary` on
-`tool.result` — a redacted rendering of the result, filtered by the same
-`pii_scope` that already masks the arguments and capped in length. It is a
-change to `ToolSpec` and to the executor, so it belongs to a card of its own;
-see §8. A cheaper half-step exists too: the masked ARGUMENTS are already in the
-log (`send_sms` carries the whole confirmation text), and a project's
-`evidence_of` could read `input_parameters` as well as outputs.
+The metric side needed nothing: `evidence_of` already read `ToolCall.output`,
+and `replay/tools.py` now puts the summary there instead of the shape. A tool
+that declares NO renderer is unchanged, still reports `NO_PAYLOAD`, and
+`replay.missing_tool_outputs(case)` still names it so the CLI can print the
+caveat above the score — read a 0.0 on such a claim as *not verifiable from the
+log*, never as an invention.
+
+Measured on a real booking recorded after the change (`ms7-7d489304`, 62 events,
+9 turns, full flow from Identify): consent 1.0, **grounding 1.0**, no leftovers,
+and `missing_tool_outputs == []` — zero judge calls in the grounding metric,
+because everything the receptionist said matched a source. The claim that used
+to be the single leftover, the hour of the appointment the patient already had,
+is now grounded by `find_patient`'s own summary.
+
+The cheaper half-step considered and not taken: the masked ARGUMENTS are already
+in the log (`send_sms` carries the whole confirmation text), so `evidence_of`
+could read `input_parameters` as well as outputs. It would have grounded a fact
+by quoting the agent's own request for it — evidence that an invention launders
+itself through — which is the thing §3.5 exists to prevent.
 
 ### 3.7 Keeps the register (ConversationalDAG) — usted or tú, and never both
 
@@ -592,13 +619,15 @@ about four minutes.
   §3.9 is measured on a recording whose caller channel is silent, so nothing
   yet exercises overlap, barge-in or the caller's own audio. That needs a human
   with a microphone (`python worker.py console --record`) or ms-13's room.
-- **Ring 3 cannot ground facts against tool results.** The log stores the shape
-  of a result, never its contents, so `grounded_facts_dag` on a replayed
-  session escalates every datum that came off the agenda and scores it 0.0 on
-  evidence that could not contain it. Proposed fix, not built here: a
-  `summary` field on `tool.result` — the result rendered through the same
-  `pii_scope` masking the arguments get, length-capped — written by
-  `LocalExecutor._record` and declared on `ToolSpec`. It is a change to the
-  contract and the executor and needs its own card. Until then the CLI prints
-  `missing_tool_outputs` next to the score and the suite asserts consent, not
-  grounding, on stored sessions.
+- ~~Ring 3 cannot ground facts against tool results.~~ **Closed in ms-7** by
+  `ToolSpec.result_summary` (§3.6). What is left of it: a project opts in tool
+  by tool, so a tenant that declares no renderer still scores 0.0 on any fact
+  that came off its systems, and `missing_tool_outputs` is what says so. The
+  template tenant declares none yet.
+- **A summary is a second place a project can leak.** The mask is the safety
+  net, not the design: it blanks values the session has SEEN declared as PII,
+  and a renderer that reaches for a field nobody ever declared (a clinical
+  note, an address on an order) would put it in the log intact. Reviewing a
+  `result_summary` is reviewing a data-protection decision. The upstream shape
+  worth having is a declarative `result_fields: tuple[str, ...]` that can only
+  name keys, so the dangerous version does not typecheck.

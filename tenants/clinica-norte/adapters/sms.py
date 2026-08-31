@@ -21,6 +21,21 @@ from core.adapters.base import Adapter
 
 SEND_SMS = "send_sms"
 MAX_CHARS = 480
+NOTHING_SENT = "the gateway returned nothing"
+
+
+def summarise_message(message: dict[str, str] | None) -> str:
+    """What `send_sms` may leave in the log: which message went out, to a masked number.
+
+    The BODY is deliberately not rendered. It names the patient by design
+    (`tools.sms_text`), and while the mask would blank the name, a summary
+    whose value depends on the mask having seen that exact spelling is a
+    summary waiting to leak. The id and the number are what an operator needs
+    to answer "did the patient get their text?".
+    """
+    if not message:
+        return NOTHING_SENT
+    return f"message {message.get('message_id', '?')} sent to {message.get('to', '?')}"
 
 
 class FakeSms(Adapter):
