@@ -27,3 +27,4 @@ sheets) live under `tmp/reports/` and are not versioned.
 | ms-9 the console — three channels on screen, the pipeline governable | landed | [ms-9.md](ms-9.md) |
 | ms-15 the supervisor — authority is a signature, the model is the last skeptic | landed | [ms-15.md](ms-15.md) |
 | ms-13 voice evals — callers who speak, nights that judge, a model that talks back | landed | [ms-13.md](ms-13.md) |
+| ms-17 the operator hears and sees — recordings, orientation, datasets | landed | [ms-17.md](ms-17.md) |
