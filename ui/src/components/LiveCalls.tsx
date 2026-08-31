@@ -18,18 +18,24 @@ type Reading =
   | { state: "sfu-down"; detail: string }
   | { state: "unavailable"; detail: string };
 
-export function LiveCalls() {
+/** What a click on a row does: join that room hidden and watch it. Absent = the strip is a readout. */
+interface LiveCallsProps {
+  onObserve?: (call: LiveCall) => void;
+  watching?: string | null;
+}
+
+export function LiveCalls({ onObserve, watching = null }: LiveCallsProps) {
   const reading = useLiveCalls();
 
   return (
     <section className="section">
       <h2 className="section__title">Live now</h2>
-      {render(reading)}
+      {render(reading, onObserve, watching)}
     </section>
   );
 }
 
-function render(reading: Reading) {
+function render(reading: Reading, onObserve?: (call: LiveCall) => void, watching?: string | null) {
   switch (reading.state) {
     case "loading":
       return <p className="note">asking the SFU…</p>;
@@ -41,12 +47,18 @@ function render(reading: Reading) {
       return reading.calls.length === 0 ? (
         <p className="note">no call in progress</p>
       ) : (
-        <CallTable calls={reading.calls} />
+        <CallTable calls={reading.calls} {...(onObserve ? { onObserve } : {})} watching={watching ?? null} />
       );
   }
 }
 
-function CallTable({ calls }: { calls: LiveCall[] }) {
+interface CallTableProps {
+  calls: LiveCall[];
+  onObserve?: (call: LiveCall) => void;
+  watching: string | null;
+}
+
+function CallTable({ calls, onObserve, watching }: CallTableProps) {
   return (
     <div className="table-wrap">
       <table className="table">
@@ -57,11 +69,12 @@ function CallTable({ calls }: { calls: LiveCall[] }) {
             <th>routed to</th>
             <th className="num">in room</th>
             <th>session</th>
+            {onObserve && <th />}
           </tr>
         </thead>
         <tbody>
           {calls.map((call) => (
-            <tr key={call.sid}>
+            <tr key={call.sid} className={call.room === watching ? "is-watched" : undefined}>
               <td className="id">{call.room}</td>
               <td className="mono">{call.phone ?? "web"}</td>
               <td className="mono">
@@ -69,6 +82,13 @@ function CallTable({ calls }: { calls: LiveCall[] }) {
               </td>
               <td className="num">{call.participants}</td>
               <td className="id">{call.session_id ?? "—"}</td>
+              {onObserve && (
+                <td className="num">
+                  <button type="button" className="link" onClick={() => onObserve(call)}>
+                    {call.room === watching ? "watching" : "observe"}
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

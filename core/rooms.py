@@ -12,6 +12,7 @@ the door can answer 503 and the console can say "the SFU is down" instead of
 "there are no calls", which is a different and much worse sentence.
 """
 
+import os
 from typing import Any
 
 from livekit import api
@@ -41,9 +42,21 @@ async def active_rooms() -> list[dict[str, Any]]:
 
 
 def _client() -> api.LiveKitAPI:
-    """The API client from the environment; a missing URL or key is already unreachable."""
+    """The API client, on the same defaults `core.auth` mints tokens with.
+
+    `api.LiveKitAPI()` reads the environment itself and raises when `LIVEKIT_URL`
+    is unset — which on a laptop running the dev compose is not "unconfigured",
+    it is "the defaults". `core.auth.mint_session` has always fallen back to
+    `ws://localhost:7880` + devkey/secret, and a console that can hand out a
+    token for a room it then cannot list is the wrong kind of surprising. A key
+    that is wrong for the server still arrives as `RoomsUnreachable`.
+    """
     try:
-        return api.LiveKitAPI()
+        return api.LiveKitAPI(
+            url=os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
+            api_key=os.getenv("LIVEKIT_API_KEY", "devkey"),
+            api_secret=os.getenv("LIVEKIT_API_SECRET", "secret"),
+        )
     except ValueError as error:
         raise RoomsUnreachable(f"livekit is not configured: {error}") from error
 
