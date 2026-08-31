@@ -25,7 +25,15 @@ about, the two tool names, and the wording of the one genuine language question
 in each graph. That is `tenants/<id>/projects/<p>/evals/`.
 """
 
-from core.testing.dag.consent import consent_graph
+from core.testing.dag.consent import (
+    CONSENT_LINE,
+    NOTHING_WAS_SAID,
+    ConsentLineNode,
+    RanTheWriteNode,
+    consent_graph,
+    ran_at,
+    said_before,
+)
 from core.testing.dag.grounded import (
     EVERY_FACT_MATCHED,
     IS_IT_SUPPORTED,
@@ -50,6 +58,10 @@ __all__ = [
     "STATES_ANY_FACT",
     "TRANSCRIPT",
     "Backing",
+    "CONSENT_LINE",
+    "ConsentLineNode",
+    "NOTHING_WAS_SAID",
+    "RanTheWriteNode",
     "DeterministicNode",
     "EveryFactMatchedNode",
     "FactNode",
@@ -58,4 +70,6 @@ __all__ = [
     "StatesAnyFactNode",
     "consent_graph",
     "grounded_facts_graph",
+    "ran_at",
+    "said_before",
 ]

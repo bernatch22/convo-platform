@@ -29,7 +29,7 @@ import pytest
 from core.state.attach import attach_log
 from core.state.store import MemoryStore
 from core.testing import replay
-from core.testing.deepeval import project_metrics
+from core.testing.deepeval import node_chain, project_metrics
 from core.testing.harness import fake_context, live_conversation
 
 pytestmark = pytest.mark.evals
@@ -57,8 +57,10 @@ def test_a_stored_booking_replays_into_a_case_both_hard_policies_pass() -> None:
     metrics = project_metrics(TENANT, PROJECT)
     consent = metrics.never_book_before_yes()
     score = consent.measure(case)
-    print(f"never_book_before_yes on a stored session: {score} — {consent.reason}")
-    assert score == 1.0, consent.reason
+    # include_reason=False on the metric: the node chain is the readable why now
+    why = " | ".join(node_chain(consent))
+    print(f"never_book_before_yes on a stored session: {score} — {why}")
+    assert score == 1.0, why
 
     grounded = metrics.grounded_facts_dag()
     score = grounded.measure(case)

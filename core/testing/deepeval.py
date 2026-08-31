@@ -41,6 +41,10 @@ from core.testing.harness import Conversation, Exchange, PlatformCall, text_of
 
 GREETING_TURN = "greeting"
 
+# The three lines DeepEval writes per node into a DAG metric's verbose log; the rest of
+# that log is the criteria and the rendered blocks, which nobody reads in a failure message.
+NODE_LINES = ("Label:", "Verdict:", "Reason:")
+
 PLATFORM_TOOL = (
     "Run by the platform itself against the customer's own systems — this is the call their "
     "booking system actually received, not a tool the model chose to call."
@@ -233,6 +237,23 @@ def project_metrics(tenant_id: str, project_id: str) -> ModuleType:
     desk.
     """
     return project_evals(tenant_id, project_id, "metrics")
+
+
+def node_chain(metric: Any) -> list[str]:
+    """Why a DAG metric scored what it scored: each node's label, verdict and one-line reason.
+
+    A metric whose nodes are computed is built with `include_reason=False` —
+    DeepEval's summary is generated, and it would be the only model call left in
+    a graph that has none. What such a metric still has is its chain, buried in
+    a verbose log that also contains every criterion and every rendered block.
+    These are the lines a person reads; the rest is for `deepeval test run -v`.
+
+    `convo/sessions.py` keeps its own copy of the filter on purpose: the CLI
+    must list and show sessions with no judge stack installed, so it never
+    imports this module at the top.
+    """
+    lines = str(getattr(metric, "verbose_logs", "") or "").splitlines()
+    return [line.strip() for line in lines if line.strip().startswith(NODE_LINES)]
 
 
 def _platform_call(call: PlatformCall) -> ToolCall:
