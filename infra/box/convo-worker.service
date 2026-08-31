@@ -1,0 +1,19 @@
+# The fleet worker on convo-box: answers the phone line from the same DC as the SFU.
+# Installed by infra/box/deploy_worker.sh into /etc/systemd/system/.
+[Unit]
+Description=convo-platform worker (agent_name=cc)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=berna
+WorkingDirectory=/home/berna/convo-app
+# start = production mode: one prewarmed process per CPU. dev mode keeps ZERO
+# idle processes and every call paid ~5s of cold process spawn (measured).
+ExecStart=/home/berna/.local/bin/uv run python worker.py start
+EnvironmentFile=/home/berna/convo-app/.env
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

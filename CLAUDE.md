@@ -49,14 +49,18 @@ and, when a decision was made, a short essay in its thread.
   caches at 1024). Every project prefix (system + tools + a stable policy/FAQ
   block) must exceed 4096 tokens; assert `prompt_cached_tokens > 0` on turn 2 in
   tests. Never put timestamps or per-request ids in the system prompt; never
-  reorder tools. `preemptive_generation.max_retries = 1`. Sonnet 5 is the
+  reorder tools. `preemptive_generation` is DISABLED (human's decision 2026-08-31: with semantic
+  end-of-turn at ~0.33s, speculation never hid Haiku's ttft and only spent calls) —
+  generation starts on confirmed end of turn. Sonnet 5 is the
   measured alternative in evals, not a default.
 - Call `sanitize_tool_pairing(chat_ctx)` before every generation (orphan
   `tool_use` bricks the conversation with Anthropic 400s).
 - STT: Soniox `stt-rt-v5`, `language_hints=["es","en"]`, endpointing
   `level=2 / sensitivity=0.3 / max_endpoint_delay_ms≈1000`, `context=` (Soniox
   silently ignores `keyterms`). Keep `sample_rate=16000` even on PSTN.
-  Fallback: Deepgram `nova-3` multi.
+  The provider is a slot (`Project.stt_provider`, overridable from the console):
+  the alternative is Deepgram Flux `flux-general-multi` via the plugin's `STTv2`
+  (`/v2/listen`) — never `flux-general-en`, which 400s on a `language_hint`.
 - TTS: ElevenLabs `eleven_v3_conversational` (primary) / `eleven_flash_v2_5`
   (latency profile), `sync_alignment=True`. Never `eleven_turbo_v2_5`
   (deprecated) and never `eleven_v3` (non-realtime). On interruption the

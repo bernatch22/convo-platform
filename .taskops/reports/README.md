@@ -21,5 +21,6 @@ sheets) live under `tmp/reports/` and are not versioned.
 | ms-6 local voice — talk to the agent with your microphone | landed | [ms-6.md](ms-6.md) |
 | ms-7 evals ring 1 complete — DeepEval suites per project in CI | deferred to the end | — |
 | ms-8 LiveKit server locally — rooms, tokens, dispatch by metadata | landed | [ms-8.md](ms-8.md) |
+| ms-10 box core on GCP — the platform answers from the cloud | landed | [ms-10.md](ms-10.md) |
 | ms-11 telephone — a real number answered by the platform | landed | [ms-11.md](ms-11.md) |
 | ms-9 the console — three channels on screen, the pipeline governable | landed | [ms-9.md](ms-9.md) |

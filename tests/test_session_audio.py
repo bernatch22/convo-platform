@@ -23,7 +23,7 @@ def test_voice_turn_handling_combines_soniox_endpointing_with_the_local_detector
     endpointing, interruption = options["endpointing"], options["interruption"]
     assert (endpointing["min_delay"], endpointing["max_delay"]) == (0.3, 2.5)
     assert interruption["min_words"] == 2 and interruption["resume_false_interruption"] is True
-    assert options["preemptive_generation"]["max_retries"] == 1
+    assert options["preemptive_generation"] == {"enabled": False}
 
 
 def test_text_turn_handling_has_no_turn_detector() -> None:

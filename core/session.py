@@ -1,15 +1,15 @@
 """build_session: assemble the AgentSession for one TenantContext.
 
 Two shapes of session leave this module. A voice session listens and speaks:
-Soniox endpointing and the local turn detector share the decision of when the
-caller has finished, a real interruption needs two words so a "vale" does not
+the STT's own endpointing and the local turn detector share the decision of
+when the caller has finished, a real interruption needs two words so a "vale" does not
 cut the agent off, and every spoken word comes back with its time for the log.
 A text session has none of it, and audio is switched off so the console's
 default audio mode does not crash.
 
 Which one you get is decided by the SESSION's channel first and the keys
 second. A chat session never asks for STT or TTS even when both keys are in
-the environment: `stt_for` opens a Soniox websocket the typed conversation
+the environment: `stt_for` opens a transcription websocket the typed conversation
 would never feed, and a provider nobody speaks to is a connection, a cost and
 a leak of the caller's audio permissions for nothing.
 """
@@ -31,7 +31,6 @@ log = logging.getLogger("platform.session")
 ENDPOINT_MIN_DELAY_S = 0.3
 ENDPOINT_MAX_DELAY_S = 2.5
 INTERRUPTION_MIN_WORDS = 2
-PREEMPTIVE_MAX_RETRIES = 1
 
 
 def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
@@ -53,7 +52,7 @@ def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
     vad = vad if audible else None
     voice = stt is not None and tts is not None and vad is not None
     session = AgentSession[TenantContext](
-        llm=llm_for(tc.tenant),
+        llm=llm_for(tc.tenant, tc.project),
         stt=stt,
         tts=tts,
         vad=vad,
@@ -78,7 +77,12 @@ def voice_turn_handling() -> TurnHandlingOptions:
         interruption=InterruptionOptions(
             min_words=INTERRUPTION_MIN_WORDS, resume_false_interruption=True
         ),
-        preemptive_generation={"max_retries": PREEMPTIVE_MAX_RETRIES},
+        # OFF by the human's decision (2026-08-31, call AJ_rt86KogpPxDa): with
+        # Soniox closing a turn in ~0.33s there is no window for speculation to
+        # hide Haiku's ttft — it appeared whole in the gap regardless — so the
+        # extra cache-read calls bought nothing. Generation starts only when the
+        # end of turn is confirmed.
+        preemptive_generation={"enabled": False},
     )
 
 

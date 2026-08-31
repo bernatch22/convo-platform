@@ -7,10 +7,11 @@ calls; a deploy is the wrong unit for that. The row lives in the store
 from the same overridden object and nothing downstream knows a row was
 involved.
 
-Only the three fields in `OVERRIDABLE` can be set this way. A value the
-platform refuses to run is still refused where it is built: an override naming
-a forbidden TTS model is neutralised by `core.providers.tts.tts_model`, and the
-control plane refuses to store one in the first place.
+Only the fields in `OVERRIDABLE` can be set this way. A value the platform
+refuses to run is still refused where it is built: an override naming a
+forbidden TTS model is neutralised by `core.providers.tts.tts_model` and one
+naming an STT provider we do not have by `core.providers.stt.provider_for`,
+and the control plane refuses to store either in the first place.
 """
 
 import dataclasses
@@ -18,7 +19,7 @@ import dataclasses
 from core.context import Project
 from core.state.store import Store
 
-OVERRIDABLE = ("voice", "tts_model", "greeting")
+OVERRIDABLE = ("voice", "tts_model", "greeting", "stt_provider", "llm_model")
 
 
 def apply(tenant: str, project: Project, store: Store) -> Project:
