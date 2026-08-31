@@ -10,6 +10,14 @@ off the agenda and were not invented. So a tool may declare ONE function that
 renders its own result into a short line the log may keep. It is opt-in per
 tool, written by the project that knows which fields are safe, and everything
 it produces still goes through the session's PII mask before it is written.
+
+`infrastructure` is the second opt-in clause, and it says the opposite thing
+about a tool: this one is not the business's. The clock every agent inherits
+answers "what day is it" and touches nothing a customer owns, so an eval that
+asks "did the turn call the agenda when it should" must not count it — a golden
+that expects no BUSINESS call is not a golden that expects silence. The flag is
+declared here rather than guessed by name so a project can mark its own
+plumbing too, and so nothing anywhere holds a list of tool names to skip.
 """
 
 from collections.abc import Callable
@@ -38,6 +46,16 @@ class ToolSpec:
     compensation: str | None = None
     requires_confirmation: bool = False
     result_summary: Callable[[Any], str] | None = None
+    infrastructure: bool = False
+
+    def is_business_tool(self) -> bool:
+        """Whether this tool acts on the customer's business — false for platform plumbing.
+
+        The one question an eval about `expected_tools` asks of a call. A
+        golden lists the tools of the BUSINESS, so the clock the platform puts
+        on every agent has to be able to say it is not one of them.
+        """
+        return not self.infrastructure
 
     def needs_confirmation(self) -> bool:
         """Irreversible tools always need an explicit confirmation token."""

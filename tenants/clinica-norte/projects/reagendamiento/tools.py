@@ -3,16 +3,21 @@
 The tools themselves are methods of the stage that owns them (`stages/`), so a
 reader opens one file and sees the model's whole surface for that step of the
 call. This module holds the pieces those tools share: turning the caller's
-words into a date, turning the agenda's rows into a line the model can read
-aloud, and writing the SMS a rebooking ends with.
+words into a date and an hour, turning the agenda's rows into a line the model
+can read aloud, and writing the SMS a booking ends with. Both booking stages —
+the one that moves a cita and the one that creates it — read from here, which is
+the whole reason it is a module and not two sets of private helpers.
 
 Pure functions, no context and no I/O, which is why every rule below is a
 one-line unit test.
 """
 
 import datetime
+import re
 
 from . import dates
+
+HHMM = re.compile(r"(\d{1,2})\s*[:.hy ]?\s*(\d{2})?")
 
 UNREADABLE_DATE = "No he entendido para qué día lo quiere. ¿Me dice el día de la semana o la fecha?"
 OFFER_LIMIT = 2
@@ -31,11 +36,29 @@ NOT_CONFIRMED = (
     "El paciente no ha confirmado, así que no se ha reservado nada. Pregúntale qué prefiere "
     "hacer y ofrécele otra hora si la quiere."
 )
+NEW_BOOKING_FAILED = (
+    "El sistema de citas ha rechazado esa hora y no se ha guardado nada: el paciente sigue "
+    "sin ninguna cita apuntada. Díselo con estas dos ideas —no ha podido reservarse y no le "
+    "queda nada a su nombre— y ofrécele otra hora."
+)
 
 
 def resolve_day(text: str, today: datetime.date) -> datetime.date:
     """The day the caller means, or ValueError; the stage turns that into a spoken sentence."""
     return dates.resolve(text, today)
+
+
+def hour_of(when: str) -> str:
+    """`2026-09-03T11:00` becomes `11:00`: the hour is how the caller names a slot."""
+    return when.split("T")[1][:5]
+
+
+def normalise_hour(time: str) -> str:
+    """`11`, `11:00`, `11.00`, `11h` — one shape, so a small variation is not a refusal."""
+    match = HHMM.search(time or "")
+    if not match:
+        return ""
+    return f"{int(match.group(1)):02d}:{match.group(2) or '00'}"
 
 
 def offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
@@ -60,6 +83,17 @@ def confirmation_question(slot: dict[str, str]) -> str:
     to and what the platform books are the same thing by construction.
     """
     return f"{dates.spoken_moment(slot['when'])} con {slot['doctor']}, ¿lo confirmo?"
+
+
+def new_confirmation_question(slot: dict[str, str]) -> str:
+    """The sentence a caller with no cita has to say yes to before one is written for them.
+
+    Same rule as `confirmation_question` and a different verb: nothing is being
+    moved, so «¿lo confirmo?» would be asking about a change that does not
+    exist. «¿se la reservo?» names what the platform is about to do, and the day,
+    the hour and the professional come off the agenda's own row.
+    """
+    return f"{dates.spoken_moment(slot['when'])} con {slot['doctor']}, ¿se la reservo?"
 
 
 def _offer(day: datetime.date, slots: list[dict[str, str]]) -> str:

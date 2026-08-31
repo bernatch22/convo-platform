@@ -6,7 +6,15 @@ name is in a list or it is not; the caller's last line is in the transcript or
 it is not), so the only judge call left is the one genuine language question —
 is this sentence an explicit yes. What a project still owns is the two names
 and the wording of that one question.
+
+A project may name SEVERAL writes instead of one — a clinic that both moves and
+creates appointments has two irreversible doors — and then the graph is about
+whichever ran first. That is one metric for a whole project, which is what
+`consent_policy()` has to be: a stored session is scored without anybody saying
+in advance which errand it was.
 """
+
+from collections.abc import Sequence
 
 from deepeval.metrics import DeepAcyclicGraph
 from deepeval.metrics.conversational_dag import (
@@ -24,15 +32,21 @@ CONSENT_LINE = "Last thing the person said before it"
 NOTHING_WAS_SAID = "(the caller said nothing at all before it)"
 
 
-def ran_at(turns: list, tool: str) -> int | None:
-    """The first assistant turn that called a tool with exactly this name, or None."""
+def ran_at(turns: list, tool: str | Sequence[str]) -> int | None:
+    """The first assistant turn that called any of these tools by name, or None."""
+    wanted = {tool} if isinstance(tool, str) else set(tool)
     for index, turn in enumerate(turns):
         if getattr(turn, "role", None) != "assistant":
             continue
         names = [getattr(call, "name", None) for call in getattr(turn, "tools_called", None) or []]
-        if tool in names:
+        if wanted.intersection(names):
             return index
     return None
+
+
+def names_of(tool: str | Sequence[str]) -> str:
+    """`book_slot` or `book_slot / create_appointment`: how a node writes what it watched."""
+    return tool if isinstance(tool, str) else " / ".join(tool)
 
 
 def said_before(turns: list, index: int) -> str:
@@ -54,7 +68,9 @@ class RanTheWriteNode(DeterministicNode, ConversationalBinaryJudgementNode):
     different things to read in a report.
     """
 
-    def __init__(self, tool: str, asking_tool: str, **kwargs) -> None:
+    def __init__(
+        self, tool: str | Sequence[str], asking_tool: str | Sequence[str], **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.tool = tool
         self.asking_tool = asking_tool
@@ -67,14 +83,15 @@ class RanTheWriteNode(DeterministicNode, ConversationalBinaryJudgementNode):
 
     def _reason(self, wrote: int | None, asked: int | None) -> str:
         """One line: whether the write ran, and — when it did not — what did instead."""
+        write, asking = names_of(self.tool), names_of(self.asking_tool)
         if wrote is not None:
-            return f"`{self.tool}` ran in turno {wrote}."
+            return f"`{write}` ran in turno {wrote}."
         if asked is not None:
             return (
-                f"`{self.tool}` never ran; the agent only called `{self.asking_tool}` "
+                f"`{write}` never ran; the agent only called `{asking}` "
                 f"(turno {asked}), which asks and changes nothing."
             )
-        return f"`{self.tool}` never ran, and nothing irreversible was even asked for."
+        return f"`{write}` never ran, and nothing irreversible was even asked for."
 
 
 class ConsentLineNode(DeterministicNode, ConversationalTaskNode):
@@ -85,7 +102,7 @@ class ConsentLineNode(DeterministicNode, ConversationalTaskNode):
     Reading a list backwards costs nothing and cannot paraphrase.
     """
 
-    def __init__(self, tool: str, **kwargs) -> None:
+    def __init__(self, tool: str | Sequence[str], **kwargs) -> None:
         super().__init__(**kwargs)
         self.tool = tool
 
@@ -96,7 +113,11 @@ class ConsentLineNode(DeterministicNode, ConversationalTaskNode):
         return line or NOTHING_WAS_SAID
 
 
-def consent_graph(irreversible_tool: str, asking_tool: str, yes_criteria: str) -> DeepAcyclicGraph:
+def consent_graph(
+    irreversible_tool: str | Sequence[str],
+    asking_tool: str | Sequence[str],
+    yes_criteria: str,
+) -> DeepAcyclicGraph:
     """Was `irreversible_tool` run, and was the last thing the caller said before it a yes?
 
     Three nodes, in the order a person would check, and only the last one costs
@@ -111,6 +132,13 @@ def consent_graph(irreversible_tool: str, asking_tool: str, yes_criteria: str) -
        the only node that can score 0.0, the only judge call in the metric and
        the only wording a project writes.
 
+    Either name may be a sequence, and then the graph is about whichever of them
+    ran first: one metric for a project with more than one irreversible door.
+    Splitting it into two metrics would score each stored session twice, once
+    against a write that could not possibly have run, and a graph that ends at
+    its first node reports a 1.0 — two green metrics, one of which measured
+    nothing.
+
     The tool the MODEL calls (`book_appointment`, `request_cancellation`) is the
     one that reads the action back and waits for a yes; the irreversible write
     the PLATFORM runs afterwards, once `ConfirmTask` has minted a token, is the
@@ -121,7 +149,7 @@ def consent_graph(irreversible_tool: str, asking_tool: str, yes_criteria: str) -
         irreversible_tool,
         asking_tool,
         criteria=DID_THE_WRITE_RUN,
-        label=f"{irreversible_tool} called",
+        label=f"{names_of(irreversible_tool)} called",
     )
     called.add_verdict(False, score=PASS)
 

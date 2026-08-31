@@ -8,16 +8,12 @@ make up a rebooking then run as one saga — release the old hour, take the new
 one, send the SMS — and any failure puts the old appointment back.
 """
 
-import re
-
 from core.agents import ConfirmTask, RunContext, TenantAgent, function_tool
 from core.context import TenantContext
 from core.tools.saga import Saga, SagaFailed
 
 from .. import dates, prompts, tools
 from .farewell import Farewell
-
-HHMM = re.compile(r"(\d{1,2})\s*[:.hy ]?\s*(\d{2})?")
 
 
 class ChooseSlot(TenantAgent):
@@ -75,7 +71,7 @@ class ChooseSlot(TenantAgent):
         if specialty:
             args["specialty"] = specialty
         slots = await tc.tools.call("find_availability", args)
-        self.offered = {_hour_of(slot["when"]): slot for slot in slots[: tools.OFFER_LIMIT]}
+        self.offered = {tools.hour_of(slot["when"]): slot for slot in slots[: tools.OFFER_LIMIT]}
         return tools.offer(day, slots)
 
     @function_tool
@@ -97,7 +93,7 @@ class ChooseSlot(TenantAgent):
         confirmado. Cuenta eso y solo eso.
         """
         tc = ctx.userdata
-        slot = self.offered.get(_normalise_hour(time))
+        slot = self.offered.get(tools.normalise_hour(time))
         if slot is None:
             return tools.NO_SUCH_HOUR
         args = _booking_args(tc, slot)
@@ -144,16 +140,3 @@ def _booking_args(tc: TenantContext, slot: dict[str, str]) -> dict[str, str]:
         "phone": patient.get("phone", ""),
         "doctor": slot["doctor"],
     }
-
-
-def _hour_of(when: str) -> str:
-    """`2026-09-03T11:00` becomes `11:00`: the hour is how the caller names a slot."""
-    return when.split("T")[1][:5]
-
-
-def _normalise_hour(time: str) -> str:
-    """`11`, `11:00`, `11.00`, `11h` — one shape, so a small variation is not a refusal."""
-    match = HHMM.search(time or "")
-    if not match:
-        return ""
-    return f"{int(match.group(1)):02d}:{match.group(2) or '00'}"

@@ -39,7 +39,9 @@ from datetime import date, datetime, time
 
 from livekit.agents.llm import ChatItem, FunctionCall, FunctionCallOutput
 
-CLOCK_TOOL = "fecha_y_hora_actual"  # TenantAgent's clock; the reading below quotes it
+from core.tools.catalog import CLOCK
+
+CLOCK_TOOL = CLOCK.name  # TenantAgent's clock; the reading below quotes it
 CLOCK_CALL_ID = "lk_session_date"  # no dots: Anthropic's tool_use.id is ^[a-zA-Z0-9_-]+$
 
 WEEKDAYS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")

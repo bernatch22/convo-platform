@@ -1,4 +1,14 @@
-"""Identify: open the call, find the patient's appointment, hand the call to ChooseSlot."""
+"""Identify: open the call, find out who is on the line, and hand it to the right stage.
+
+Two exits, and which one a call takes is a tool call in the run rather than a
+flag. `identify_patient` finds an existing cita and hands over to ChooseSlot;
+`start_new_booking` hands over to NewBooking for a caller who has none. The
+second is deliberately NOT what a failed lookup does on its own: a misheard
+surname is the commonest error on a phone line, and routing the first miss
+straight into a new booking is how a patient ends up with two citas. The miss
+asks for the name again; the caller saying they want a new one is what moves the
+call.
+"""
 
 from core.agents import RunContext, TenantAgent, function_tool
 from core.context import TenantContext
@@ -8,21 +18,29 @@ from .. import dates, prompts
 NOT_FOUND = (
     "No consta ninguna cita con esos datos. Pídele que te repita el nombre o el teléfono "
     "por si se ha oído mal, y si sigue sin aparecer, explícale que no hay ninguna cita a "
-    "su nombre y ofrécele pedir una nueva."
+    "su nombre y ofrécele pedir una nueva. Si acepta, llama a start_new_booking con su "
+    "nombre y su teléfono: es esa herramienta la que abre la parte de pedir la cita. No le "
+    "preguntes tú por especialidades ni por días — eso viene después y no es de esta parte "
+    "de la llamada."
 )
 
 
 class Identify(TenantAgent):
-    """Greets, asks for the name and the phone, and looks the existing appointment up."""
+    """Greets, asks for the name and the phone, and routes to a change or to a new cita."""
 
     def __init__(self, tc: TenantContext) -> None:
         super().__init__(tc, instructions=prompts.identify_prompt(tc))
 
     def summary(self) -> str:
-        """What ChooseSlot needs from this stage: who is calling and what they already have."""
+        """What the next stage needs from this one: who is calling and what they already have."""
         patient = self.tc.customer
         if not patient:
             return "Todavía no se ha identificado al paciente."
+        if not patient.get("appointment_id"):
+            return (
+                f"Paciente identificado: {patient['patient']}, teléfono {patient['phone']}. "
+                "No consta ninguna cita a su nombre: quiere pedir una nueva."
+            )
         return (
             f"Paciente identificado: {patient['patient']}, teléfono {patient['phone']}. "
             f"Su cita actual es el {dates.spanish_moment(patient['when'])} con "
@@ -62,3 +80,33 @@ class Identify(TenantAgent):
         from .choose_slot import ChooseSlot
 
         return self.hand_off(ChooseSlot(tc))
+
+    @function_tool
+    async def start_new_booking(
+        self,
+        ctx: RunContext[TenantContext],
+        name: str,
+        phone: str,
+    ) -> str | tuple:
+        """Da paso a pedir una cita nueva para un paciente que no tiene ninguna.
+
+        Llámala cuando el paciente quiera una cita nueva y no una cambiada: porque lo ha
+        dicho él, o porque has buscado su cita y no consta ninguna y te ha dicho que sí a
+        pedirla. Antes de llamarla necesitas el nombre completo y el teléfono, los dos: la
+        cita se va a apuntar a ese nombre y el SMS de confirmación va a ese número, así que
+        aquí el teléfono no es opcional. No la llames para cambiar una cita que ya existe;
+        para eso está la de buscar al paciente.
+
+        Args:
+            name: el nombre completo del paciente tal y como lo ha dicho. No lo corrijas ni
+                lo completes tú.
+            phone: el teléfono de contacto, solo los dígitos ("600123456").
+
+        A partir de aquí la conversación sigue sola con la parte de pedir la cita: tú no
+        tienes que despedirte ni anunciar el traspaso.
+        """
+        tc = ctx.userdata
+        tc.customer = {"patient": name, "phone": phone}
+        from .new_booking import NewBooking
+
+        return self.hand_off(NewBooking(tc))

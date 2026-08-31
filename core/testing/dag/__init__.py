@@ -31,6 +31,7 @@ from core.testing.dag.consent import (
     ConsentLineNode,
     RanTheWriteNode,
     consent_graph,
+    names_of,
     ran_at,
     said_before,
 )
@@ -70,6 +71,7 @@ __all__ = [
     "StatesAnyFactNode",
     "consent_graph",
     "grounded_facts_graph",
+    "names_of",
     "ran_at",
     "said_before",
 ]
