@@ -25,7 +25,7 @@ and `missing_tool_outputs` names the calls it applies to so a caller can say so.
 
 The field that would close it — a `pii_scope`-filtered `summary` on
 `tool.result` — is proposed and deliberately not built here: it changes
-`ToolSpec` and the executor. `docs/evals.md` §3.6 and §8 carry the whole story.
+`ToolSpec` and the executor. `docs/evals.md` §3.6 and §9 carry the whole story.
 
 Open source note: nothing below knows about clinics or about LiveKit. It reads
 a `Store` and returns DeepEval objects, so any project whose log speaks these

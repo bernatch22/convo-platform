@@ -146,17 +146,24 @@ uv run pytest -m unit                     # includes LLM-judged tests when the k
 uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-tenant leakage pair
 ```
 
-[`docs/evals.md`](docs/evals.md) explains every metric and how to add one.
+A run also has a screen: the console's Evals page lists every run with its
+scores, diffs it against the previous run of the same suite, and can launch one
+on the box (one at a time, killed at fifteen minutes, log tail on screen).
+
+[`docs/evals.md`](docs/evals.md) explains every metric, how to add one, and how
+a project declares the suites the console can run (§8).
 
 ## The web UI
 
 `ui/` is the operator console: the tenant/project switcher, Talk (the three
 channels — WebRTC voice, web chat, and the phone line on **+1 417 674 3169**),
-Sessions, Pipeline, and the shells for Evals and Supervisor. Vite + React +
-TypeScript + react-router; no state library, no CSS framework.
+Sessions, Pipeline, Evals (every stored run with its per-metric diff, and the
+button that launches another on the box) and the shell for Supervisor. Vite +
+React + TypeScript + react-router; no state library, no CSS framework.
 
 Two ways to run it. In development the vite server serves the app and proxies
-`/tenants`, `/token`, `/sessions` and `/pipeline` to the control plane:
+`/tenants`, `/token`, `/sessions`, `/pipeline` and `/evals` to the control
+plane:
 
 ```bash
 uv run uvicorn api:app --port 8090        # terminal 1: the control plane
