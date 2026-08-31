@@ -18,7 +18,7 @@
  */
 
 import { useState, type FormEvent } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 
 import { LiveCalls } from "../components/LiveCalls";
 import { Timeline } from "../components/Timeline";
@@ -28,9 +28,6 @@ import { useRoom, type Live, type Mode } from "../lib/useRoom";
 import { useTimeline } from "../lib/useTimeline";
 
 import { useShellData } from "./Shell";
-
-/** The public number of the Twilio Elastic SIP trunk pointed at this deploy. */
-const PHONE_NUMBER = "+1 417 674 3169";
 
 export function Talk() {
   const { tenant = "", project = "" } = useParams();
@@ -53,8 +50,15 @@ export function Talk() {
         <h1 className="page__title">{known?.name ?? project}</h1>
         <p className="page__lede">
           One runtime, three ways in — the microphone in this tab, a text session with no audio at
-          all, or the trunk on <span className="accent mono">{PHONE_NUMBER}</span>. The transcript
-          and the log below do not know which one you used.
+          all, or the SIP trunk, if this project has a number of its own (
+          <Link
+            className="accent"
+            to={`/t/${tenant}/pipeline?project=${encodeURIComponent(project)}`}
+          >
+            Pipeline
+          </Link>{" "}
+          names it, or says there is none). The transcript and the log below do not know which one
+          you used.
         </p>
       </header>
 
