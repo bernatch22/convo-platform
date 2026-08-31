@@ -24,7 +24,7 @@ from livekit.agents.voice.agent import ModelSettings
 
 from core.barge_in import backchannels_of, holds_the_floor, is_backchannel
 from core.context import TenantContext
-from core.dates_note import date_note
+from core.dates_note import clock_reading, date_note
 from core.observability.voice import TimedWords
 from core.state.log import record
 from core.stt_gate import TranscriptGate, gate_options_for
@@ -42,7 +42,7 @@ class TenantAgent(Agent):
         self.tc = tc
 
     async def on_enter(self) -> None:
-        """Inherit the previous stage's summary, announce the stage, open the turn.
+        """Read the clock, inherit the previous stage's summary, announce the stage, open the turn.
 
         The very first stage of a session speaks the project's `greeting`
         verbatim when one is set: a caller hears the business immediately
@@ -51,9 +51,10 @@ class TenantAgent(Agent):
         sentence a supervisor edits from the console — a paraphrasing model
         would make it uneditable. `say` puts the line in the chat history so
         the model knows what was said. Later stages, and a project with no
-        greeting, still open with `generate_reply`.
+        greeting, still open with `generate_reply` — and that is the shape the
+        date reaches the model in front of, so `_read_the_clock` runs first.
         """
-        await self._note_the_date()
+        await self._read_the_clock()
         await self._inherit_summary()
         log.info("stage.enter %s agent=%s", self.tc.label(), self.stage_name())
         record(self.tc, "stage.enter", {"stage": self.stage_name()})
@@ -192,18 +193,22 @@ class TenantAgent(Agent):
         """The stage as it appears in logs and, from ms-4, in the event log."""
         return type(self).__name__
 
-    async def _note_the_date(self) -> None:
-        """Once per session, tell the model what day it is — in the messages, cache-safe.
+    async def _read_the_clock(self) -> None:
+        """Once per session, put the day in front of the model — as evidence, not as a turn.
 
         The system prompt cannot carry the date (the cached prefix must stay
-        byte-identical), and a model with no calendar invents one when asked
+        byte-identical) and a model with no calendar invents one when asked
         "¿hoy qué día es?" — it said "viernes" on a Saturday, on a real call.
+        It cannot be a system message either: the framework rewrites every
+        system item after the first into a USER message, and Haiku then opened
+        the call by answering it. `core.dates_note` carries the measurement and
+        the why; here it is two paired tool items, written before the greeting.
         """
         if self.tc.date_noted:
             return
         self.tc.date_noted = True
         chat_ctx: ChatContext = self.chat_ctx.copy()
-        chat_ctx.add_message(role=SUMMARY_ROLE, content=date_note(self.tc.today))
+        chat_ctx.insert(clock_reading(self.tc.today))
         await self.update_chat_ctx(chat_ctx)
 
     async def _inherit_summary(self) -> None:

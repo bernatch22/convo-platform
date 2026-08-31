@@ -317,6 +317,7 @@ async def eval_room(req: EvalRoomRequest, store: Reader) -> dict[str, str]:
         raise HTTPException(503, str(error)) from error
     return mint_caller(room, tenant=req.tenant, identity=req.identity)
 
+
 @app.post("/supervise")
 def supervise(req: SuperviseRequest) -> dict[str, str]:
     """Mint a role-scoped, short-lived ticket for a supervisor entering one live call.

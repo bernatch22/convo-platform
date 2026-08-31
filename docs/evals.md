@@ -834,17 +834,29 @@ position so a run filed late by CI never diffs against a future.
   day of the patient's own cita is looked up like any other, with the why: of
   that day the agent knows exactly one hour, and it is not the free ones. The
   golden and `test_reception_tools.py -k thursday` stay as the regression.
-- **The greeting golden fails on Haiku and passes on GPT-5.4-mini, in BOTH
-  projects**, and it is the agent, not the metric: Haiku reads the session date
-  note (`core/dates_note.py`) as an instruction addressed to it and answers the
-  operator instead of the caller — «Perfecto, tengo anotado que hoy es martes 1
-  de septiembre de 2026. Estoy listo para atender las llamadas de Tienda Sur.»,
-  and «Entendido. Hoy es martes 1 de septiembre de 2026. Estoy listo…» for the
-  clinic. It is intermittent, so it surfaces under a different metric each run
+- ~~The greeting golden fails on Haiku and passes on GPT-5.4-mini, in BOTH
+  projects.~~ **Closed in `tk-097125`**, and the cause was the delivery of the
+  session date, not the metric and not the prompt. The date was a `system`
+  message written into the chat context after the prefix; livekit-agents 1.7.1
+  keeps only the FIRST system item as one and rewrites every later one as a
+  **user** message wrapped in `<instructions>`
+  (`llm/_provider_format/utils.convert_mid_conversation_instructions`), so the
+  date reached Anthropic as the caller's opening line and Haiku answered it —
+  «Entendido. Hoy es martes 1 de septiembre de 2026. Estoy listo para atender
+  las llamadas de la Clínica Norte», 5 of 6 measured runs across both projects,
+  where gpt-5.4-mini never did. It surfaced under a different metric each run
   (Reception line, Order desk line, or Keeps the register on a stray "te"),
-  which is exactly why it went unnoticed until two models were run side by side.
-  The fix belongs in how the date note is delivered, not in the goldens: found
-  by the matrix (§10), and every golden stays exactly as it is.
+  which is why it went unnoticed until two models ran side by side. The date is
+  now a paired `fecha_y_hora_actual` call and result inserted before the first
+  turn (`core/dates_note.clock_reading`): a tool result is evidence, not
+  speech, so there is nothing to answer, and it stays out of the cached system
+  prefix. Measured against dropping the note and letting the model call the
+  clock itself — that fixes the opening line too, but costs a tool round-trip
+  on every date question and, 2 times in 3, an audible «espere un momento, le
+  digo la fecha exacta». Regression: `tests/test_date_note.py` renders the real
+  context through the real Anthropic formatter and asserts no message says the
+  date and no system block carries it — keyless. Every golden stayed exactly as
+  it was; one was ADDED («hola, ¿qué día es hoy?»).
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6
