@@ -702,6 +702,16 @@ tr.is-watched td {
   letter-spacing: 0.06em;
 }
 
+/* The same edge as badge--live, for the fact a supervisor most needs to see go wrong:
+ * "the caller CAN see you". A monitor that is not hidden is not a monitor. */
+.badge--warn {
+  padding: 1px var(--s2);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  color: var(--warn);
+  letter-spacing: 0.06em;
+}
+
 /* ── the transcript ──────────────────────────────────────────────────────── */
 
 .stream {

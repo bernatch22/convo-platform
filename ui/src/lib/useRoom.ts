@@ -1,12 +1,18 @@
 /* One live session, raw livekit-client: the door, the microphone, the words, the state.
  *
- * Three doors, one hook. `voice` and `chat` mint a ticket at POST /token and
- * open a fresh room the agent is dispatched into; `observe` mints a hidden,
- * publish-nothing ticket at POST /observe and joins a room somebody is
- * already in — a phone call, usually, which never passed through /token at
- * all. After connect the three are the same object: the same
- * `lk.transcription` streams, the same `lk.agent.state` attribute, the same
- * transcript on screen.
+ * Four doors, one hook. `voice` and `chat` mint a ticket at POST /token and
+ * open a fresh room the agent is dispatched into; `observe` and `supervise`
+ * join a room somebody is already in — a phone call, usually, which never
+ * passed through /token at all. After connect all four are the same object:
+ * the same `lk.transcription` streams, the same `lk.agent.state` attribute,
+ * the same transcript on screen.
+ *
+ * `observe` and `supervise` differ only in who is knocking. /observe mints an
+ * anonymous `observer:<hex>` ticket — a developer peeking at a room from the
+ * tenant screen. /supervise mints a named, short-lived, role-scoped
+ * `sup:<uid>` one, and the supervisor desk is expected to follow it with
+ * `superviseEntered` so the arrival reaches the caller's log. Both are hidden
+ * and publish nothing; only one of them is on the record.
  *
  * Deliberately not here: no components package, no audio element in JSX, no
  * global store. The Room is a ref because it is not React state — what React
@@ -23,7 +29,7 @@ import {
   type TextStreamReader,
 } from "livekit-client";
 
-import { mintToken, observe, type Channel } from "./api";
+import { mintToken, observe, supervise, type Channel } from "./api";
 import {
   AGENT_STATE,
   SEGMENT_ID,
@@ -38,8 +44,8 @@ import {
 const TRANSCRIPTION_TOPIC = "lk.transcription";
 const CHAT_TOPIC = "lk.chat";
 
-/** Which door this session came in by. `observe` is the only one that publishes nothing. */
-export type Mode = Channel | "observe";
+/** Which door this session came in by. `observe` and `supervise` publish nothing. */
+export type Mode = Channel | "observe" | "supervise";
 
 /** Where the session is. `ended` is a call that finished; `failed` is one that never opened. */
 export type Phase = "idle" | "connecting" | "live" | "ended" | "failed";
@@ -50,6 +56,7 @@ export interface Live {
   phase: Phase;
   error: string | null;
   room: string | null;
+  identity: string | null;
   lines: Line[];
   state: AgentState | null;
   audible: boolean;
@@ -70,6 +77,7 @@ export function useRoom(tenant: string, project: string): Live {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [state, setState] = useState<AgentState | null>(null);
   const [audible, setAudible] = useState(true);
@@ -82,6 +90,7 @@ export function useRoom(tenant: string, project: string): Live {
     if (open) await open.disconnect();
     setPhase((was) => (was === "idle" || was === "failed" ? was : "ended"));
     setState(null);
+    setIdentity(null);
   }, []);
 
   const open = useCallback(
@@ -92,21 +101,23 @@ export function useRoom(tenant: string, project: string): Live {
       setError(null);
       setLines([]);
       setName(target ?? null);
-      const listen = next !== "observe";
+      setIdentity(null);
+      // A watched call starts SILENT: a supervisor reads it by default and only
+      // then chooses to hear it. `startAudio` is still called — it needs the
+      // click that opened the door — so the toggle has something to unmute.
+      const listen = next === "voice" || next === "chat";
       audibleRef.current = listen;
       setAudible(listen);
       try {
-        const ticket =
-          next === "observe"
-            ? await observe(target ?? "")
-            : await mintToken({ tenant, project, channel: next });
+        const ticket = await ticketFor(next, target ?? "", tenant, project);
         const joined = new Room({ adaptiveStream: false, dynacast: false });
         wire(joined, { setLines, setState, speakers, audibleRef });
         room.current = joined;
         await joined.connect(ticket.url, ticket.token);
         if (next === "voice") await joined.localParticipant.setMicrophoneEnabled(true);
-        if (listen) await joined.startAudio();
+        await joined.startAudio();
         setName(ticket.room);
+        setIdentity(joined.localParticipant.identity);
         setPhase("live");
       } catch (cause) {
         room.current = null;
@@ -140,7 +151,32 @@ export function useRoom(tenant: string, project: string): Live {
 
   useEffect(() => () => void close(), [close]);
 
-  return { mode, phase, error, room: name, lines, state, audible, open, close, say, listen };
+  return {
+    mode,
+    phase,
+    error,
+    room: name,
+    identity,
+    lines,
+    state,
+    audible,
+    open,
+    close,
+    say,
+    listen,
+  };
+}
+
+/** The ticket each door is opened with — the only line where the four differ. */
+async function ticketFor(
+  mode: Mode,
+  target: string,
+  tenant: string,
+  project: string,
+): Promise<{ url: string; token: string; room: string }> {
+  if (mode === "supervise") return supervise(target, "listen");
+  if (mode === "observe") return observe(target);
+  return mintToken({ tenant, project, channel: mode });
 }
 
 interface Sinks {

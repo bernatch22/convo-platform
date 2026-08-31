@@ -31,6 +31,7 @@ from core.context import Project, Tenant
 from core.contracts import Channel, SessionMeta
 from core.registry import load_registry
 from core.rooms import RoomsUnreachable
+from core.security import desk
 from core.state import overrides
 from core.state.store import PipelineOverride, SQLiteStore, Store
 from core.webui import mount_ui
@@ -74,6 +75,20 @@ class SuperviseRequest(BaseModel):
     room: str
     capability: SupervisorCapability = "listen"
     user_id: str = ""
+
+
+class EnteredRequest(BaseModel):
+    """A supervisor saying they are through the door; the SFU is asked whether it is true.
+
+    Nothing here is trusted beyond "look at this room for this identity". The
+    capability is read off the participant's signed attributes at the SFU, not
+    taken from this body — which is why there is no field for it.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    room: str
+    identity: str
 
 
 class PipelineUpdate(BaseModel):
@@ -252,28 +267,51 @@ def supervise(req: SuperviseRequest) -> dict[str, str]:
     return mint_supervisor(req.room, req.capability, user_id=req.user_id)
 
 
+@app.post("/supervise/entered")
+async def supervise_entered(req: EnteredRequest) -> dict[str, Any]:
+    """Record that a supervisor really did enter this call, and say what the SFU sees.
+
+    → `{"identity": "sup:<uid>", "capability": str, "hidden": bool, "announced": bool}`
+
+    Two things happen and both matter. The SFU is asked who is in the room, so
+    the answer is a *presence* and not a ticket somebody was handed — `hidden`
+    is the server's own word for "the caller cannot see this participant", which
+    is what the desk shows the supervisor. And the arrival is announced to the
+    room's agent alone, on the `supervisor` data topic, which is what puts
+    `supervisor.join` in the caller's log with the next `seq`: the job process
+    owns that log, so the fact has to reach it rather than be written around it.
+
+    `announced` is False when no agent is in the room — nothing is being logged
+    there either. → 404 when the identity is not in the room, 503 when the SFU
+    cannot be asked.
+    """
+    try:
+        return await desk.entered(req.room, req.identity)
+    except desk.NotInRoom as error:
+        raise HTTPException(404, str(error)) from error
+    except RoomsUnreachable as error:
+        raise HTTPException(503, str(error)) from error
+
+
 @app.get("/pipeline/{tenant}/{project}")
 async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, Any]:
     """The three providers as data, plus what the console changed and what calls measured.
 
-        → `{"tenant", "project", "name", "language", "greeting",
-            "stt": {"provider", "requested_provider", "providers", "model", "language_hints",
-                    "sample_rate", "endpointing": "<the CHOSEN provider's own knobs>", "keyterms"},
-            "llm": {"provider", "model", "requested_model", "default_model", "allowed_models",
-                    "caching", "max_tokens", "cache_minimum_tokens", "cache_note"},
-            "llm": {"provider", "model", "caching", "max_tokens",
-                    "cache_minimum_tokens", "cache_note"},
-    >>>>>>> ms/ms-10-box-core-on-gcp-self-hoste
-            "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
-                    "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
-            "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
-            "latency": {"sessions": int, "turns": int,
-                        "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",
-                                    "tts_node_ttfb", "e2e_latency"}}}`
+    → `{"tenant", "project", "name", "language", "greeting",
+        "stt": {"provider", "requested_provider", "providers", "model", "language_hints",
+                "sample_rate", "endpointing": "<the CHOSEN provider's own knobs>", "keyterms"},
+        "llm": {"provider", "model", "requested_model", "default_model", "allowed_models",
+                "caching", "max_tokens", "cache_minimum_tokens", "cache_note"},
+        "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
+                "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
+        "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
+        "latency": {"sessions": int, "turns": int,
+                    "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",
+                                "tts_node_ttfb", "e2e_latency"}}}`
 
-        Every value is what the NEXT session will use: the overrides are already
-        applied to `greeting`, `tts.model` and `tts.voice`. A median is null when
-        no stored voice session measured it.
+    Every value is what the NEXT session will use: the overrides are already
+    applied to `greeting`, `tts.model` and `tts.voice`. A median is null when
+    no stored voice session measured it.
     """
     known, effective = _effective(tenant, project, store)
     return pipeline.snapshot(known, effective, store)

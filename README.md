@@ -152,8 +152,20 @@ uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-te
 
 `ui/` is the operator console: the tenant/project switcher, Talk (the three
 channels — WebRTC voice, web chat, and the phone line on **+1 417 674 3169**),
-Sessions, Pipeline, and the shells for Evals and Supervisor. Vite + React +
+Sessions, Pipeline, the Supervisor desk, and the shell for Evals. Vite + React +
 TypeScript + react-router; no state library, no CSS framework.
+
+**The Supervisor desk** (`/supervisor`) lists every call live on the fleet,
+phone calls included. Clicking one joins that room with a short-lived,
+subscribe-only ticket from `POST /supervise` and shows the transcript live,
+audio muted until you press *listen in*. The supervisor is `hidden` at the SFU,
+so the caller is never told anybody joined — and the badge on the screen is the
+server's own answer, read back off `list_participants`, not our claim. The
+arrival is written into the caller's own log as `supervisor.join`:
+
+```bash
+uv run python -m convo sessions show <id> | grep supervisor
+```
 
 Two ways to run it. In development the vite server serves the app and proxies
 `/tenants`, `/token`, `/sessions` and `/pipeline` to the control plane:

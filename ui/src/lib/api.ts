@@ -65,6 +65,20 @@ export interface SupervisorTicket {
   token: string;
 }
 
+/** What the SFU says about a supervisor who is already in the room — not what the ticket said.
+ *
+ * `hidden` is the server's own word for "the caller cannot see this
+ * participant": it is the proof the desk puts on screen, and it comes from
+ * `list_participants`, never from this client. `announced` is whether the
+ * room's agent was told, which is what puts `supervisor.join` in the log.
+ */
+export interface SupervisorPresence {
+  identity: string;
+  capability: SupervisorCapability;
+  hidden: boolean;
+  announced: boolean;
+}
+
 /* ── /sessions ────────────────────────────────────────────────────────────── */
 
 /** One line of the call log. `outcome` and `cost_eur` are null while the call runs.
@@ -278,6 +292,14 @@ export async function supervise(
     "/supervise",
     json("POST", { room, capability, user_id: userId }),
   );
+}
+
+/** Tell the control plane the supervisor is through the door, and get the SFU's own view back. */
+export async function superviseEntered(
+  room: string,
+  identity: string,
+): Promise<SupervisorPresence> {
+  return request<SupervisorPresence>("/supervise/entered", json("POST", { room, identity }));
 }
 
 /** The call log, newest first, optionally narrowed to one tenant or project. */
