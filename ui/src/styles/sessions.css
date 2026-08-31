@@ -1,0 +1,452 @@
+/* The two session screens. Layout and density only — every colour comes from tokens.css.
+ *
+ * A log is the one place this instrument is allowed to be dense: 12px rows,
+ * hairlines, tabular numbers, and a single coloured rule down the left of each
+ * row saying which family the fact belongs to. The accent is spent exactly
+ * twice — on a live call, and on the consent that authorised something
+ * irreversible — because those are the two things worth interrupting a scan for.
+ */
+
+/* A log needs the width; the prose pages keep theirs. */
+.page--wide {
+  max-width: 1320px;
+}
+
+.link {
+  color: var(--text-dim);
+  border-bottom: 1px solid transparent;
+}
+
+.link:hover {
+  color: var(--text);
+  border-bottom-color: var(--line-strong);
+}
+
+/* ── the call log's own columns ──────────────────────────────────────────── */
+
+.medium {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.medium--phone {
+  color: var(--accent);
+}
+
+.medium__number {
+  margin-left: var(--s2);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+}
+
+.outcome {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+
+.outcome--completed {
+  color: var(--text);
+}
+
+.outcome--dropped,
+.outcome--failed {
+  color: var(--warn);
+}
+
+.outcome--live {
+  color: var(--accent);
+}
+
+/* ── the envelope: one row of labelled facts ─────────────────────────────── */
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Each fact is as wide as its value needs and no wider; a short last row ends
+ * where the facts end rather than painting a band across the panel. */
+.fact {
+  flex: 1 0 auto;
+  min-width: 132px;
+  padding: var(--s3) var(--s4);
+  border-right: 1px solid var(--line);
+}
+
+.fact:last-child {
+  border-right: none;
+}
+
+.fact__key {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.fact__val {
+  margin-top: var(--s1);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.fact--accent .fact__val {
+  color: var(--accent);
+}
+
+/* ── the latency strip ───────────────────────────────────────────────────── */
+
+.strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.strip__cell {
+  padding: var(--s4) var(--s5);
+  background: var(--bg);
+}
+
+.strip__leg {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+}
+
+.strip__median {
+  margin-top: var(--s2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.strip__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-top: var(--s2);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.strip__max {
+  color: var(--text-dim);
+}
+
+/* ── consent — the only evidence on the screen ───────────────────────────── */
+
+.consent {
+  display: grid;
+  gap: var(--s3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.consent__item {
+  padding: var(--s4) var(--s5);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+}
+
+.consent__item--granted {
+  border-left-color: var(--accent);
+}
+
+.consent__item--declined {
+  border-left-color: var(--text-faint);
+}
+
+.consent__item--unanswered {
+  border-left-color: var(--warn);
+}
+
+.consent__head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.consent__verb {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.consent__item--granted .consent__verb {
+  color: var(--accent);
+}
+
+.consent__sentence {
+  margin: var(--s2) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+
+.consent__audience {
+  margin-top: var(--s1);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.consent__question {
+  margin: var(--s2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+}
+
+/* The same link, said inline on the row it authorised. */
+.consent__link {
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* ── the log table ───────────────────────────────────────────────────────── */
+
+.table-wrap--tall {
+  max-height: 74vh;
+  overflow-y: auto;
+}
+
+.table-wrap--tall thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg);
+}
+
+.log__row td {
+  padding: var(--s2) var(--s4);
+  font-size: var(--text-sm);
+}
+
+/* One rule per family, down the left of the kind — the log's only colour coding. */
+.log__kind {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  border-left: 2px solid var(--line-strong);
+  padding-left: var(--s3);
+}
+
+.log__row--turn .log__kind {
+  border-left-color: var(--text-dim);
+}
+
+.log__row--tool .log__kind {
+  border-left-color: var(--text-faint);
+}
+
+.log__row--consent .log__kind {
+  border-left-color: var(--accent);
+  color: var(--accent);
+}
+
+.log__row--envelope .log__kind {
+  border-left-color: var(--text);
+}
+
+.log__row--stage .log__kind,
+.log__row--audio .log__kind,
+.log__row--state .log__kind {
+  border-left-color: var(--line);
+}
+
+.log__row--state td,
+.log__row--audio td {
+  color: var(--text-faint);
+}
+
+.log__detail {
+  max-width: 0;
+  width: 100%;
+}
+
+/* ── the pieces a payload is drawn with ──────────────────────────────────── */
+
+.detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s3);
+}
+
+.detail--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s1);
+}
+
+.chip,
+.args__pair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--s1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.chip--accent {
+  color: var(--accent);
+}
+
+.chip__key {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.turn__text {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.turn__text--agent {
+  color: var(--text);
+}
+
+.turn__text--caller {
+  color: var(--text-dim);
+}
+
+.turn__text--caller::before {
+  content: "› ";
+  color: var(--text-faint);
+}
+
+.karaoke {
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+.tool {
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+/* Three side effects, three weights of warning — irreversible is the one that needs consent. */
+.effect {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+.effect--write {
+  color: var(--warn);
+}
+
+.effect--irreversible {
+  color: var(--danger);
+}
+
+.args {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s1) var(--s4);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+}
+
+.args__pair {
+  align-items: baseline;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.args__pair .chip__key {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* ── the folding sip panel ───────────────────────────────────────────────── */
+
+.fold {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.fold__summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s4);
+  padding: var(--s3) var(--s5);
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+
+.fold__summary::-webkit-details-marker {
+  display: none;
+}
+
+.fold__summary::before {
+  content: "▸";
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.fold[open] .fold__summary::before {
+  content: "▾";
+}
+
+.fold__title {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.fold__body {
+  padding: 0 var(--s5) var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+.fold__body .kv__val {
+  overflow-wrap: anywhere;
+  text-align: left;
+  padding-left: var(--s5);
+}
+
+/* ── the call log's columns ──────────────────────────────────────────────── */
+
+.table--calls td.id {
+  white-space: nowrap;
+}
+
+.table--calls th:nth-child(3) {
+  width: 200px;
+}
+
+.table--calls th:last-child,
+.table--calls td:last-child {
+  padding-right: var(--s5);
+}

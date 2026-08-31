@@ -1,10 +1,11 @@
 """MemoryStore: dicts and lists — what tests and the harness use; nothing survives the process."""
 
-from dataclasses import dataclass, field
+import time
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from core.state.events import Event
-from core.state.store.protocol import ProjectVersion, Route, SessionRow
+from core.state.store.protocol import PipelineOverride, ProjectVersion, Route, SessionRow
 
 
 @dataclass
@@ -15,6 +16,7 @@ class MemoryStore:
     log: dict[str, list[Event]] = field(default_factory=dict)
     routing: dict[tuple[str, str], Route] = field(default_factory=dict)
     pins: dict[tuple[str, str], ProjectVersion] = field(default_factory=dict)
+    overrides: dict[tuple[str, str, str], PipelineOverride] = field(default_factory=dict)
 
     def open_session(self, row: SessionRow) -> None:
         self.rows[row.id] = row
@@ -56,3 +58,11 @@ class MemoryStore:
 
     def versions(self) -> list[ProjectVersion]:
         return sorted(self.pins.values(), key=lambda v: (v.tenant, v.project))
+
+    def pipeline_overrides(self, tenant: str, project: str) -> list[PipelineOverride]:
+        rows = [o for o in self.overrides.values() if (o.tenant, o.project) == (tenant, project)]
+        return sorted(rows, key=lambda o: o.field)
+
+    def set_pipeline_override(self, override: PipelineOverride) -> None:
+        stamped = replace(override, updated_at=override.updated_at or time.time())
+        self.overrides[(override.tenant, override.project, override.field)] = stamped

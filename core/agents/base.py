@@ -41,10 +41,11 @@ class TenantAgent(Agent):
         The very first stage of a session speaks the project's `greeting`
         verbatim when one is set: a caller hears the business immediately
         instead of waiting an LLM ttft for a sentence that never changes
-        (measured on a real phone call: 1.9 s of silence). `say` puts the
-        line in the chat history, so the model knows what was said. Every
-        later stage — and a project with no greeting — still opens with
-        `generate_reply`.
+        (measured on a real phone call: 1.9 s of silence), and it is the one
+        sentence a supervisor edits from the console — a paraphrasing model
+        would make it uneditable. `say` puts the line in the chat history so
+        the model knows what was said. Later stages, and a project with no
+        greeting, still open with `generate_reply`.
         """
         await self._inherit_summary()
         log.info("stage.enter %s agent=%s", self.tc.label(), self.stage_name())

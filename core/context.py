@@ -45,6 +45,10 @@ class Project:
     (`core.tools.messages`) in the project's own register and language.
     `backchannels` overrides the murmurs a barge-in filter ignores
     (`core.barge_in.SPANISH_BACKCHANNELS`) — data, so core knows one language.
+
+    `voice`, `tts_model` and `greeting` are the three fields a supervisor may
+    change from the console without a deploy: `core.state.overrides` replaces
+    them on the way out of the router (`core.state.store.PipelineOverride`).
     """
 
     id: str
@@ -52,7 +56,7 @@ class Project:
     voice: str | None = None
     tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
     language: str = "es"
-    greeting: str | None = None  # spoken verbatim on session start: no LLM turn, no ttft
+    greeting: str = ""  # spoken verbatim on session start (no LLM turn); "" = the model opens
     keyterms: list[str] = field(default_factory=list)
     backchannels: list[str] = field(default_factory=list)  # [] = the Spanish default
     tools: ToolCatalog = field(default_factory=ToolCatalog)

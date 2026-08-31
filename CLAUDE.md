@@ -49,7 +49,9 @@ and, when a decision was made, a short essay in its thread.
   caches at 1024). Every project prefix (system + tools + a stable policy/FAQ
   block) must exceed 4096 tokens; assert `prompt_cached_tokens > 0` on turn 2 in
   tests. Never put timestamps or per-request ids in the system prompt; never
-  reorder tools. `preemptive_generation.max_retries = 1`. Sonnet 5 is the
+  reorder tools. `preemptive_generation` is DISABLED (human's decision 2026-08-31: with semantic
+  end-of-turn at ~0.33s, speculation never hid Haiku's ttft and only spent calls) —
+  generation starts on confirmed end of turn. Sonnet 5 is the
   measured alternative in evals, not a default.
 - Call `sanitize_tool_pairing(chat_ctx)` before every generation (orphan
   `tool_use` bricks the conversation with Anthropic 400s).

@@ -1,11 +1,17 @@
 """build_session: assemble the AgentSession for one TenantContext.
 
-Two shapes of session leave this module. With STT and TTS (keys present) the
-session listens and speaks: Soniox endpointing and the local turn detector
-share the decision of when the caller has finished, a real interruption needs
-two words so a "vale" does not cut the agent off, and every spoken word comes
-back with its time for the log. Without them it is text only, and audio is
-switched off so the console's default audio mode does not crash.
+Two shapes of session leave this module. A voice session listens and speaks:
+Soniox endpointing and the local turn detector share the decision of when the
+caller has finished, a real interruption needs two words so a "vale" does not
+cut the agent off, and every spoken word comes back with its time for the log.
+A text session has none of it, and audio is switched off so the console's
+default audio mode does not crash.
+
+Which one you get is decided by the SESSION's channel first and the keys
+second. A chat session never asks for STT or TTS even when both keys are in
+the environment: `stt_for` opens a Soniox websocket the typed conversation
+would never feed, and a provider nobody speaks to is a connection, a cost and
+a leak of the caller's audio permissions for nothing.
 """
 
 import logging
@@ -25,11 +31,14 @@ log = logging.getLogger("platform.session")
 ENDPOINT_MIN_DELAY_S = 0.3
 ENDPOINT_MAX_DELAY_S = 2.5
 INTERRUPTION_MIN_WORDS = 2
-PREEMPTIVE_MAX_RETRIES = 3  # was 1; see the preemptive_generation comment below
 
 
 def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
     """One session per job: providers chosen by the tenant, the context as userdata.
+
+    The channel gates the audio providers: on `chat` no STT, no TTS and no VAD
+    are built at all, so a typed session opens zero provider connections even
+    with every key present. On `voice` the keys decide, as they always did.
 
     The observers are wired here and nowhere else. They have to be subscribed
     before the session starts — the entry agent's `on_enter` runs inside
@@ -37,8 +46,10 @@ def build_session(tc: TenantContext, vad=None) -> AgentSession[TenantContext]:
     opened the call — and building the session is the one moment every caller
     (worker, console, harness) passes through.
     """
-    stt = stt_for(tc.tenant, tc.project)
-    tts = tts_for(tc.tenant, tc.project)
+    audible = tc.channel == "voice"
+    stt = stt_for(tc.tenant, tc.project) if audible else None
+    tts = tts_for(tc.tenant, tc.project) if audible else None
+    vad = vad if audible else None
     voice = stt is not None and tts is not None and vad is not None
     session = AgentSession[TenantContext](
         llm=llm_for(tc.tenant),
@@ -66,14 +77,12 @@ def voice_turn_handling() -> TurnHandlingOptions:
         interruption=InterruptionOptions(
             min_words=INTERRUPTION_MIN_WORDS, resume_false_interruption=True
         ),
-        preemptive_generation={
-            # Measured on the phone (AJ_AKu49RuK222h): Haiku's 1.6-2.1s ttft sat whole
-            # in the reply gap. Speculate hard: run LLM AND TTS on the interim
-            # transcript, allow retries; a wasted attempt costs a cache-read call,
-            # a saved one removes the largest block of silence we have left.
-            "max_retries": PREEMPTIVE_MAX_RETRIES,
-            "preemptive_tts": True,
-        },
+        # OFF by the human's decision (2026-08-31, call AJ_rt86KogpPxDa): with
+        # Soniox closing a turn in ~0.33s there is no window for speculation to
+        # hide Haiku's ttft — it appeared whole in the gap regardless — so the
+        # extra cache-read calls bought nothing. Generation starts only when the
+        # end of turn is confirmed.
+        preemptive_generation={"enabled": False},
     )
 
 
