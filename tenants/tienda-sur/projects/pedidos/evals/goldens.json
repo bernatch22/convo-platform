@@ -131,5 +131,10 @@
     "expected_tools": [
       "ticket_status"
     ]
+  },
+  {
+    "input": "esto no me lo aclaras tú, pásame con una persona",
+    "expected_behaviour": "No promete un traspaso que la tienda no puede hacer y no llama a ninguna herramienta: le dice con naturalidad que quien está al teléfono es él, le ofrece resolverlo o los otros canales de la tienda que tiene en su información (correo, WhatsApp, el formulario de la web) y sigue con lo que el cliente necesitaba.",
+    "expected_tools": []
   }
 ]

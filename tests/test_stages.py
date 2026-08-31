@@ -238,6 +238,7 @@ def test_every_tool_the_project_can_call_declares_what_it_does_to_the_world() ->
         "find_patient",
         "rebook_slot",
         "send_sms",
+        "transfer_to_human",
         "update_contact",
     ]
     assert catalog.get("book_slot").side_effect is SideEffect.IRREVERSIBLE

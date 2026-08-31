@@ -59,6 +59,7 @@ NO_ANSWER = "no_answer"  # the phone rang out
 BUSY = "busy"  # the phone was on another call
 REJECTED = "rejected"  # somebody said no: the person, or the carrier
 UNREACHABLE = "unreachable"  # the SFU or the trunk could not be asked at all
+NO_LEG = "no_phone_leg"  # there was no phone call to move: a browser or a chat asked
 
 # The SIP response code, turned into a word an operator can act on.
 SIP_OUTCOMES: dict[int, str] = {

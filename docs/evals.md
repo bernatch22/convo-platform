@@ -147,7 +147,8 @@ measured.
 
 - **Kind:** judged, **1 judge call** per case. Score 0-1, `threshold=0.7`.
 - **Owns:** tone, register ("usted"), length (one to three short sentences),
-  remit (appointments and clinic information, no clinical advice), and handing
+  remit (appointments, clinic information and handing the call to a colleague,
+  no clinical advice), and handing
   the turn back with a question or a next step.
 - **Explicitly does NOT own facts.** The criterion says so in as many words:
   another metric checks every hour, price and name against its source; the
@@ -877,7 +878,10 @@ criterion:
    call, and the judge scored a textbook refusal («por protección de datos solo
    puedo decirle las últimas cifras») 0.3 for being out of scope — while
    writing, in its own reason, that "the response itself is well-executed". The
-   list has to grow in the same commit as the verb.
+   list has to grow in the same commit as the verb. It happened again in the same
+   milestone, and it will keep happening: `transfer_to_human` made «páseme con
+   una persona» a legitimate thing to ask a reception, and both the clinic's and
+   the shop's criteria had to learn the verb before the ring was run.
 8. **A judge shown `tools_called` grades the tool calls.** Same shape as cause
    5, one layer over. `tools_called` is in this metric's `evaluation_params` on
    purpose — several goldens describe a turn that must NOT consult the agenda,
@@ -900,7 +904,7 @@ when a question is genuinely its to answer. That is §3.5.
 
 ## 5. Where the conversations come from
 
-**Goldens** (`goldens.json`, 30 for the clinic today). One entry per behaviour,
+**Goldens** (`goldens.json`, 32 for the clinic today). One entry per behaviour,
 in the project's own language. `turn: greeting` judges the opening line;
 `before: [...]` replays turns that are not judged (the identification, so the
 judged turn belongs to whichever booking stage the call reached);
@@ -1524,6 +1528,55 @@ The consent graph is unchanged and that is the design: `open_ticket` is a
 Grounding grew one extractor: an incident number (`TS-T0003`) is checked
 against the CALL and never against the sheet, because it does not exist until
 the helpdesk mints it.
+
+### What ms-20 added (2026-08-31, `tk-8ee108`) — transfer to a human, 3 new goldens
+
+`transfer_to_human` made «páseme con una persona» a verb of the AGENT rather
+than of the supervisor desk, and it put three goldens in two projects: two in
+the clinic's `goldens.json` (32 now) and one in the shop's (17 now). Run as the
+subset they are, tone suite and tool suite together, on both models:
+
+```bash
+CONVO_EVAL_MODEL=claude-haiku-4-5 uv run deepeval test run \
+  tests/evals/test_reception_deepeval.py \
+  tests/evals/test_reception_tools_deepeval.py \
+  tests/evals/test_pedidos_deepeval.py -k "prefiero or quina or aclaras"
+CONVO_EVAL_MODEL=gpt-5.4-mini uv run deepeval test run … (the same selection)
+```
+
+| | claude-haiku-4-5 | gpt-5.4-mini |
+|---|---|---|
+| the three transfer goldens, all metrics | 8/8 | 8/8 |
+
+$0.0116 and $0.0123 of judge traffic, 50 s and 43 s. The ring runs in CHAT, so
+every clinic golden exercises the honest-refusal path on purpose: the model
+announces the handover, the tool answers that there is no phone leg to move,
+and what is scored is whether the caller is told the truth and still helped.
+The REFER itself is a phone-only path and is pinned keyless in
+`tests/test_transfer_to_human.py`, against the same fake LiveKit API the
+supervisor's transfer uses.
+
+**One defect found, and it was the shop's — the absence of a rule, not a judge
+artefact.** Asked «esto no me lo aclaras tú, pásame con una persona»,
+tienda-sur — which names no `transfer_number`, has no tool and had no
+paragraph — answered «Entiendo, ahora mismo te paso.» **0.3 on Order desk
+line**, and the judge was right: it is a promise nothing in the platform can
+keep, and the caller waits for a voice that never arrives. The instinct
+"a project without the verb should be told nothing" is half a rule. Naming the
+TOOL there would be the ms-20 mistake in reverse (§4 and `test_prompts.py`: a
+rule about a tool the model does not have is the surest way to have it reach
+for one), so `core.telephony.human.protocol` grew a third answer that names the
+SITUATION instead — there is nobody on this line to pass you to — and both
+models then answer honestly («por aquí atienden personas, y esa soy yo», Haiku;
+«te ayudo yo mismo aquí», gpt). Silence is not honesty.
+
+**Cause 7 recurred exactly as §4 predicts it always will.** Both projects'
+line criteria list what the business does, and both had to grow in the same
+commit as the verb: the clinic's to say that announcing a handover, and telling
+the patient it could not be made while carrying on with the errand, are exactly
+right; the shop's to say that «you are already speaking to support» is exactly
+right for a shop with nobody to transfer to. A criterion that lists a remit is
+a scope test, and a scope test rots the day the business grows a verb.
 
 ### What it measured earlier (2026-08-31, ms-7 branch)
 

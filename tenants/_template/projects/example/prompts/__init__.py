@@ -18,6 +18,7 @@ project's `messages`, and in nothing under `core/`.
 
 from core.context import TenantContext
 from core.security.protocol import SUPERVISOR_PROTOCOL
+from core.telephony import human
 
 from .desk import CONFIRM_INSTRUCTIONS, DESK_EXAMPLES, DESK_INSTRUCTIONS, DESK_ROLE
 from .reception import RECEPTION_EXAMPLES, RECEPTION_INSTRUCTIONS, RECEPTION_ROLE
@@ -48,6 +49,11 @@ def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str 
     exist ranks its own script above them and ignores the whisper (measured 0/3;
     3/3 with this paragraph — `core.security.protocol`). It is fixed text, so it
     rides inside the cached prefix and costs nothing per turn.
+
+    The transfer paragraph closes it only when there IS one: `human.protocol`
+    answers "" for a project that names no `transfer_number`, so the rule and
+    the tool appear and disappear together. A rule about a tool the model does
+    not have is the surest way to have it reach for one.
     """
     return "\n".join(
         [
@@ -60,5 +66,6 @@ def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str 
             instructions,
             examples,
             SUPERVISOR_PROTOCOL,
+            human.protocol(tc.project),
         ]
     )

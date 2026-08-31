@@ -254,6 +254,24 @@ export interface PhoneLine {
   serving: boolean;
 }
 
+/** Where the AGENT may hand a call when the caller asks for a person.
+ *
+ * `offered` false means the model is never shown the verb at all — a tool that
+ * cannot work is not offered — and `unavailable_reasons` carries the control
+ * plane's own sentence saying which half is missing: the project's opt-in
+ * (`declared`) or the number.
+ */
+export interface TransferSnapshot {
+  /** The tool name the model would call, and the key `unavailable_reasons` is keyed by. */
+  tool: string;
+  /** E.164, or "" for a project the agent may not hand a call away from. */
+  number: string;
+  declared: boolean;
+  offered: boolean;
+  unavailable_reasons: Record<string, string>;
+  note: string;
+}
+
 /** The project's own telephony: its lines, and the sentence the screen prints under them. */
 export interface PhoneSnapshot {
   /** The agent_name this deploy dispatches to — the fleet a line has to be on to be answered. */
@@ -261,6 +279,8 @@ export interface PhoneSnapshot {
   /** Empty for a project nobody can call: a number is a route, not a property of a project. */
   lines: PhoneLine[];
   note: string;
+  /** The outbound half: the number the agent itself may hand a live call to. */
+  transfer: TransferSnapshot;
 }
 
 /** One field the console changed, and when. */
@@ -306,6 +326,8 @@ export interface PipelineUpdate {
   greeting?: string;
   stt_provider?: string;
   llm_model?: string;
+  /** E.164, or "" to take the handover verb away from the agent entirely. */
+  transfer_number?: string;
 }
 
 /* ── /evals ───────────────────────────────────────────────────────────────── */

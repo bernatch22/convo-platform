@@ -19,7 +19,7 @@
  * line, or its absence, is the control plane's own sentence, printed verbatim.
  */
 
-import type { PhoneLine as Line, PhoneSnapshot } from "../lib/api";
+import type { PhoneLine as Line, PhoneSnapshot, TransferSnapshot } from "../lib/api";
 
 /** Where these lines are being shown: a section panel, or one strip under a page title. */
 export type PhoneFrame = "panel" | "header";
@@ -51,8 +51,33 @@ export function PhoneLines({
       <div className="panel__body dial dial--panel">
         <Lines phone={phone} />
         {phone.lines.length > 0 && <p className="leg__note">{phone.note}</p>}
+        <Transfer transfer={phone.transfer} />
       </div>
     </article>
+  );
+}
+
+/* The other direction: not who can ring this project, but who the agent may ring.
+ *
+ * Greyed out with the control plane's own sentence when the verb is not
+ * offered — the same `unavailable_reasons` idiom the provider panels use for a
+ * model this box carries no key for. Nobody should discover a rule by failing.
+ */
+function Transfer({ transfer }: { transfer: TransferSnapshot }) {
+  const why = transfer.unavailable_reasons[transfer.tool];
+
+  return (
+    <div className="leg__refused">
+      <span className="leg__refused-title">transfer to a human</span>
+      <p className="leg__refused-row">
+        {transfer.offered ? (
+          <span className="dial__number mono">{readable(transfer.number)}</span>
+        ) : (
+          <s className="mono">{transfer.tool}</s>
+        )}
+        <span className="leg__refused-why">{why ?? transfer.note}</span>
+      </p>
+    </div>
   );
 }
 

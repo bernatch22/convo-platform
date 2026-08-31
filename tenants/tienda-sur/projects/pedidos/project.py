@@ -19,6 +19,7 @@ spoken failure instead of a refusal, and the refusal is the honest answer.
 from dataclasses import dataclass
 
 from core.context import Project, TenantContext
+from core.telephony.human import TRANSFER_TO_HUMAN
 from core.tools.catalog import ToolCatalog
 from core.tools.contract import SideEffect, ToolSpec
 from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
@@ -113,8 +114,18 @@ PROJECT = PedidosProject(
     language="es-ES",
     greeting="¡Hola! Soy la asistente de Tienda Sur. ¿En qué te ayudo?",
     voice="gD1IexrzCvsXPHUuT0s3",  # ElevenLabs "Sara Martin - 3": the shop's own voice
+    # `TRANSFER_TO_HUMAN` is declared and `transfer_number` is deliberately unset: this
+    # shop has no switchboard to hand a call to, so the model is never offered the verb and
+    # the console says which of the two halves is missing. Opting in is the catalog line;
+    # turning it on is one field the console owns (`core.telephony.human`).
     tools=ToolCatalog.of(
-        FIND_ORDER, CANCEL_ORDER, RESTORE_ORDER, SEND_SMS, OPEN_TICKET, TICKET_STATUS
+        FIND_ORDER,
+        CANCEL_ORDER,
+        RESTORE_ORDER,
+        SEND_SMS,
+        OPEN_TICKET,
+        TICKET_STATUS,
+        TRANSFER_TO_HUMAN,
     ),
     messages=MESSAGES,
     knowledge_seed=knowledge.SHOP,

@@ -14,6 +14,10 @@
  * the day a third model is priced the console offers it without a redeploy of
  * this file.
  *
+ * The transfer number is the one field whose EMPTY value is a real value: it
+ * takes the handover verb away from the agent, so the form sends "" rather than
+ * treating it as "nothing changed".
+ *
  * The one refusal this form makes on its own is the empty voice: picking the
  * free-text escape hatch clears the field, and saving there used to store `""`,
  * which no layer below refused — `tts_for` reads it as "no voice configured"
@@ -47,6 +51,7 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
   const [llmModel, setLlmModel] = useState(runningLlm);
   const [greeting, setGreeting] = useState(snapshot.greeting);
   const [sttProvider, setSttProvider] = useState(snapshot.stt.requested_provider);
+  const [transferNumber, setTransferNumber] = useState(snapshot.phone.transfer.number);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -64,6 +69,9 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
     if (llmModel !== runningLlm) update.llm_model = llmModel;
     if (greeting !== snapshot.greeting) update.greeting = greeting;
     if (sttProvider !== snapshot.stt.requested_provider) update.stt_provider = sttProvider;
+    if (transferNumber.trim() !== snapshot.phone.transfer.number) {
+      update.transfer_number = transferNumber.trim();
+    }
 
     if (update.voice === "") {
       setSaved(false);
@@ -181,6 +189,24 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
         <p className="ctl__note">
           the whole menu, read from the control plane — the two models this platform prices and
           measures. They do not cache the same way: see the cache floor in the LLM panel above.
+        </p>
+      </label>
+
+      <label className="ctl__field">
+        <span className="ctl__label">transfer_number</span>
+        <input
+          className="ctl__input mono"
+          value={transferNumber}
+          spellCheck={false}
+          placeholder="+34910000000 — empty takes the verb away"
+          onChange={(event) => setTransferNumber(event.target.value)}
+        />
+        <p className="ctl__note">
+          where the agent hands the call when the caller asks for a person. E.164, because the
+          transfer is a SIP REFER carrying a <code className="mono">tel:</code> URI — anything else
+          is a 422 from the control plane. Leaving it empty is not a mistake: the model is then
+          never offered <code className="mono">transfer_to_human</code> at all, which is what the
+          Phone panel above says in the server&apos;s own words.
         </p>
       </label>
 
