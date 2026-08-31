@@ -6,7 +6,7 @@ import pytest
 from livekit.plugins import deepgram
 
 from core.context import Project
-from core.providers import stt, tts, turn
+from core.providers import llm, stt, tts, turn
 from core.testing import fake_context
 
 pytestmark = pytest.mark.unit
@@ -186,3 +186,55 @@ def test_the_turn_detector_is_the_local_mini_model() -> None:
     detector = turn.turn_detector_for()
 
     assert "mini" in detector.model
+
+
+# --- the LLM slot ------------------------------------------------------------
+
+
+def test_a_project_that_names_no_model_gets_the_platform_default(project: Project) -> None:
+    project.llm_model = None
+
+    assert llm.llm_model(project) == "claude-haiku-4-5"
+
+
+def test_a_project_may_opt_into_the_openai_model(project: Project) -> None:
+    project.llm_model = "gpt-5.4-mini"
+
+    assert llm.llm_model(project) == "gpt-5.4-mini"
+    assert llm.family("gpt-5.4-mini") == "openai"
+    assert llm.family("claude-haiku-4-5") == "anthropic"
+
+
+def test_a_model_nobody_priced_is_never_built(project: Project) -> None:
+    """git may name anything; the platform still only opens a connection it costed."""
+    project.llm_model = "gpt-4o"
+
+    assert llm.llm_model(project) == llm.DEFAULT_MODEL
+
+
+def test_claude_is_built_with_ephemeral_caching(project: Project, monkeypatch) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID", raising=False)
+    tc = fake_context("clinica-norte", "reagendamiento")
+    project.llm_model = None
+
+    built = llm.llm_for(tc.tenant, project)
+
+    assert built.model == "claude-haiku-4-5"
+    assert built._opts.caching == "ephemeral"
+
+
+def test_gpt_is_built_with_the_openai_plugin_and_one_cache_key_per_project(
+    project: Project, monkeypatch
+) -> None:
+    """`max_completion_tokens` is the openai name for `max_tokens`; the key pins a shard."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    tc = fake_context("clinica-norte", "reagendamiento")
+    project.llm_model = "gpt-5.4-mini"
+
+    built = llm.llm_for(tc.tenant, project)
+
+    assert built.model == "gpt-5.4-mini"
+    assert built._opts.max_completion_tokens == llm.MAX_TOKENS
+    assert built._opts.prompt_cache_key == "clinica-norte/reagendamiento"
+    assert built._opts.reasoning_effort == "none", "a reasoning pass is latency the caller hears"

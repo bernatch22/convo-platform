@@ -50,6 +50,12 @@ PRICES: dict[str, TokenPrice] = {
     # Anthropic list prices, $/Mtok: cache reads are 0.1x input, 5-minute writes 1.25x.
     "claude-haiku-4-5": _usd(1.00, 0.10, 1.25, 5.00),
     "claude-sonnet-5": _usd(2.00, 0.20, 2.50, 10.00),
+    # OpenAI list prices, $/Mtok (developers.openai.com, checked 2026-08-31): cached input is
+    # 0.1x input. There is no cache-WRITE row because there is no such token on this vendor:
+    # caching is automatic, the first request pays the plain input rate and
+    # `input_cache_creation_tokens` is always 0, so the 0.0 below is a row that never applies
+    # rather than a write we believe is free.
+    "gpt-5.4-mini": _usd(0.75, 0.075, 0.0, 4.50),
     # TODO(ms-6): ElevenLabs bills characters and Soniox audio seconds, not tokens.
     # Their rows stay at zero until the voice path exists and the units are real.
     "eleven_v3_conversational": _usd(0, 0, 0, 0),

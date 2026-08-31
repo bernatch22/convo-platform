@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from api import app, open_store
 from core import router
 from core.agents import TenantAgent
-from core.providers import stt, tts
+from core.providers import llm, stt, tts
 from core.state.events import Event
 from core.state.store import MemoryStore, PipelineOverride, SessionRow, SQLiteStore
 from core.testing.fake_job import fake_job_context
@@ -237,3 +237,53 @@ def _record_call(store: MemoryStore, session_id: str, ttft: float, e2e: float) -
     store.open_session(SessionRow(session_id, TENANT, PROJECT, "voice", started_at=1.0))
     metrics = {"llm_node_ttft": ttft, "e2e_latency": e2e}
     store.append(session_id, Event(1, "turn.agent", 1000, {"text": "sí", "metrics": metrics}))
+
+
+# --- the LLM slot ------------------------------------------------------------
+
+
+def test_the_snapshot_shows_the_llm_family_its_caching_floor_and_the_whole_menu(client) -> None:
+    view = client.get(PIPELINE).json()["llm"]
+
+    assert (view["provider"], view["model"]) == ("anthropic", "claude-haiku-4-5")
+    assert view["allowed_models"] == ["claude-haiku-4-5", "gpt-5.4-mini"]
+    assert view["cache_minimum_tokens"] == 4096 and view["caching"] == "ephemeral"
+
+
+async def test_a_put_of_the_openai_model_changes_what_the_next_session_builds(
+    client, store, monkeypatch
+) -> None:
+    """The whole point of the slot: the console swaps the vendor and `resolve` agrees."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+
+    reply = client.put(PIPELINE, json={"llm_model": "gpt-5.4-mini"}).json()
+
+    assert reply["llm"] == {
+        **reply["llm"],
+        "provider": "openai",
+        "model": "gpt-5.4-mini",
+        "caching": "automatic",
+        "cache_minimum_tokens": 1024,
+    }
+    assert "1024" in reply["llm"]["cache_note"], "each family states its own caching story"
+    tc = await router.resolve(fake_job_context(metadata=META), store)
+    assert tc.project.llm_model == "gpt-5.4-mini"
+    assert llm.llm_for(tc.tenant, tc.project).model == "gpt-5.4-mini"
+
+
+def test_a_model_outside_the_allow_list_is_refused_with_the_list(client, store) -> None:
+    reply = client.put(PIPELINE, json={"llm_model": "gpt-4o"})
+
+    assert reply.status_code == 422
+    detail = reply.json()["detail"]
+    assert "gpt-4o" in detail
+    for allowed in llm.ALLOWED_MODELS:
+        assert allowed in detail, "a refusal names every model that would have been accepted"
+    assert store.pipeline_overrides(TENANT, PROJECT) == [], "nothing unpriced reaches the store"
+
+
+def test_every_model_the_platform_runs_has_a_price(client) -> None:
+    from core.observability.prices import PRICES
+
+    for model in llm.ALLOWED_MODELS:
+        assert model in PRICES, "the allow-list IS the priced list; they cannot drift apart"

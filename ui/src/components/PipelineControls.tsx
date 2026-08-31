@@ -9,6 +9,10 @@
  * forbidden ones are shown in the provider panel, struck out, with the same
  * sentence a PUT would have answered with — so nobody discovers the rule by
  * failing.
+ *
+ * The LLM select is built from `llm.allowed_models`, the server's own list, so
+ * the day a third model is priced the console offers it without a redeploy of
+ * this file.
  */
 
 import { useState, type FormEvent } from "react";
@@ -26,8 +30,10 @@ interface ControlsProps {
 
 export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
   const runningModel = snapshot.tts.requested_model ?? snapshot.tts.model;
+  const runningLlm = snapshot.llm.requested_model ?? snapshot.llm.model;
   const [voice, setVoice] = useState(snapshot.tts.voice);
   const [model, setModel] = useState(runningModel);
+  const [llmModel, setLlmModel] = useState(runningLlm);
   const [greeting, setGreeting] = useState(snapshot.greeting);
   const [sttProvider, setSttProvider] = useState(snapshot.stt.requested_provider);
   const [busy, setBusy] = useState(false);
@@ -43,6 +49,7 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
     const update: PipelineUpdate = {};
     if (voice !== snapshot.tts.voice) update.voice = voice;
     if (model !== runningModel) update.tts_model = model;
+    if (llmModel !== runningLlm) update.llm_model = llmModel;
     if (greeting !== snapshot.greeting) update.greeting = greeting;
     if (sttProvider !== snapshot.stt.requested_provider) update.stt_provider = sttProvider;
 
@@ -137,6 +144,25 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
         <p className="ctl__note">
           only the two the platform runs are offered — {snapshot.tts.forbidden_models.join(" and ")}{" "}
           are refused by the control plane, not hidden by this form.
+        </p>
+      </label>
+
+      <label className="ctl__field">
+        <span className="ctl__label">llm_model</span>
+        <select
+          className="ctl__input mono"
+          value={llmModel}
+          onChange={(event) => setLlmModel(event.target.value)}
+        >
+          {snapshot.llm.allowed_models.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <p className="ctl__note">
+          the whole menu, read from the control plane — the two models this platform prices and
+          measures. They do not cache the same way: see the cache floor in the LLM panel above.
         </p>
       </label>
 

@@ -19,7 +19,7 @@ import dataclasses
 from core.context import Project
 from core.state.store import Store
 
-OVERRIDABLE = ("voice", "tts_model", "greeting", "stt_provider")
+OVERRIDABLE = ("voice", "tts_model", "greeting", "stt_provider", "llm_model")
 
 
 def apply(tenant: str, project: Project, store: Store) -> Project:
