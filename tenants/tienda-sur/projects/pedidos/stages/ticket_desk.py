@@ -38,14 +38,31 @@ class TicketDesk(TenantAgent):
     def __init__(self, tc: TenantContext) -> None:
         super().__init__(tc, instructions=prompts.ticket_desk_prompt(tc))
         self.opened: dict[str, str] | None = None
+        self.asking: str | None = None
 
     def summary(self) -> str:
-        """What a later stage needs: the incident that now exists, in the words to read out."""
+        """What a later stage needs: the incident that now exists, in the words to read out.
+
+        Two stages read it now. Farewell closes a call that filed one, and OrderDesk
+        arrives when the customer went back to asking about the parcel — so the note
+        has to be true for a desk that is NOT going to talk about the incident, which
+        is why it never asks the next stage to bring it up.
+        """
         if not self.opened:
             return "Todavía no se ha abierto ninguna incidencia."
         return (
             f"Incidencia {self.opened['ticket_id']} abierta y anotada. El cliente ya tiene el "
-            "número; un compañero la revisa y se le escribe."
+            f"número; un compañero la revisa y se le escribe.{self._asked()} Esta nota es para "
+            "ti: no se lee en voz alta ni se resume al cliente."
+        )
+
+    def _asked(self) -> str:
+        """The question that sent the call back, when one did — so it is not asked twice."""
+        if not self.asking:
+            return ""
+        return (
+            f" Lo que el cliente quiere ahora es esto y es a lo que respondes: «{self.asking}». "
+            "Ya lo ha dicho, así que no se lo preguntes otra vez: míralo y contéstalo."
         )
 
     @function_tool
@@ -114,3 +131,33 @@ class TicketDesk(TenantAgent):
             {"ticket_id": ticket_id, "phone": (tc.customer or {}).get("phone")},
         )
         return tools.ticket_line(ticket) if ticket else tools.NO_TICKET
+
+    @function_tool
+    async def back_to_orders(self, ctx: RunContext[TenantContext], pregunta: str) -> "TenantAgent":
+        """Devuelve la llamada al mostrador de pedidos, cuando el cliente vuelve a su pedido.
+
+        En `pregunta` pones lo que acaba de preguntar, en sus palabras y en una frase
+        —«cuándo llega mi pedido», «quiero cancelarlo»—, para que el mostrador le responda
+        eso mismo y no se lo haga repetir.
+
+        Llámala en cuanto el cliente vuelva a hablar de su pedido y no de la incidencia: dónde
+        está, cuándo llega, si puede seguirlo o si quiere cancelarlo. Es el camino de vuelta
+        del que vino, y existe porque una persona que entra a poner una incidencia sigue
+        teniendo un pedido del que preguntar.
+
+        No la llames si lo que pregunta es por su incidencia: eso lo resuelves tú aquí.
+
+        """
+        tc = ctx.userdata
+        from .identify import Identify
+        from .order_desk import OrderDesk
+
+        # Symmetric to `start_ticket_desk`: what the customer just said travels with the
+        # handoff, because a handoff copies no history in either direction.
+        self.asking = pregunta.strip() or None
+
+        # Back to the desk that knows the order — or to the front, when this call reached the
+        # incidents without ever localising one: OrderDesk's whole contract is that the order
+        # is already on the table, and arriving there without it would ask the customer for a
+        # number in the middle of a conversation instead of at the start of it.
+        return self.hand_off(OrderDesk(tc) if tc.customer else Identify(tc))
