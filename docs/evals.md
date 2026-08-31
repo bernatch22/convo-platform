@@ -26,7 +26,7 @@ consent, grounded facts, register — and share not one sentence of criteria.
 | Ring | What is evaluated | When | Status |
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
-| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live nightly (ms-13) | offline live since ms-6 — §3.9; live since ms-13 — §3.10 |
+| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live nightly (ms-13) | offline since ms-6 — §3.9; live since ms-13 — §3.11, §3.12 |
 | **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; grounding is blind to tool results — §3.6 |
 
 The metrics are the same in every ring. A ring changes where the conversation
@@ -484,6 +484,76 @@ human's.
   `docker compose -f infra/compose/dev.yml up`, `uv run uvicorn api:app --port
   8090`, `python worker.py dev` — then `converse(...)` from a fourth.
 
+### 3.12 Two personas, and the goldens that turn a call into a suite
+
+- **What it is:** `core/testing/personas.py` — two callers as data, not classes
+  — and `core/testing/ring2_goldens.py`, which reads a project's
+  `evals/ring2_goldens.json`, makes the call through `converse`, and hands back
+  the two cases it is scored on. Per project:
+  `deepeval test run tenants/<t>/projects/<p>/evals/test_ring2.py`.
+- **Why two personas and not five.** A persona earns its place by breaking
+  something no other caller reaches. `apurado` (Alex, es peninsular male,
+  `patience_s=2.5`) talks over the agent, which is the only barge-in in the
+  whole suite: everything else waits politely for silence, which no real caller
+  does. `spanglish` (Carolina Ruiz, TTS `language` deliberately UNSET) switches
+  es↔en inside a sentence, and her transcript is the only evidence
+  `language_hints` is doing anything — a Spanish-only STT does not fail loudly
+  on English, it quietly writes down the nearest Spanish words. A third
+  ("elderly", slow and repetitive) was dropped: it measures the same turn
+  detector as `apurado` from the other side and costs another live call a night.
+- **A golden is a whole call.** `{name, persona, objective, turns, policies,
+  max_turns}`. `turns` are the lines that caller says out loud, written in that
+  persona's own words — the whole "script strategy" while `converse` speaks a
+  written script. Everything checkable is checked at LOAD time (unknown
+  persona, unknown policy, a script longer than its own cap), because the
+  alternative is finding a typo after four minutes of talking.
+- **Two cases, and which policy reads which.** A synthetic caller hears
+  everything that was SAID and nothing that was DONE — no track carries a tool
+  call. So `register` and `leakage` are scored on the WIRE case (the
+  transcript, `flaky=True`), and `consent` on the LOG case: the same call
+  rebuilt from its append-only log through `core.testing.replay`, ring 3's own
+  reader, over `GET /sessions/<id>`. The session is identified DURING the call
+  by `GET /live-calls` (`core.control_plane._match` now strips the `eval-`
+  prefix), because the room is gone the moment we hang up. `grounded` is
+  deliberately NOT a ring-2 policy: it needs tool OUTPUTS as evidence and the
+  log keeps result shapes, never contents.
+- **First green run (dev compose, `FLEET=cc-w15`), four calls:**
+  clinica-norte `apurado-mueve-el-jueves` — 7 interruptions, `book_slot` ran
+  after an explicit "sí, confirmo", consent 1.0, register 1.0.
+  clinica-norte `spanglish-pregunta-por-un-paquete` — transcribed `en+es`, the
+  parcel question answered with a clean refusal, leakage 1.0, register 1.0.
+  tienda-sur `apurado-cancela-el-pedido` — 7 interruptions, `cancel_order` ran,
+  consent 1.0, register 1.0. tienda-sur `spanglish-cancela-el-pedido` —
+  transcribed `en+es`, consent 1.0, register 1.0. Latencies (wire, not
+  `e2e_latency`): greeting 6.4–7.2 s cold, then 1.6–5.9 s.
+- **Quiet on the transcript is not silence on the wire, and it cost a whole
+  run.** The agent's transcription is a DELTA stream: it closes when the LLM
+  finishes GENERATING, seconds before the TTS finishes SAYING it. `_hear_out`
+  waited three quiet seconds and then spoke — so the "patient" caller was
+  interrupting every single turn, and a whole transcript came back ending
+  mid-word ("el de 74,90"), which reads as the model trailing off and is in
+  fact us talking over it. The floor settles it: an answer is over when the
+  transcript is quiet AND `lk.agent.state` is no longer `speaking`.
+- **Interrupting delivers the words late.** Closing the stream mid-sentence
+  hands over the text a moment AFTER the interruption, so `Call.settle` folds
+  that tail into the turn it was cut from — while our own line is still going
+  out. Without it, one turn's words are read as the next one's.
+- **A caller must not sound like the project it calls, and one did.**
+  `CALLER_VOICE` was Sara Martín, which is `tienda-sur`'s own agent voice: on a
+  shop call both sides were the same woman. Both personas now use voices no
+  project speaks with, and `tests/test_personas.py` checks that against the
+  live registry rather than against a comment.
+- **`tenants/<t>` is not a Python package** (`tienda-sur` is not an
+  identifier), so pytest lands its rootdir inside the tenant folder and
+  `import core` fails. `pythonpath = ["."]` in `pyproject.toml` is what makes a
+  per-project suite runnable from a bare checkout.
+- **How to see it:** four terminals —
+  `docker compose -f infra/compose/dev.yml up`, `FLEET=cc uv run uvicorn api:app
+  --port 8090`, `FLEET=cc python worker.py dev`, then
+  `deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py -s`.
+  Two workers on one `FLEET` share every dispatch, so a second harness needs a
+  `FLEET` of its own and `CONVO_API` pointed at its own `api.py`.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
@@ -623,7 +693,8 @@ about four minutes.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6
-  (§3.9), its live half against a LiveKit room with ms-13 (§3.10).
+  (§3.9), its live half against a LiveKit room with ms-13 (§3.11), and its
+  personas and per-project goldens with ms-13 too (§3.12).
 - **`AudioIntegrityMetric` is uncalibrated for conversational turns.** Its
   dropout detector reads normal inter-word pauses as defects, so the score is
   0.0 for any well-formed sentence longer than a phrase (§3.9). We assert the
@@ -633,11 +704,13 @@ about four minutes.
   noise; it cannot tell the caller's voice from the agent's own TTS coming back
   down a leg with echo. Measuring that needs ring 2's live room.
 - **A `--record` run with a microphone has never been scored.** Everything in
-  §3.9 is measured on a recording whose caller channel is silent, so nothing
-  yet exercises overlap, barge-in or the caller's own audio. §3.10 closes half
-  of it — the caller now really speaks — but `converse` is still half duplex: it
-  waits out its own line and never talks over the agent, so barge-in and
-  overlap remain unmeasured until a persona is allowed to interrupt.
+  §3.9 is measured on a recording whose caller channel is silent. §3.11 gave
+  the caller a real voice and §3.12 gave it the will to interrupt — `apurado`
+  cuts the agent off seven times a call — so barge-in and overlap are now
+  exercised on the wire. What is still unscored is the OGG of such a call: the
+  recorder is wired for a headless session, not for a room with two live
+  tracks, so the voice metrics still read a file whose caller channel is
+  silent.
 - **Ring 3 cannot ground facts against tool results.** The log stores the shape
   of a result, never its contents, so `grounded_facts_dag` on a replayed
   session escalates every datum that came off the agenda and scores it 0.0 on

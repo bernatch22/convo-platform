@@ -51,18 +51,23 @@ from dataclasses import dataclass, field
 from urllib.request import Request, urlopen
 
 import aiohttp
-from deepeval.dataset import Persona
 from deepeval.test_case import ConversationalTestCase, Turn
+from livekit.agents import NOT_GIVEN
 from livekit.plugins import elevenlabs
 
 from core.testing.caller import Call
+from core.testing.personas import ALEX, CallerPersona
 from core.testing.speaker import VirtualMicrophone
 
-DEFAULT_API = "http://localhost:8090"
-# The caller must never sound like the project it is calling: Sara Martín is
-# the account's second peninsular voice, and flash is the latency profile — a
-# synthetic caller wants to be understood quickly, not to be expressive.
-CALLER_VOICE = "gD1IexrzCvsXPHUuT0s3"
+# The control plane this harness calls. An override exists because the nightly
+# run does not talk to a laptop: `CONVO_API` points it at the box.
+DEFAULT_API = os.getenv("CONVO_API", "http://localhost:8090")
+# The caller must never sound like the project it is calling, and both of the
+# fleet's projects speak with a peninsular woman — so the fallback voice for a
+# call made with no persona is a peninsular man (`core.testing.personas.ALEX`).
+# Flash is the latency profile: a synthetic caller wants to be understood
+# quickly, not to be expressive.
+CALLER_VOICE = ALEX
 CALLER_MODEL = "eleven_flash_v2_5"
 
 
@@ -77,6 +82,7 @@ class Transcript:
 
     room: str
     turns: list[Turn] = field(default_factory=list)
+    session_id: str | None = None
 
     def case(self, scenario: str = "", expected_outcome: str = "") -> ConversationalTestCase:
         """The turns as the test case conversational metrics score."""
@@ -95,9 +101,14 @@ class Transcript:
         """Everything one side said, in order — the quickest way to eyeball a run."""
         return [turn.content for turn in self.turns if turn.role == role]
 
+    @property
+    def interruptions(self) -> int:
+        """How many of the agent's answers this caller talked over."""
+        return sum(1 for turn in self.turns if turn.interrupted)
+
 
 async def converse(
-    persona: Persona | None,
+    persona: CallerPersona | None,
     tenant: str,
     project: str,
     turns: list[str],
@@ -108,21 +119,29 @@ async def converse(
 
     The agent greets first, so the transcript opens with an assistant turn
     whose latency is how long the greeting took to arrive. Each line after that
-    is spoken in real time, waited out, and answered.
+    is spoken in real time, answered, and — if the persona is patient — waited
+    out; a persona with a `patience_s` talks over the answer instead, and the
+    turn it cut off is settled while its own line is still going out.
 
     The caller's turn is built AFTER its answer arrives, never before: the STT
     transcript of a line lands a moment after the line ends, and a turn built
-    on the instant we stopped talking would carry no transcript at all.
+    on the instant we stopped talking would carry no transcript at all. That
+    holds for an impatient caller too — the agent only takes the floor once it
+    has decided our turn ended, so by then its transcript of us is published.
     """
+    patience = persona.patience_s if persona else None
     ticket = mint_room(api, tenant, project, persona)
     call = Call(ticket, microphone(persona))
     await call.join()
     script = Transcript(room=ticket["room"])
     try:
-        script.turns.append(await call.listen(since=call.origin))
+        answer = await call.listen(since=call.origin, patience=patience)
+        script.turns.append(answer)
+        script.session_id = session_of(api, ticket["room"])
         for line in turns:
             spoken = await call.say(line)
-            answer = await call.listen(since=spoken.ended_at)
+            await call.settle(answer)
+            answer = await call.listen(since=spoken.ended_at, patience=patience)
             script.turns.append(call.heard_us(spoken))
             script.turns.append(answer)
     finally:
@@ -130,8 +149,32 @@ async def converse(
     return script
 
 
+def session_of(api: str, room: str) -> str | None:
+    """Which stored session is logging this room, asked while the call is still up.
+
+    It has to be asked DURING the call: `/live-calls` matches rooms the SFU
+    still holds against sessions that are still open, and the moment we hang up
+    the agent leaves and the room is gone. What it buys is the half of a call
+    the caller cannot hear — a synthetic caller sees what was SAID, and the
+    consent policy is about what the platform DID, which only the event log
+    knows.
+
+    A control plane that cannot answer is not a failed call: the transcript is
+    still a transcript, so this returns None rather than raising.
+    """
+    try:
+        with urlopen(f"{api}/live-calls", timeout=10) as reply:
+            live = json.load(reply)
+    except OSError:
+        return None
+    for call in live:
+        if call.get("room") == room:
+            return call.get("session_id")
+    return None
+
+
 def mint_room(
-    api: str, tenant: str, project: str, persona: Persona | None = None
+    api: str, tenant: str, project: str, persona: CallerPersona | None = None
 ) -> dict[str, str]:
     """Ask the control plane for a room whose agent is already dispatched to this project."""
     body = json.dumps(
@@ -147,12 +190,18 @@ def mint_room(
         return json.load(reply)
 
 
-def microphone(persona: Persona | None = None) -> VirtualMicrophone:
+def microphone(persona: CallerPersona | None = None) -> VirtualMicrophone:
     """The caller's voice: the persona's if it named one, the platform's second voice otherwise.
 
     The `aiohttp` session is built here and handed to the plugin. A harness is
     not a job, so there is no job context to borrow one from — see
     `VirtualMicrophone`, which closes it when the call hangs up.
+
+    `language` is left UNSET for a caller who code-switches. Pinned to "es",
+    ElevenLabs reads "where is my package" with Spanish phonemes, and what
+    arrives at the STT is then a Spanish accent doing English rather than
+    English — which would make the transcript prove nothing about
+    `language_hints` either way.
     """
     key = os.getenv("ELEVENLABS_API_KEY")
     if not key:
@@ -162,7 +211,7 @@ def microphone(persona: Persona | None = None) -> VirtualMicrophone:
         api_key=key,
         voice_id=(persona.voice if persona and persona.voice else CALLER_VOICE),
         model=CALLER_MODEL,
-        language="es",
+        language=(persona.language if persona and persona.language else NOT_GIVEN),
         sync_alignment=False,
         http_session=session,
     )
