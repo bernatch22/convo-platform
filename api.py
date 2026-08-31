@@ -19,7 +19,7 @@ worker thread while an SSE generator runs in the event loop: one store per
 request, created and used in one place, is the whole of the concurrency story.
 """
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -89,6 +89,24 @@ class EnteredRequest(BaseModel):
 
     room: str
     identity: str
+
+
+class VerbRequest(BaseModel):
+    """One supervision verb, aimed at a live room from the control plane rather than a browser.
+
+    `identity` is the supervisor the SFU will be asked about; nothing here is
+    trusted beyond "look at this room for this identity". The agent asks the
+    same question again of the packet it receives.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    room: str
+    identity: str
+    verb: Literal["steer", "takeover", "release"]
+    text: str = ""
+    mode: Literal["inject", "inject_and_speak"] = "inject"
+    deaf: bool = False
 
 
 class PipelineUpdate(BaseModel):
@@ -289,6 +307,39 @@ async def supervise_entered(req: EnteredRequest) -> dict[str, Any]:
         return await desk.entered(req.room, req.identity)
     except desk.NotInRoom as error:
         raise HTTPException(404, str(error)) from error
+    except RoomsUnreachable as error:
+        raise HTTPException(503, str(error)) from error
+
+
+@app.post("/supervise/verb")
+async def supervise_verb(req: VerbRequest) -> dict[str, Any]:
+    """Whisper to a live agent, take its line, or hand the line back — server-side.
+
+    → `{"verb": str, "identity": "sup:<uid>", "sent": true}`
+
+    The browser desk does not come through here: it holds a `whisper` ticket
+    and calls the agent's own `supervisor.steer` RPC, which is one hop instead
+    of three. This exists for the callers that have no room connection — an
+    escalation rule, a compliance trigger, a `curl` in a terminal — and for
+    the demo that shows a whisper landing without a browser at all:
+
+        curl -XPOST localhost:8000/supervise/verb -H 'content-type: application/json' \
+          -d '{"room":"...","identity":"sup:berna","verb":"steer","text":"ve al grano"}'
+
+    What happens next is the agent's decision, not this handler's: the packet
+    reaches the job that owns the caller's log, `SupervisorControl` checks the
+    identity again, applies the verb at a turn boundary and writes the line
+    with the next `seq`. → 404 when the supervisor or the agent is not in the
+    room, 422 for a verb this door does not forward, 503 when the SFU cannot
+    be asked.
+    """
+    body = {"text": req.text, "mode": req.mode, "deaf": req.deaf}
+    try:
+        return await desk.command(req.room, req.identity, req.verb, body)
+    except desk.NotInRoom as error:
+        raise HTTPException(404, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(422, str(error)) from error
     except RoomsUnreachable as error:
         raise HTTPException(503, str(error)) from error
 

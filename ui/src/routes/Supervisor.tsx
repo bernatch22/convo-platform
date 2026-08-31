@@ -19,11 +19,12 @@
  * relationship with. One runtime, one log, one screen — from the other side.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { LiveCalls } from "../components/LiveCalls";
 import { Timeline } from "../components/Timeline";
 import { Transcript } from "../components/Transcript";
+import { WhisperDesk } from "../components/WhisperDesk";
 import { superviseEntered, type LiveCall, type SupervisorPresence } from "../lib/api";
 import { useRoom, type Live } from "../lib/useRoom";
 import { useTimeline } from "../lib/useTimeline";
@@ -39,10 +40,14 @@ export function Supervisor() {
   const log = useTimeline(live.phase === "live" ? live.room : null);
   const entry = useEntry(live);
   const [watched, setWatched] = useState<Watched | null>(null);
+  // One desk, one `sup:<uid>`, for as long as this tab is open: escalating a
+  // ticket has to UPGRADE the participant already in the room, and LiveKit
+  // decides that by identity. A fresh uid per click would be a second person.
+  const me = useMemo(() => Math.random().toString(36).slice(2, 10), []);
 
   const monitor = (call: LiveCall) => {
     setWatched({ caller: call.phone ?? "web", tenant: call.tenant ?? "" });
-    void live.open("supervise", call.room);
+    void live.open("supervise", call.room, { capability: "listen", userId: me });
   };
 
   return (
@@ -72,6 +77,7 @@ export function Supervisor() {
             <div className="talk__main">
               <MonitorBar live={live} watched={watched} entry={entry} />
               <Transcript lines={live.lines} state={live.state} empty={hint(live.phase)} />
+              {live.phase === "live" && <WhisperDesk live={live} me={me} />}
               {live.error && <p className="note note--warn">{live.error}</p>}
             </div>
             <Timeline log={log} tenant={watched?.tenant ?? ""} />
@@ -98,7 +104,7 @@ export function Supervisor() {
               </tr>
               <tr>
                 <td className="mono">whisper</td>
-                <td>still hidden and still silent, but may send the agent text</td>
+                <td>still hidden and still silent, but may send the agent text over RPC</td>
                 <td className="mono">supervisor.steer</td>
               </tr>
               <tr>

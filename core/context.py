@@ -106,6 +106,11 @@ class TenantContext:
     customer: dict[str, Any] | None = None
     pii_values: set[str] = field(default_factory=set)
     prev_agent: Any = None
+    # The live session's supervision state (`core.security.control.SupervisorControl`),
+    # or None where no second human can reach the call: the console, a harness,
+    # an offline eval. Every stage carries it because every stage may be the one
+    # holding the floor when a human takes the line.
+    supervisor: Any = None
 
     def label(self) -> str:
         """Short identifier for logs: `tenant/project#session`."""
