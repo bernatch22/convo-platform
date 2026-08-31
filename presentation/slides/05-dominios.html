@@ -1,0 +1,72 @@
+<section class="slide" data-title="Dominios" data-entregable="2">
+  <style>
+    .d05-dom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px 22px; }
+    .d05-dom .d { border: 1px solid var(--line); background: var(--card); padding: 15px 18px; }
+    .d05-dom h3 { font: 600 15.5px var(--sans); color: var(--ink); margin: 0 0 5px; }
+    .d05-dom p  { font: 400 13.5px/1.45 var(--sans); color: var(--ink-2); margin: 0; }
+    .d05-pipe   { border: 1.5px solid var(--accent); background: var(--accent-soft);
+                  border-radius: 10px; padding: 18px 24px 16px; margin-top: 24px; }
+    .d05-pipe .t { font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                   color: var(--accent); margin: 0 0 12px; }
+    .d05-steps  { display: flex; align-items: stretch; gap: 0; }
+    .d05-steps .s { flex: 1; text-align: center; padding: 0 6px; }
+    .d05-steps .n { font: 600 15px var(--sans); color: var(--ink); }
+    .d05-steps .w { font: 400 12.5px/1.3 var(--sans); color: var(--ink-2); display: block; margin-top: 3px; }
+    .d05-steps .ms { font: 500 13px var(--mono); color: var(--accent); display: block; margin-top: 7px; }
+    .d05-steps .gt { align-self: center; font: 400 20px var(--sans); color: var(--muted); padding: 0 2px; }
+    .d05-note { font: 400 13px/1.4 var(--sans); color: var(--muted); margin: 12px 0 0; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">05 <span class="sep">·</span> Principales dominios — y la anatomía de un turno</div>
+      <h2 class="head" style="max-width:52ch">Seis dominios con fronteras estrictas; dentro de la conversación, un pipeline medido</h2>
+      <p class="lede" style="max-width:100ch">
+        Cada dominio posee una cosa y se niega al resto. La frontera más importante es la
+        primera: <strong>la conversación no conoce negocios y el control de negocio no conoce
+        audio</strong> — se hablan por un contrato, no por dependencias compartidas.
+      </p>
+    </div>
+
+    <div class="d05-dom" data-anim="2">
+      <div class="d"><h3>Conversación</h3>
+        <p>Tiempo real: audio, turnos, el modelo de IA. Un proceso aislado por llamada.</p></div>
+      <div class="d"><h3>Control de negocio</h3>
+        <p>Contratos de tools, autorización en dos fases, ejecución contra los sistemas del cliente.</p></div>
+      <div class="d"><h3>Evidencia</h3>
+        <p>Historial numerado, grabación, coste y nota de calidad. Solo se añade; nunca se edita.</p></div>
+      <div class="d"><h3>Tenancy</h3>
+        <p>Verticales (el código del rubro: clínica, retail) y negocios (su configuración: voz,
+        número, datos). Un negocio roto queda fuera de ruta — la flota sigue.</p></div>
+      <div class="d"><h3>Evaluación</h3>
+        <p>Los cuatro niveles de la lámina 3. Juzga con las mismas métricas en todos, sin tocar producción.</p></div>
+      <div class="d"><h3>Operación</h3>
+        <p>La consola: supervisar en vivo, configurar sin desplegar, auditar cada llamada.</p></div>
+    </div>
+
+    <div class="d05-pipe" data-anim="3">
+      <p class="t">Anatomía de un turno — medianas de 125 turnos reales de producción</p>
+      <div class="d05-steps">
+        <div class="s"><span class="n">El cliente habla</span><span class="w">audio en vivo</span><span class="ms">&nbsp;</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">Voz a texto</span><span class="w">transcripción en streaming</span><span class="ms">0,35 s</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">¿Terminó de hablar?</span><span class="w">detección semántica de fin de turno</span><span class="ms">0,46 s</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">El modelo responde</span><span class="w">primera palabra generada</span><span class="ms">0,88 s</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">Texto a voz</span><span class="w">primera sílaba sintetizada</span><span class="ms">0,11 s</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">El cliente oye</span><span class="w">respuesta completa</span><span class="ms">2,25 s extremo a extremo</span></div>
+      </div>
+      <p class="d05-note">Cada eslabón es un proveedor intercambiable (voz a texto, modelo, texto a voz) y cada
+      turno deja sus tiempos en el historial — la latencia se gobierna con datos, no con impresiones.</p>
+    </div>
+
+    <p class="proof" data-anim="4">
+      La frontera conversación / negocio está garantizada por prueba automática: el núcleo no
+      puede importar código de ningún cliente, y el intento rompe la build.
+    </p>
+
+  </div>
+</section>

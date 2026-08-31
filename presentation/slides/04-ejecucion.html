@@ -1,120 +1,110 @@
 <section class="slide" data-title="Ejecución de una conversación" data-entregable="3">
+  <style>
+    .e04-h   { font: 600 16px var(--sans); fill: var(--ink); }
+    .e04-l   { font: 400 14px var(--sans); fill: var(--ink-2); }
+    .e04-n   { font: 600 11px var(--mono); fill: var(--paper); }
+    .e04-m   { font: 400 11.5px var(--mono); fill: var(--muted); }
+    .e04-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+    .e04-hot { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+    .e04-life{ stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 4 5; }
+    .e04-arr { stroke: var(--ink-2); stroke-width: 1.6; }
+    .e04-chip{ fill: var(--accent); }
+  </style>
   <div class="slide-body">
 
     <div class="head-block" data-anim="1">
-      <div class="eyebrow">04 <span class="sep">·</span> Entregable 3 — modelo de ejecución</div>
-      <h2 class="head" style="max-width:52ch">Un turno es una transacción con log, no una respuesta</h2>
-      <p class="lede">
-        El turno lo cierra la máquina: el endpointing del STT y un detector de turno local en CPU
-        comparten la decisión, y una interrupción necesita dos palabras — un «vale» a media frase
-        es un asentimiento, no el turno del llamante.
+      <div class="eyebrow">04 <span class="sep">·</span> Modelo de ejecución de una conversación</div>
+      <h2 class="head" style="max-width:52ch">Una llamada real, paso a paso: leer es libre, operar exige un sí</h2>
+      <p class="lede" style="max-width:100ch">
+        Cada llamada vive en un proceso aislado que muere con ella. El historial se escribe
+        <strong>mientras la llamada ocurre</strong>, paso a paso — si el proceso cae a mitad,
+        la evidencia ya está guardada.
       </p>
     </div>
 
     <figure class="fig" data-anim="2">
-      <svg viewBox="0 0 1420 344" role="img" aria-label="Diagrama de secuencia de un turno: llamante, STT, detección de turno, LLM, guard y tool, TTS, con el log append-only a la derecha">
+      <svg viewBox="0 0 1420 520" role="img" aria-label="Diagrama de secuencia de una llamada: el cliente pide mover su cita, la IA consulta, el cliente confirma, el control de negocio autoriza y ejecuta, y todo queda en el historial.">
         <defs>
-          <marker id="a04" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-            <path d="M0 0 L8 4 L0 8 z" style="fill:var(--rule)"/>
-          </marker>
-          <marker id="a04b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-            <path d="M0 0 L8 4 L0 8 z" style="fill:var(--accent)"/>
+          <marker id="e04a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" style="fill:var(--ink-2)"/>
           </marker>
         </defs>
 
-        <rect class="box" x="0" y="0" width="160" height="46"/>
-        <text class="lbl" x="80" y="20" text-anchor="middle">Llamante</text>
-        <text class="lbl-sm" x="80" y="37" text-anchor="middle">PSTN · WebRTC · chat</text>
-        <rect class="box" x="180" y="0" width="160" height="46"/>
-        <text class="lbl" x="260" y="20" text-anchor="middle">STT — Soniox</text>
-        <text class="lbl-sm" x="260" y="37" text-anchor="middle">stt-rt-v5 · es/en</text>
-        <rect class="box" x="360" y="0" width="160" height="46"/>
-        <text class="lbl" x="440" y="20" text-anchor="middle">Turno</text>
-        <text class="lbl-sm" x="440" y="37" text-anchor="middle">VAD + detector CPU</text>
-        <rect class="box-accent" x="540" y="0" width="160" height="46"/>
-        <text class="lbl" x="620" y="20" text-anchor="middle">Agente — LLM</text>
-        <text class="lbl-sm" x="620" y="37" text-anchor="middle">Haiku 4.5 · caché</text>
-        <rect class="box" x="720" y="0" width="160" height="46"/>
-        <text class="lbl" x="800" y="20" text-anchor="middle">Guard + tool</text>
-        <text class="lbl-sm" x="800" y="37" text-anchor="middle">ToolSpec · saga</text>
-        <rect class="box" x="900" y="0" width="160" height="46"/>
-        <text class="lbl" x="980" y="20" text-anchor="middle">TTS</text>
-        <text class="lbl-sm" x="980" y="37" text-anchor="middle">ElevenLabs v3</text>
+        <!-- cabeceras -->
+        <rect class="e04-box" x="40" y="4" width="200" height="44" rx="8"/>
+        <text class="e04-h" x="140" y="31" text-anchor="middle">Cliente</text>
+        <rect class="e04-box" x="440" y="4" width="200" height="44" rx="8"/>
+        <text class="e04-h" x="540" y="31" text-anchor="middle">Agente de IA</text>
+        <rect class="e04-hot" x="840" y="4" width="220" height="44" rx="8"/>
+        <text class="e04-h" x="950" y="31" text-anchor="middle">Control de negocio</text>
 
-        <path class="edge" d="M80 46 V336" stroke-dasharray="3 5"/>
-        <path class="edge" d="M260 46 V336" stroke-dasharray="3 5"/>
-        <path class="edge" d="M440 46 V336" stroke-dasharray="3 5"/>
-        <path class="edge" d="M620 46 V336" stroke-dasharray="3 5"/>
-        <path class="edge" d="M800 46 V336" stroke-dasharray="3 5"/>
-        <path class="edge" d="M980 46 V336" stroke-dasharray="3 5"/>
+        <!-- líneas de vida -->
+        <line class="e04-life" x1="140" y1="48" x2="140" y2="470"/>
+        <line class="e04-life" x1="540" y1="48" x2="540" y2="470"/>
+        <line class="e04-life" x1="950" y1="48" x2="950" y2="470"/>
 
-        <path class="edge" d="M1075 0 V336"/>
-        <text class="lbl-sm" x="1090" y="20">LOG APPEND-ONLY · seq POR SESIÓN</text>
-        <text class="lbl-sm" x="1090" y="37">escrito durante el turno, no al colgar</text>
+        <!-- historial -->
+        <rect class="e04-box" x="1120" y="4" width="296" height="466" rx="10"/>
+        <text class="e04-h" x="1144" y="34">Historial de la llamada</text>
+        <text class="e04-m" x="1144" y="56">inmutable · numerado · en tiempo real</text>
+        <text class="e04-m" x="1144" y="102">07 · el cliente pidió el cambio</text>
+        <text class="e04-m" x="1144" y="138">12 · se consultó la agenda</text>
+        <text class="e04-m" x="1144" y="174">15 · se ofreció jueves 10:00</text>
+        <text class="e04-m" x="1144" y="210">21 · el cliente dijo «sí, confirmo»</text>
+        <text class="e04-m" x="1144" y="246">22 · autorización emitida</text>
+        <text class="e04-m" x="1144" y="282">23 · cambio ejecutado en la agenda</text>
+        <text class="e04-m" x="1144" y="318">24 · SMS de confirmación enviado</text>
+        <text class="e04-m" x="1144" y="354">…</text>
+        <text class="e04-m" x="1144" y="390">al colgar: grabación disponible</text>
+        <text class="e04-m" x="1144" y="412">y nota de calidad automática</text>
 
-        <path class="edge" d="M80 76 H256" marker-end="url(#a04)"/>
-        <text class="lbl-sm" x="168" y="70" text-anchor="middle">audio · parciales</text>
+        <!-- 1 -->
+        <line class="e04-arr" x1="146" y1="110" x2="532" y2="110" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="93" r="10"/><text class="e04-n" x="160" y="97" text-anchor="middle">1</text>
+        <text class="e04-l" x="180" y="98">«quiero mover mi cita al jueves»</text>
 
-        <path class="edge" d="M260 103 H436" marker-end="url(#a04)"/>
-        <text class="lbl-sm" x="348" y="97" text-anchor="middle">final 0,47 s</text>
-        <text class="lbl-sm" x="1090" y="107">stt.final</text>
+        <!-- 2 -->
+        <line class="e04-arr" x1="546" y1="165" x2="942" y2="165" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="148" r="10"/><text class="e04-n" x="560" y="152" text-anchor="middle">2</text>
+        <text class="e04-l" x="580" y="153">consulta la disponibilidad — leer no requiere permiso</text>
 
-        <path class="edge" d="M440 130 H616" marker-end="url(#a04)"/>
-        <text class="lbl-sm" x="528" y="124" text-anchor="middle">turno cerrado · ≤ 1000 ms</text>
-        <text class="lbl-sm" x="1090" y="134">turn.user</text>
+        <!-- 3 -->
+        <line class="e04-arr" x1="942" y1="215" x2="548" y2="215" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="198" r="10"/><text class="e04-n" x="560" y="202" text-anchor="middle">3</text>
+        <text class="e04-l" x="580" y="203">huecos reales del jueves</text>
 
-        <path class="edge-accent" d="M620 157 H796" marker-end="url(#a04b)"/>
-        <text class="lbl-sm" x="708" y="151" text-anchor="middle">tool_call + idempotency_key</text>
-        <text class="lbl-sm" x="1090" y="161">tool.call · ttft 0,64 s</text>
+        <!-- 4 -->
+        <line class="e04-arr" x1="532" y1="265" x2="148" y2="265" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="248" r="10"/><text class="e04-n" x="160" y="252" text-anchor="middle">4</text>
+        <text class="e04-l" x="180" y="253">«puedo ofrecerle el jueves a las 10:00 — ¿se la cambio?»</text>
 
-        <path class="edge" d="M800 184 H624" marker-end="url(#a04)" stroke-dasharray="4 4"/>
-        <text class="lbl-sm" x="712" y="178" text-anchor="middle">sin token: rechazada</text>
-        <text class="lbl-sm" x="1090" y="188">tool.refused</text>
+        <!-- 5 -->
+        <line class="e04-arr" x1="146" y1="315" x2="532" y2="315" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="298" r="10"/><text class="e04-n" x="160" y="302" text-anchor="middle">5</text>
+        <text class="e04-l" x="180" y="303">«sí, confirmo»</text>
 
-        <path class="edge-accent" d="M620 211 H976" marker-end="url(#a04b)"/>
-        <text class="lbl-sm" x="798" y="205" text-anchor="middle">ConfirmTask pregunta</text>
-        <text class="lbl-sm" x="1090" y="215">confirm.request · seq 39</text>
+        <!-- 6 -->
+        <line class="e04-arr" x1="546" y1="365" x2="942" y2="365" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="348" r="10"/><text class="e04-n" x="560" y="352" text-anchor="middle">6</text>
+        <text class="e04-l" x="580" y="353">solicita ejecutar el cambio</text>
 
-        <path class="edge-accent" d="M80 238 H796" marker-end="url(#a04b)"/>
-        <text class="lbl-sm" x="438" y="232" text-anchor="middle">«sí» — el token se acuña aquí, no en el prompt</text>
-        <text class="lbl-sm" x="1090" y="242">confirm.granted · seq 46</text>
+        <!-- 7: el control trabaja -->
+        <rect class="e04-hot" x="830" y="390" width="240" height="52" rx="8"/>
+        <circle class="e04-chip" cx="846" cy="382" r="10"/><text class="e04-n" x="846" y="386" text-anchor="middle">7</text>
+        <text class="e04-l" x="850" y="411">verifica el «sí» · autoriza con un</text>
+        <text class="e04-l" x="850" y="431">vale de un solo uso · ejecuta</text>
 
-        <path class="edge" d="M800 265 H624" marker-end="url(#a04)" stroke-dasharray="4 4"/>
-        <text class="lbl-sm" x="712" y="259" text-anchor="middle">ejecutada + compensación</text>
-        <text class="lbl-sm" x="1090" y="269">tool.result · seq 51</text>
-
-        <path class="edge" d="M620 292 H976" marker-end="url(#a04)"/>
-        <text class="lbl-sm" x="798" y="286" text-anchor="middle">respuesta en streaming</text>
-        <text class="lbl-sm" x="1090" y="296">turn.agent</text>
-
-        <path class="edge" d="M980 319 H84" marker-end="url(#a04)"/>
-        <text class="lbl-sm" x="530" y="313" text-anchor="middle">audio · tts ttfb 0,11 s · e2e del turno 3,31 s</text>
-        <text class="lbl-sm" x="1090" y="323">session.end · 0,0063 €</text>
+        <!-- 8 -->
+        <line class="e04-arr" x1="532" y1="465" x2="148" y2="465" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="448" r="10"/><text class="e04-n" x="160" y="452" text-anchor="middle">8</text>
+        <text class="e04-l" x="180" y="453">«hecho — le llega un SMS con la nueva hora»</text>
       </svg>
-      <figcaption>Figura 2 — un turno completo con confirmación: el modelo pide, la máquina autoriza, el log lo numera</figcaption>
     </figure>
 
-    <div class="grid3" data-anim="3">
-      <div class="note"><b>Error de proveedor.</b> La tool falla con <code>ToolError</code> y el modelo
-        lee el motivo; cualquier otra excepción queda oculta y se registra como
-        <code>tool.error</code>. El turno sigue, la llamada no muere.</div>
-      <div class="note"><b><code>tool_use</code> huérfano.</b> <code>sanitize_tool_pairing(chat_ctx)</code>
-        corre antes de cada generación: un par roto devuelve un 400 de Anthropic y deja la
-        conversación inservible hasta colgar.</div>
-      <div class="note"><b>Caída a mitad de saga.</b> Se ejecuta la compensación declarada en el
-        <code>ToolSpec</code>, en orden inverso. La sesión no se reanuda: se re-engancha por número
-        en la siguiente entrante (lámina 07).</div>
-    </div>
-
-    <div class="proof" data-anim="4">
-      <b>Validación.</b> Sesión <span class="n">AJ_rdrkYph3FaeS</span>, <span class="n">13</span>
-      turnos: ttft <span class="n">0,64 s</span> (máx <span class="n">1,01</span>), transcripción
-      <span class="n">0,47 s</span>, tts ttfb <span class="n">0,11 s</span>, e2e
-      <span class="n">3,31 s</span>. El consentimiento vive en el mismo log —
-      <span class="n">seq 39</span> preguntó, <span class="n">seq 46</span> autorizó,
-      <span class="n">seq 51</span> ejecutó — y se relee entero con
-      <b>python -m convo sessions show AJ_rdrkYph3FaeS</b>.
-    </div>
+    <p class="proof" data-anim="3">
+      La secuencia completa, con sus números de orden y tiempos, es consultable por llamada
+      en la consola (sección Sessions) — https://lk.bernardocastro.dev
+    </p>
 
   </div>
 </section>
