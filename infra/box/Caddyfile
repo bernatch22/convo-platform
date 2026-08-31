@@ -1,0 +1,23 @@
+# One domain, two upstreams. Caddy terminates TLS on lk.bernardocastro.dev (its own
+# ACME cert — the A record already points here) and routes by path:
+#   the LiveKit signalling + RTC paths → livekit-server:7880 (WebSocket upgrade included)
+#   everything else (the console, /token, /pipeline, /sessions, SSE) → api.py:8090
+# Media (RTP/WebRTC UDP) and SIP do NOT pass through Caddy — they hit the host ports direct.
+lk.bernardocastro.dev {
+	# LiveKit's own paths and any websocket upgrade go to the SFU.
+	@livekit path /rtc* /twirp* /rtc/v1* /validate*
+	handle @livekit {
+		reverse_proxy 127.0.0.1:7880
+	}
+	@ws {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	handle @ws {
+		reverse_proxy 127.0.0.1:7880
+	}
+	# The console and the control-plane API.
+	handle {
+		reverse_proxy 127.0.0.1:8090
+	}
+}
