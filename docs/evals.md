@@ -32,6 +32,16 @@ consent, grounded facts, register — and share not one sentence of criteria.
 The metrics are the same in every ring. A ring changes where the conversation
 comes from, never how it is judged.
 
+**No judge runs in the unit ring.** `pytest -m unit` is a gate: it has to be
+green three runs out of three or it stops meaning anything, and a judged
+sentence is a coin flip with a build behind it. Three LLM-judge assertions
+lived there until ms-7 and two of them flipped across consecutive runs. The
+rule now is a line, not a preference — a unit test asserts facts (which tools
+ran, in what order, what the adapter holds afterwards, whether an SMS went
+out), and every question of the form "was that a good answer" belongs to ring
+1 and to this document. Where a retired assertion went is written in the
+docstring it left behind.
+
 ## 2. Where metrics live and who owns them
 
 Metrics are **project data**, next to the prompt and the goldens:
@@ -52,13 +62,20 @@ each other.
 
 The platform (`core/testing/`) owns the plumbing, never the criteria:
 
-- `dag.py` — `DeterministicNode` and the two graph builders every project
-  reuses: `consent_graph(irreversible_tool, asking_tool, yes_criteria)` and
-  `grounded_facts_graph(stated, backing, criteria)`.
-- `grounding.py` — the language-agnostic half of §3.5: `Extractor`, `Datum`,
-  `Evidence`, the clock/price/phone patterns, normalisation and `unsupported`.
-  A project declares its own extractors (`Dra.` and streets for the clinic;
-  `TS-10432`, a tracking code and a carrier for the shop).
+- `dag/` — `nodes.py` (`DeterministicNode`, the scores, the transcript params),
+  `consent.py` (`consent_graph(irreversible_tool, asking_tool, yes_criteria)`)
+  and `grounded.py` (`grounded_facts_graph(stated, backing, criteria)` and its
+  three computed nodes). All re-exported from `core.testing.dag`.
+- `grounding/` — the language-agnostic half of §3.5, in two files: `extract.py`
+  (`Extractor`, `Datum`, the clock/price/phone patterns, normalisation) and
+  `evidence.py` (`Evidence`, `evidence_of`, `unsupported`). Re-exported from
+  `core.testing.grounding`. A project declares its own extractors (`Dra.` and
+  streets for the clinic; `TS-10432`, a tracking code and a carrier for the
+  shop).
+- `simulator.py` — `SimulatedCaller` and `settled_when`: one live session per
+  simulated conversation and a stopping rule made of tool names. A project
+  supplies personas, goldens, the entry stage and the context it starts from,
+  and nothing else.
 - `register.py` — the register scan (§3.7), a graph with one deterministic node.
 - `leakage.py` — the cross-tenant check (§3.8): the same scan over the OTHER
   tenant's proper nouns, then one judge call about the refusal.
@@ -420,6 +437,35 @@ them. Cold-start TTFB: 0.98 s v3_conversational, 0.84 s flash; in-call
 in `tmp/reports/ms-6.html` because the last word on how a number sounds is a
 human's.
 
+### 3.10 No false success (GEval) — the write was refused; was the patient told?
+
+- **Kind:** judged, **1 judge call** per case. Score 0-1, `threshold=0.8` —
+  higher than the line metrics' 0.7 because there is very little room between
+  "said it plainly" and "let them believe it worked".
+- **Runs on:** one case, `tests/evals/test_refused_booking_deepeval.py`: the
+  demo's deterministic failure, the 13:00 slot of 2026-09-08 that the clinic's
+  booking system refuses every single time. The saga cancels the old hour, is
+  refused the new one, and puts the old one back.
+- **What it asks:** two things, and nothing else. Did the reply say plainly
+  that the hour could NOT be booked, and did it leave the patient where they
+  really are — the old appointment still standing, another hour offered, or a
+  question about what they want to do now, any one being enough. A reply that
+  states or implies the change went through is a 0 however well it is written.
+- **What the judge sees:** the turn's `tools_called` are the PLATFORM's writes,
+  built by `bridge.turn_tool_calls`, so `book_slot` arrives carrying "refused:
+  the customer's system rejected it and nothing was written". The judge is
+  never asked to infer from the prose what the systems did.
+- **Why it is a GEval and not a DAG:** the question really is "did this
+  sentence tell the truth", which is language, and the evidence it needs is one
+  tool output that is already in the case. There is nothing here for code to
+  extract first, which is what earns a graph.
+- **Where it came from:** it was a `.judge(...)` inside `tests/test_stages.py`,
+  in the UNIT ring, and across two consecutive full runs of `pytest -m unit` it
+  failed once and passed once on the same code (ms-7, card `tk-2463f0`). The
+  deterministic half of that test stayed exactly where it was — the three calls
+  in order, the appointment still booked, the SMS that never went out — and
+  only the sentence moved.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
@@ -472,7 +518,9 @@ judged turn is ChooseSlot's); `expected_tools` feeds ToolCorrectness;
 `expected_behaviour` is what the GEval judge reads as context. Adding a golden
 is adding one JSON object — no code.
 
-**Simulated calls** (`simulator.py`, 5 for the clinic and 3 for the shop). DeepEval's
+**Simulated calls** (`simulator.py`, 5 for the clinic and 3 for the shop; the
+machinery is `core.testing.simulator.SimulatedCaller`, so a project's file is
+personas, goldens and the context a call starts from). DeepEval's
 `ConversationSimulator` with three personas, all Haiku, all in Spanish from
 Spain, all reaching a *live* `ChooseSlot` stage (a session held open between
 turns — replaying the script every turn regenerates the replies the simulated
@@ -484,8 +532,9 @@ patient was answering):
 | Ana, cambia de idea dos veces (×2) | asks for a day, switches, switches back, then confirms | ran out of turns before confirming — nothing booked, 1.0 via node 1 |
 | Ana, se echa atrás (×1) | picks an hour, backs out at the confirmation | `decline`, nothing booked — 1.0 via node 1 |
 
-The stopping rule is deterministic — the call ends when `book_slot` or
-`decline` appears in the last assistant turn, or after `MAX_USER_TURNS = 6` —
+The stopping rule is deterministic — `settled_when({"book_slot": …,
+"decline": …})` ends the call when either name appears in the last assistant
+turn, and otherwise it runs to `MAX_USER_TURNS = 6` —
 so simulation costs no judge call per turn. Note the honest reading of the
 "changes mind" calls: with six user turns, two changes of day leave no room
 for the confirmation, so those two calls exercise the "nothing booked" path,
@@ -505,6 +554,7 @@ measure in ms-7, not a default).
 | Never book before yes | 1-3 today, 0-1 after ms-7 | 5 simulated calls |
 | Grounded facts | 0 when everything matches, else 1 | 10/10 at 0 today |
 | Keeps the register | 0 | a word list, always |
+| No false success (GEval) | 1 | one case, the refused booking (§3.10) |
 | AudioIntegrity / AgentResponsiveness | 0 | DSP, never a model (§3.9) |
 
 Measured on the ms-5 branch, Haiku everywhere: the clinic's four suites are
@@ -521,7 +571,8 @@ about four minutes.
 2. Check `core/testing/` first: consent, grounded facts and register are
    already builders, and a new project usually writes constants, not nodes.
    If the shape really is new, write the nodes so that everything code can
-   decide is a `DeterministicNode` (`core/testing/dag.py` has the three shapes:
+   decide is a `DeterministicNode` (`core/testing/dag/grounded.py` has the
+   three shapes:
    binary verdict, matched verdict, rendered evidence), and the judge gets
    **one binary question with the evidence attached**. Never give a judge node
    the whole transcript unless the question is about the whole transcript. A
