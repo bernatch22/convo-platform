@@ -7,8 +7,13 @@
  * single byte of state.
  */
 
-/** The sections a project has, in the order the rail lists them. Talk is the project's root. */
-export const SECTIONS = ["talk", "sessions", "pipeline"] as const;
+/** The sections a project has, in the order the rail lists them. Talk is the project's root.
+ *
+ * Board sits beside Sessions because they are the same evidence read two ways:
+ * Sessions is every conversation, Board is what those conversations DID to the
+ * business. Both are computed off the one append-only log.
+ */
+export const SECTIONS = ["talk", "sessions", "board", "pipeline"] as const;
 
 export type Section = (typeof SECTIONS)[number];
 

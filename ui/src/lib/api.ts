@@ -403,6 +403,72 @@ export interface EvalRunRequest {
   suite: string;
 }
 
+/* ── /outcomes ────────────────────────────────────────────────────────────── */
+
+/** How one transaction ended. `pending` is a call whose result never landed — a killed job. */
+export type OutcomeStatus = "done" | "failed" | "pending";
+
+/** One irreversible thing the platform did to the business, and the call it happened in.
+ *
+ * `verb` is the tool's own name, whatever a project chose to call it: nothing
+ * in this console holds a list of verbs, so a new irreversible tool shows up
+ * the first time it runs. `summary` is the line the tool's `result_summary`
+ * rendered and the session's PII mask scrubbed — reused verbatim, null for a
+ * tool that declares no renderer and for one that failed.
+ */
+export interface OutcomeRow {
+  session: string;
+  tenant: string;
+  project: string;
+  channel: Channel;
+  seq: number;
+  at: number;
+  day: string;
+  verb: string;
+  /** Whether a `confirm.granted` for this tool stood unspent before the call: the caller's yes. */
+  confirmed: boolean;
+  status: OutcomeStatus;
+  summary: string | null;
+}
+
+/** One verb's tally over the whole window. */
+export interface OutcomeVerb {
+  verb: string;
+  count: number;
+  confirmed: number;
+  failed: number;
+  pending: number;
+}
+
+/** One day of the window. Every day is present, empty ones included, so the bars keep an axis. */
+export interface OutcomeDay {
+  day: string;
+  total: number;
+  /** verb -> how many times it ran that day. */
+  verbs: Record<string, number>;
+}
+
+/** The four numbers across the top of the board. */
+export interface OutcomeTotals {
+  transactions: number;
+  confirmed: number;
+  failed: number;
+  sessions: number;
+}
+
+/** Everything the Board screen reads: the tallies, the days, and the recent transactions. */
+export interface OutcomeBoard {
+  tenant: string | null;
+  project: string | null;
+  days: number;
+  since: number;
+  until: number;
+  totals: OutcomeTotals;
+  verbs: OutcomeVerb[];
+  series: OutcomeDay[];
+  rows: OutcomeRow[];
+}
+
 /* ── errors ───────────────────────────────────────────────────────────────── */
 
 /** A control-plane refusal with the status and the sentence the API gave, for the UI to show. */
@@ -462,6 +528,14 @@ export async function listSessions(
   signal?: AbortSignal,
 ): Promise<SessionLine[]> {
   return request<SessionLine[]>(`/sessions${query(params)}`, signal ? { signal } : {});
+}
+
+/** What the platform DID to the business over a window: counts by verb by day, recent rows. */
+export async function getOutcomes(
+  params: { tenant?: string; project?: string; days?: number; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<OutcomeBoard> {
+  return request<OutcomeBoard>(`/outcomes${query(params)}`, signal ? { signal } : {});
 }
 
 /** One session in full. `events` is split into the count and the log so both keep their names. */

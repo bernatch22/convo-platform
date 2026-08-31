@@ -13,6 +13,7 @@
 
 import { createBrowserRouter } from "react-router";
 
+import { Board, boardLoader } from "./routes/Board";
 import { Crash } from "./routes/Crash";
 import { Evals, evalsLoader } from "./routes/Evals";
 import { Home } from "./routes/Home";
@@ -50,6 +51,7 @@ export const router = createBrowserRouter([
         element: <SessionDetail />,
         loader: sessionDetailLoader,
       },
+      { path: "t/:tenant/:project/board", element: <Board />, loader: boardLoader },
       { path: "t/:tenant/:project/pipeline", element: <Pipeline />, loader: pipelineLoader },
       {
         // The only screen that needs the SFU client, so it is the only one that downloads

@@ -30,6 +30,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
 from core import control_plane, pipeline, recordings, rooms
+from core import outcomes as core_outcomes
 from core.auth import (
     SupervisorCapability,
     mint_caller,
@@ -248,6 +249,45 @@ async def sessions(
     player rather than a broken one.
     """
     return control_plane.sessions(store, tenant=tenant, project=project, limit=limit)
+
+
+@app.get("/outcomes")
+async def outcomes(
+    store: Reader,
+    tenant: str | None = None,
+    project: str | None = None,
+    days: Annotated[int, Query(ge=1, le=core_outcomes.MAX_DAYS)] = core_outcomes.DEFAULT_DAYS,
+    limit: Annotated[int, Query(ge=1, le=core_outcomes.MAX_ROWS)] = core_outcomes.DEFAULT_ROWS,
+) -> dict[str, Any]:
+    """What the platform DID to the business: irreversible transactions, counted off the log.
+
+    → `{"tenant": str|null, "project": str|null, "days": int,
+         "since": float, "until": float,
+         "totals": {"transactions": int, "confirmed": int, "failed": int, "sessions": int},
+         "verbs": [{"verb": str, "count": int, "confirmed": int, "failed": int, "pending": int}],
+         "series": [{"day": "YYYY-MM-DD", "total": int, "verbs": {str: int}}],
+         "rows": [{"session": str, "tenant": str, "project": str, "channel": str,
+                   "seq": int, "at": float, "day": str, "verb": str,
+                   "confirmed": bool, "status": "done"|"failed"|"pending",
+                   "summary": str|null}]}`
+
+    A transaction is one `tool.call` whose `side_effect` is `irreversible` —
+    the verb is the tool's own name and nothing here knows which names exist,
+    so a project that declares a new irreversible tool appears on this board
+    the first time it runs. `confirmed` is whether a `confirm.granted` for that
+    tool stood unspent before the call: the caller's yes, paired one to one.
+
+    `summary` is the line the tool's own `result_summary` rendered and the
+    session's PII mask scrubbed, reused verbatim; it is null for a tool that
+    declares no renderer and for one that failed. Nothing is re-rendered here.
+
+    `series` covers every day of the window, empty days included, so a bar
+    strip has a stable axis; `rows` is newest first and capped by `limit`.
+    There is no rollup table — see `core/outcomes.py` for why.
+    """
+    return core_outcomes.outcomes(
+        store, tenant=tenant, project=project, days=days, limit=limit
+    )
 
 
 @app.get("/sessions/{session_id}")
