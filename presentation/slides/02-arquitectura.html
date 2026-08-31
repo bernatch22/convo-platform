@@ -1,118 +1,98 @@
 <section class="slide" data-title="Arquitectura de alto nivel" data-entregable="1">
+  <style>
+    .a02-t   { font: 600 19px/1.2 var(--sans); fill: var(--ink); }
+    .a02-b   { font: 400 14.5px/1.35 var(--sans); fill: var(--ink-2); }
+    .a02-m   { font: 400 11px var(--mono); fill: var(--muted); }
+    .a02-arr { font: 500 13px var(--sans); fill: var(--accent); }
+    .a02-cap { font: 500 11px var(--mono); fill: var(--muted); letter-spacing: .08em; }
+    .a02-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+    .a02-hot { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  </style>
   <div class="slide-body">
 
     <div class="head-block" data-anim="1">
-      <div class="eyebrow">02 <span class="sep">·</span> Entregable 1 — arquitectura de alto nivel</div>
-      <h2 class="head" style="max-width:44ch">Tres planos, y una llamada es un proceso aislado</h2>
-      <p class="lede">
-        El plano de datos habla (<code>worker.py</code>), el de control decide y guarda
-        (<code>api.py</code>), el de evidencia deja constancia. Un job no abre base de datos ni
-        pool: todo el IO de negocio sale por HTTP, de modo que matar una llamada se lleva esa
-        llamada y nada más. La alternativa —un worker con conexiones a la BD— ahorra un salto de
-        red y a cambio deja que cualquier conversación corrompa el estado de todas. El LLM es un
-        nodo dentro de una caja, no el marco del dibujo.
+      <div class="eyebrow">02 <span class="sep">·</span> Arquitectura de alto nivel</div>
+      <h2 class="head" style="max-width:52ch">Cuatro piezas: canales, conversación, control de negocio y sistemas del cliente</h2>
+      <p class="lede" style="max-width:100ch">
+        La plataforma separa la <strong>conversación</strong> (tiempo real, donde opera la IA) del
+        <strong>control de negocio</strong> (donde se valida, se autoriza y se registra). Esa
+        frontera es la garantía central del diseño: el modelo de IA genera lenguaje — las
+        operaciones las ejecuta y audita el backend.
       </p>
     </div>
 
     <figure class="fig" data-anim="2">
-      <svg viewBox="0 0 1420 348" role="img" aria-label="Arquitectura de alto nivel: canales, transporte, plano de datos, tools, sistemas del cliente, plano de control y plano de evidencia">
+      <svg viewBox="0 0 1420 470" role="img" aria-label="Diagrama de arquitectura: canales, conversación en tiempo real, control de negocio, sistemas del cliente y consola de operación.">
         <defs>
-          <marker id="a02" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-            <path d="M0 0 L8 4 L0 8 z" style="fill:var(--rule)"/>
-          </marker>
-          <marker id="a02b" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+          <marker id="f02" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
             <path d="M0 0 L8 4 L0 8 z" style="fill:var(--accent)"/>
           </marker>
         </defs>
 
-        <text class="lbl-sm" x="0" y="13">CANALES</text>
-        <text class="lbl-sm" x="220" y="13">TRANSPORTE</text>
-        <text class="lbl-sm" x="450" y="13">PLANO DE DATOS · worker.py</text>
-        <text class="lbl-sm" x="940" y="13">TOOLS</text>
-        <text class="lbl-sm" x="1210" y="13">SISTEMAS DEL CLIENTE</text>
+        <text class="a02-cap" x="4" y="34">EL MODELO DE IA GENERA LENGUAJE — NINGUNA OPERACIÓN DE NEGOCIO SE EJECUTA FUERA DEL CONTROL DE NEGOCIO</text>
 
-        <rect class="box" x="0" y="26" width="160" height="58"/>
-        <text class="lbl" x="14" y="52">SIP / PSTN</text>
-        <text class="lbl-sm" x="14" y="70">+1 417 674 3169</text>
-        <rect class="box" x="0" y="96" width="160" height="58"/>
-        <text class="lbl" x="14" y="122">WebRTC</text>
-        <text class="lbl-sm" x="14" y="140">navegador</text>
-        <rect class="box" x="0" y="166" width="160" height="58"/>
-        <text class="lbl" x="14" y="192">Chat</text>
-        <text class="lbl-sm" x="14" y="210">texto, sin audio</text>
+        <!-- CANALES -->
+        <rect class="a02-box" x="4" y="60" width="230" height="200" rx="10"/>
+        <text class="a02-t" x="28" y="102">Canales</text>
+        <text class="a02-b" x="28" y="136">teléfono, voz web y chat —</text>
+        <text class="a02-b" x="28" y="158">el cliente usa el canal</text>
+        <text class="a02-b" x="28" y="180">que prefiera</text>
+        <text class="a02-m" x="28" y="238">PSTN · WebRTC · texto</text>
 
-        <rect class="box" x="220" y="26" width="170" height="198"/>
-        <text class="lbl" x="234" y="52">SFU + puente SIP</text>
-        <text class="lbl-sm" x="234" y="74">una sala por llamada</text>
-        <text class="lbl-sm" x="234" y="94">dispatch por metadata</text>
-        <text class="lbl" x="234" y="130">Caja propia</text>
-        <text class="lbl-sm" x="234" y="152">lk.bernardocastro.dev</text>
-        <text class="lbl-sm" x="234" y="172">redis · minio · caddy</text>
+        <!-- flecha 1 -->
+        <line x1="238" y1="150" x2="320" y2="150" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="243" y="138">audio / texto</text>
 
-        <rect class="box" x="450" y="18" width="430" height="214"/>
-        <text class="lbl-sm" x="464" y="44">AgentServer · un agent_name, dispatch explícito</text>
-        <rect class="box-accent" x="470" y="54" width="390" height="166"/>
-        <text class="lbl" x="484" y="80">un job = un proceso del SO</text>
-        <text class="lbl-sm" x="484" y="106">VAD silero + detector de turno v1-mini — CPU local</text>
-        <text class="lbl-sm" x="484" y="128">STT Soniox stt-rt-v5 · pistas es/en</text>
-        <text class="lbl-sm" x="484" y="150">LLM Haiku 4.5 · caché de prefijo ≥ 4096 tokens</text>
-        <text class="lbl-sm" x="484" y="172">TTS ElevenLabs v3 conversational · sync_alignment</text>
-        <text class="lbl-sm" x="484" y="194">executor + guard + saga · sin pool ni base de datos</text>
+        <!-- CONVERSACIÓN -->
+        <rect class="a02-box" x="326" y="60" width="330" height="200" rx="10"/>
+        <text class="a02-t" x="348" y="102">Conversación en tiempo real</text>
+        <text class="a02-b" x="348" y="136">convierte voz en texto, genera la</text>
+        <text class="a02-b" x="348" y="158">respuesta con el modelo de IA y</text>
+        <text class="a02-b" x="348" y="180">la devuelve como voz</text>
+        <text class="a02-m" x="348" y="216">un proceso aislado por llamada</text>
+        <text class="a02-m" x="348" y="238">STT · LLM · TTS — proveedores intercambiables</text>
 
-        <rect class="box" x="940" y="26" width="200" height="58"/>
-        <text class="lbl" x="954" y="52">Locales</text>
-        <text class="lbl-sm" x="954" y="70">en el propio job</text>
-        <rect class="box" x="940" y="96" width="200" height="58"/>
-        <text class="lbl" x="954" y="122">Adaptador REST</text>
-        <text class="lbl-sm" x="954" y="140">un puerto por dominio</text>
-        <rect class="box" x="940" y="166" width="200" height="58" stroke-dasharray="4 4"/>
-        <text class="lbl" x="954" y="192">Remotas · WS</text>
-        <text class="lbl-sm" x="954" y="210">tenant-sdk — lám. 09</text>
+        <!-- flechas 2 (ida y vuelta) -->
+        <line x1="660" y1="128" x2="782" y2="128" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="662" y="116">solicita autorización</text>
+        <line x1="782" y1="188" x2="660" y2="188" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="662" y="214">autoriza y responde</text>
 
-        <rect class="box" x="1210" y="26" width="210" height="58"/>
-        <text class="lbl" x="1224" y="52">Agenda / CRM</text>
-        <text class="lbl-sm" x="1224" y="70">clinica-norte</text>
-        <rect class="box" x="1210" y="96" width="210" height="58"/>
-        <text class="lbl" x="1224" y="122">ERP / pedidos</text>
-        <text class="lbl-sm" x="1224" y="140">tienda-sur</text>
-        <rect class="box" x="1210" y="166" width="210" height="58"/>
-        <text class="lbl" x="1224" y="192">SMS · correo</text>
-        <text class="lbl-sm" x="1224" y="210">adaptador genérico</text>
+        <!-- CONTROL DE NEGOCIO -->
+        <rect class="a02-hot" x="790" y="60" width="330" height="200" rx="10"/>
+        <text class="a02-t" x="812" y="102">Control de negocio</text>
+        <text class="a02-b" x="812" y="136">valida cada acción, exige confirmación</text>
+        <text class="a02-b" x="812" y="158">explícita antes de operaciones definitivas</text>
+        <text class="a02-b" x="812" y="180">y registra cada paso de la llamada</text>
+        <text class="a02-m" x="812" y="216">contratos de tools · confirmación en dos fases</text>
+        <text class="a02-m" x="812" y="238">historial de auditoría inmutable</text>
 
-        <path class="edge" d="M160 55 H216" marker-end="url(#a02)"/>
-        <path class="edge" d="M160 125 H216" marker-end="url(#a02)"/>
-        <path class="edge" d="M160 195 H216" marker-end="url(#a02)"/>
-        <path class="edge" d="M390 125 H446" marker-end="url(#a02)"/>
-        <text class="lbl-sm" x="418" y="118" text-anchor="middle">media</text>
-        <path class="edge" d="M880 125 H936" marker-end="url(#a02)"/>
-        <text class="lbl-sm" x="908" y="118" text-anchor="middle">tools</text>
-        <path class="edge" d="M1140 125 H1206" marker-end="url(#a02)"/>
-        <text class="lbl-sm" x="1173" y="118" text-anchor="middle">invoca</text>
+        <!-- flecha 3 -->
+        <line x1="1124" y1="150" x2="1204" y2="150" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="1130" y="138">opera</text>
 
-        <path class="edge-accent" d="M665 232 V258" marker-end="url(#a02b)"/>
-        <text class="lbl-sm" x="678" y="252">HTTP · todo el IO de negocio</text>
-        <path class="edge" d="M450 300 H305 V230" marker-end="url(#a02)" stroke-dasharray="4 4"/>
-        <text class="lbl-sm" x="314" y="294">token + dispatch</text>
+        <!-- SISTEMAS DEL CLIENTE -->
+        <rect class="a02-box" x="1210" y="60" width="206" height="200" rx="10"/>
+        <text class="a02-t" x="1232" y="102">Sistemas</text>
+        <text class="a02-t" x="1232" y="126">del cliente</text>
+        <text class="a02-b" x="1232" y="160">agenda, pedidos,</text>
+        <text class="a02-b" x="1232" y="182">ticketing</text>
+        <text class="a02-m" x="1232" y="238">adapters por cliente</text>
 
-        <rect class="box" x="450" y="262" width="970" height="82"/>
-        <path class="edge" d="M1010 262 V344"/>
-        <text class="lbl-sm" x="466" y="286">PLANO DE CONTROL · api.py</text>
-        <text class="lbl" x="466" y="312">rutas, versiones de proyecto y overrides</text>
-        <text class="lbl-sm" x="466" y="332">tokens con el dispatch dentro · el job nunca abre la BD</text>
-        <text class="lbl-sm" x="1026" y="286">PLANO DE EVIDENCIA · log</text>
-        <text class="lbl" x="1026" y="312">append-only, seq por sesión</text>
-        <text class="lbl-sm" x="1026" y="332">escrito durante la llamada · consola y CLI</text>
+        <!-- CONSOLA -->
+        <line x1="491" y1="260" x2="491" y2="336" style="stroke:var(--rule);stroke-width:1.5;stroke-dasharray:5 5"/>
+        <line x1="955" y1="260" x2="955" y2="336" style="stroke:var(--rule);stroke-width:1.5;stroke-dasharray:5 5"/>
+        <rect class="a02-box" x="326" y="340" width="792" height="106" rx="10"/>
+        <text class="a02-t" x="350" y="380">Consola de operación</text>
+        <text class="a02-b" x="350" y="412">supervisión en tiempo real — escuchar, intervenir, transferir a un agente humano —</text>
+        <text class="a02-b" x="350" y="434">y auditoría posterior: transcripción, grabación, resultado, coste y calidad de cada llamada</text>
       </svg>
-      <figcaption>Figura 1 — canales → transporte → un job por llamada → plano de control por HTTP → tools → sistemas del cliente</figcaption>
     </figure>
 
-    <div class="proof" data-anim="3">
-      <b>Validación.</b> Los tres planos corren por separado hoy: <b>python worker.py dev</b> (datos),
-      <b>uvicorn api:app --port 8090</b> (control) y <b>python -m convo sessions show AJ_rdrkYph3FaeS</b>
-      (evidencia). Esa sesión es una llamada PSTN real de <span class="n">1 m 11 s</span> y
-      <span class="n">88</span> eventos: el job que la atendió no abrió ninguna conexión a base de
-      datos — <b>core/control_plane.py</b> es lo único que sostiene un handle.
-    </div>
+    <p class="proof" data-anim="3">
+      En operación: dos negocios sobre un único despliegue — telefonía, voz web y chat —
+      verificable en https://lk.bernardocastro.dev
+    </p>
 
   </div>
 </section>

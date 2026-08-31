@@ -26,21 +26,20 @@
             <tr>
               <td>LiveKit autohospedado — SFU y SIP en nuestra caja</td>
               <td>una pila gestionada de voz</td>
-              <td>operamos la caja: troncal, certificados y un firewall que ya nos costó un incidente
-                de fraude SIP. A cambio, PSTN, WebRTC y chat sobre <b>un</b> runtime, y el audio no sale
-                de casa.</td>
+              <td>operamos la caja: troncal, certificados y un firewall que ya nos costó un incidente de
+                fraude SIP. A cambio, PSTN, WebRTC y chat sobre <b>un</b> runtime, y el audio no sale de casa.</td>
             </tr>
             <tr>
               <td>Modelos pequeños con caché de prefijo, detrás de una allow-list</td>
               <td>un modelo grande en cada turno</td>
               <td>menos margen en razonamiento largo. A cambio, una llamada de 13 turnos cuesta
-                <b>0,0063 €</b>, y cambiar de modelo es configuración de proyecto.</td>
+                <b>0,0063 €</b> y cambiar de modelo es configuración.</td>
             </tr>
             <tr>
               <td>STT, LLM y TTS como <em>slots</em> con lista de permitidos</td>
               <td>fijar un proveedor por capa</td>
-              <td>mantener dos integraciones vivas por capa. A cambio, la plataforma se niega a correr
-                un modelo que nadie ha medido.</td>
+              <td>mantener dos integraciones vivas por capa. A cambio, la plataforma se niega a correr un
+                modelo que nadie ha medido.</td>
             </tr>
             <tr>
               <td>El tenant es un paquete en nuestro árbol</td>
@@ -50,14 +49,13 @@
             </tr>
           </tbody>
         </table>
-        <div class="note" style="margin-top:14px">
-          No construimos: cola de reintentos propia, almacén de audio a largo plazo, panel de
-          negocio. Producto, no plataforma.
+        <div class="note" style="margin-top:10px">
+          No construimos: cola de reintentos propia, almacén de audio a largo plazo, panel de negocio.
         </div>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:16px" data-anim="3">
-        <div class="rows" style="--row-pad:10px">
+      <div style="display:flex;flex-direction:column;gap:12px" data-anim="3">
+        <div class="rows" style="--row-pad:7px">
           <div class="row">
             <div class="idx">0</div>
             <div class="txt">Fundamentos <span class="tag off">ms-0 → ms-2</span>
@@ -66,39 +64,43 @@
           </div>
           <div class="row">
             <div class="idx">1</div>
-            <div class="txt">La conversación transaccional <span class="tag off">ms-3 → ms-5</span>
-              <span class="why">Etapas, <code>ConfirmTask</code>, saga, log y dos negocios en un worker.</span>
+            <div class="txt">La conversación transaccional <span class="tag off">ms-3 → ms-5 · ms-7</span>
+              <span class="why">Etapas, <code>ConfirmTask</code>, saga, log, dos negocios en un worker y sus goldens.</span>
             </div>
           </div>
           <div class="row">
             <div class="idx">2</div>
-            <div class="txt">Voz real <span class="tag off">ms-6 · ms-8 · ms-11</span>
-              <span class="why">LiveKit propio y un número que contesta. Acabó con una llamada desde un móvil.</span>
+            <div class="txt">Voz real <span class="tag off">ms-6 · ms-8 · ms-10 · ms-11</span>
+              <span class="why">LiveKit propio en una caja y un número que contesta. Acabó con una llamada desde un móvil.</span>
             </div>
           </div>
           <div class="row">
             <div class="idx">3</div>
-            <div class="txt">El instrumento <span class="tag ok">en curso</span>
-              <span class="why">La consola: pipeline, sesiones con score y coste, supervisor, evals.</span>
+            <div class="txt">El instrumento <span class="tag off">ms-9 · ms-13 → ms-15 · ms-17 · ms-19</span>
+              <span class="why">La consola: pipeline, sesiones con score y coste, supervisor, evals y grabaciones.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="idx">4</div>
+            <div class="txt">Lo siguiente <span class="tag warn">disparadores escritos</span>
+              <span class="why">Remote-tenant (lámina 09) cuando un cliente pida su proceso; re-enganche al caerse una saga abierta; segunda caja al llenar los procesos de ésta.</span>
             </div>
           </div>
         </div>
 
-        <div class="shot-missing" style="padding:18px 22px">
+        <div class="shot-missing" style="padding:12px 18px">
           <b>Falta: screenshots/board.png</b>
-          <div>El tablero con ms-0 … ms-16 y las cards de un hito desplegadas.
-            Cómo capturarlo: <code>screenshots/README.md</code>.</div>
+          <div>El tablero con ms-0 … ms-19. Cómo capturarlo: <code>screenshots/README.md</code>.</div>
         </div>
       </div>
 
     </div>
 
     <div class="proof" data-anim="5">
-      <b>Validación.</b> <span class="n">Diez</span> de dieciséis hitos cerrados, cada uno con su
-      informe en <b>.taskops/reports/ms-N.md</b> y sus commits atados a una card del tablero. La
-      consola corre en <b>lk.bernardocastro.dev</b>; el juicio automático de la llamada
-      <span class="n">AJ_rdrkYph3FaeS</span> costó <span class="n">0,0018 €</span> contra un techo de
-      <span class="n">0,0100 €</span> comprobado <em>antes</em> de hacer la llamada.
+      <b>Validación.</b> <span class="n">Dieciocho</span> de los veinte hitos del tablero están cerrados,
+      cada uno con su informe en <b>.taskops/reports/ms-N.md</b> —indexados en su
+      <b>README.md</b>— y sus commits atados a una card. Los dos abiertos son este mazo y el protocolo
+      remote-tenant, sin implementar a propósito. La consola corre en <b>lk.bernardocastro.dev</b>.
     </div>
 
   </div>
