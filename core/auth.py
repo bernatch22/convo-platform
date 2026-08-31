@@ -155,7 +155,7 @@ def mint_caller(room: str, tenant: str, identity: str = "caller") -> dict[str, s
         .to_jwt()
     )
     return {
-        "url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
+        "url": public_url(),
         "room": room,
         "identity": identity,
         "token": token,
