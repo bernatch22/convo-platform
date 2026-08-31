@@ -13,6 +13,11 @@ the one metric the suite runs and this does not — `evaluate()` scores every ca
 with every metric, and a judge asked about the arguments of a turn that called
 nothing has nothing to read. It stays in the pytest suite, where it is applied
 only to the goldens that call.
+
+At the end the run files itself with the control plane (`POST /evals/runs`), so
+a report written on a laptop shows up on the console's evals screen next to the
+runs the box launched itself. A control plane that is not answering costs
+nothing: the HTML on disk is still the evidence.
 """
 
 import asyncio
@@ -25,6 +30,7 @@ from deepeval.evaluate.configs import DisplayConfig
 from deepeval.test_case import LLMTestCase
 from dotenv import load_dotenv
 
+from core.evals.filing import file_run, metrics_from
 from core.testing.deepeval import (
     inputs_for,
     project_metrics,
@@ -34,6 +40,7 @@ from core.testing.deepeval import (
 from core.testing.harness import fake_context, run_conversation
 
 REPORT_DIR = pathlib.Path("tmp/reports/deepeval")  # generated artifact, not versioned
+DEFAULT_SUITE = "report"  # what this CLI files under when nobody names a suite
 
 
 async def build_cases(tenant_id: str, project_id: str) -> list[LLMTestCase]:
@@ -52,15 +59,29 @@ def main(argv: list[str]) -> None:
     """CLI: tenant and project ids; writes tmp/reports/deepeval/<name>_<timestamp>.html."""
     load_dotenv(".env")
     tenant_id, project_id = argv[1], argv[2]
+    suite = argv[3] if len(argv) > 3 else DEFAULT_SUITE
     metrics = project_metrics(tenant_id, project_id)
     cases = asyncio.run(build_cases(tenant_id, project_id))
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    evaluate(
+    result = evaluate(
         test_cases=cases,
         metrics=[metrics.reception_line(), metrics.tool_correctness()],
         display_config=DisplayConfig(file_type="html", file_output_dir=str(REPORT_DIR)),
         identifier=f"{tenant_id}-{project_id}",
     )
+    file_run(
+        tenant_id,
+        project_id,
+        suite,
+        metrics_from(result.test_results),
+        report_html=_newest_html(),
+    )
+
+
+def _newest_html() -> str | None:
+    """The HTML this run just wrote, so the console links the evidence instead of naming it."""
+    written = sorted(REPORT_DIR.glob("*.html"), key=lambda path: path.stat().st_mtime)
+    return str(written[-1]) if written else None
 
 
 if __name__ == "__main__":

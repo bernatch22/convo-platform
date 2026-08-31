@@ -277,7 +277,7 @@ also in the clinic's opening hours in `<clinic_knowledge>`.
 `tool.result` — a redacted rendering of the result, filtered by the same
 `pii_scope` that already masks the arguments and capped in length. It is a
 change to `ToolSpec` and to the executor, so it belongs to a card of its own;
-see §8. A cheaper half-step exists too: the masked ARGUMENTS are already in the
+see §9. A cheaper half-step exists too: the masked ARGUMENTS are already in the
 log (`send_sms` carries the whole confirmation text), and a project's
 `evidence_of` could read `input_parameters` as well as outputs.
 
@@ -513,7 +513,70 @@ about four minutes.
 6. Run the suite once. If a judge misreads, fix the criterion text once, write
    the misreading down in the card's closing note, and move on. Do not loop.
 
-## 8. Known gaps, tracked
+## 8. Running evals from the console
+
+Since ms-14 an eval run is not only a terminal command: the console's **Evals**
+screen lists every run this deploy knows about, scores it metric by metric, and
+diffs it against the previous run of the same suite. There are two ways a run
+gets there, and both end in the same store.
+
+**A run launched from the box.** `POST /evals/run {tenant, project, suite}`
+spawns `deepeval test run <target>` as a subprocess. The rules are deliberately
+severe, because a run is minutes of paid LLM traffic:
+
+- **one at a time.** A second request while one is alive is a `409`, never a
+  queue: a queue silently doubles a bill nobody watched being spent.
+- **fifteen minutes, then SIGKILL.** A hung judge cannot leave a pytest holding
+  a provider connection open on the box.
+- **nothing runs blind.** Every line the child writes goes to
+  `tmp/evals/<run id>.log`, and `GET /evals/run/<id>` answers
+  `running | done | failed` with that log's tail, which is what the screen
+  shows while it happens.
+
+The child inherits the provider keys from the box's `.env` — a suite cannot
+judge anything without them. They travel into its environment and nowhere else;
+no handler echoes an environment and the only thing written to disk is the
+child's own output.
+
+**A run that happened somewhere else.** `python -m core.testing.report <tenant>
+<project>` files itself with `POST /evals/runs` when it finishes, so a report
+written on a laptop shows up next to the runs the box launched. CI can do the
+same with one POST. A control plane that is not answering costs nothing: the
+HTML on disk is still the evidence.
+
+### Declaring a suite
+
+A suite is a project's own data, never a name `core` knows. Each project lists
+its suites in `tenants/<tenant>/projects/<project>/evals/suites.json`:
+
+```json
+{
+  "ring1": "tests/evals/test_reception_deepeval.py",
+  "tools": "tests/evals/test_reception_tools_deepeval.py",
+  "grounding": "tests/evals/test_reagendamiento_dag.py"
+}
+```
+
+The key is the suite id the console shows on its Run button; the value is the
+single path `deepeval test run` accepts. Ring 2's personas plug in here as one
+more key when ms-13 lands — nothing in `core/evals/` special-cases ring 1, and
+a project that declares nothing simply has no button.
+
+### The scores, and where they come from
+
+The run's numbers are read out of deepeval's own `test_run_*.json`
+(`DEEPEVAL_RESULTS_FOLDER`, one folder per run), from the `metricsScores` block
+it already aggregates: one row per metric with every case's score and the
+pass/fail tally. Reading deepeval's own file is what keeps this screen and
+`deepeval test run` from ever disagreeing about what a metric scored. A run
+that FAILED still stores its scores — a failing suite is exactly the one whose
+numbers you want to read.
+
+`delta` on a metric is its score minus what the previous **scored** run of the
+same tenant/project/suite gave it, matched by start time rather than list
+position so a run filed late by CI never diffs against a future.
+
+## 9. Known gaps, tracked
 
 - Consent DAG nodes 1-2 are still judge `TaskNode`s; both are extractable in
   code (ms-7, `tk-ff61b4`). The register half of that card landed in ms-5
