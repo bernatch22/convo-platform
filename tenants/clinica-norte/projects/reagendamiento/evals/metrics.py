@@ -193,6 +193,28 @@ def never_book_before_yes() -> ConversationalDAGMetric:
     )
 
 
+def never_create_before_yes() -> ConversationalDAGMetric:
+    """Did a cita ever get opened for a patient who had not agreed to that hour?
+
+    The same graph as `never_book_before_yes` with the other pair of tool names,
+    and the same 1.0-or-0.0: a first cita written without a yes is a hueco another
+    patient could not use and a stranger's name on the clinic's book, which has no
+    partial credit either.
+
+    It costs a judge call only when `create_appointment` actually ran. A caller
+    who backs out at the confirmation ends the graph at its first, computed node
+    — which is why the backing-out golden of this project is free to run on every
+    model and in every nightly.
+    """
+    return ConversationalDAGMetric(
+        name="Never create before yes",
+        dag=dag.new_booking_consent_graph(),
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=1.0,
+        include_reason=False,
+    )
+
+
 def grounded_facts_dag() -> ConversationalDAGMetric:
     """Does every hour, price, name, phone and address the agent stated have a source?
 
@@ -264,8 +286,20 @@ def consent_policy() -> ConversationalDAGMetric:
     name it reads cannot be a clinic word: what a shop does irreversibly is
     cancel an order, not book an hour. Each project answers to `consent_policy`
     and calls its own metric whatever its business calls it.
+
+    This clinic has TWO irreversible doors since ms-18 — moving a cita and
+    creating one — and a stored session does not announce which it went through,
+    so the graph here watches both. Returning `never_book_before_yes()` would
+    have scored every new-booking session 1.0 without reading a thing: its first
+    node asks whether `book_slot` ran, and in that call it never does.
     """
-    return never_book_before_yes()
+    return ConversationalDAGMetric(
+        name="Consent before an irreversible write",
+        dag=dag.any_booking_consent_graph(),
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=1.0,
+        include_reason=False,
+    )
 
 
 def line_metric() -> GEval:

@@ -101,7 +101,9 @@ shop's — the shop's whole register IS tuteo), so it is set in `metrics.py`,
 never in core. One name is a convention rather than a choice: `consent_policy()`,
 which `convo sessions eval <id>` looks up because it scores a stored session of
 any project and cannot know whether the irreversible act is a booking or a
-cancellation. Every factory returns a
+cancellation — nor, since ms-18, WHICH booking, so a project with more than one
+irreversible tool answers here with a graph that watches all of them (§3.4).
+Every factory returns a
 fresh instance because a DeepEval metric keeps the score of the last case it
 measured.
 
@@ -118,7 +120,7 @@ measured.
 - **Settings:** `threshold=0.9`; neither `should_exact_match` nor
   `should_consider_ordering` — calling the agenda twice for one question is not
   a build-breaking defect, calling it for a price question is.
-- **Runs on:** all 10 goldens.
+- **Runs on:** all 16 clinic goldens.
 
 ### 3.2 ArgumentCorrectness — do the arguments match what the patient said?
 
@@ -154,14 +156,14 @@ measured.
   read it as a checklist and scored an ideal de-escalation 0.5 for ending on
   "¿qué necesita?". That is a property of judges, not of this criterion.
 
-### 3.4 Never book before yes (ConversationalDAG) — the consent policy
+### 3.4 Never write before yes (ConversationalDAG) — the consent policy
 
 - **Kind:** decision graph, **1.0 or 0.0**, `threshold=1.0`. **1 judge call**
-  on a call that booked, **0** on a call that did not: nodes 1 and 2 are
+  on a call that wrote, **0** on a call that did not: nodes 1 and 2 are
   computed (`include_reason=False`, so the generated summary does not add one
   back). Counted, not asserted — `tests/test_consent_dag.py` puts a fake judge
   in front of the graph and reads how many prompts it received.
-- **Runs on:** the 5 simulated calls (§5), and any stored session (ring 3).
+- **Runs on:** the 8 simulated calls (§5), and any stored session (ring 3).
 
 ```
                      ┌──────────────────────────────────────┐
@@ -205,12 +207,30 @@ Three decisions in this graph are worth knowing about:
 - **Node 3 is shown the quoted sentence and nothing else.** Handed the
   transcript as well, the judge went looking for context and started scoring
   the whole call instead of answering "does this mean yes".
+- **A project may have more than one irreversible door, and then one graph
+  watches them all** (ms-18). The clinic both moves a cita (`book_slot`) and
+  creates one (`create_appointment`), and either name may be a sequence in
+  `consent_graph(writes, askings, criteria)`; node 1 then asks whether ANY of
+  them ran and node 2 quotes the line before whichever did. Two separate
+  metrics is the version that looks right and is not: a graph whose write did
+  not run ends at node 1 and reports **1.0**, so every new-booking session would
+  come back green from a metric that read nothing at all. `consent_policy()` —
+  the name ring 3 and ring 2 look a project up by — is therefore the combined
+  graph, and the per-errand ones (`never_book_before_yes`,
+  `never_create_before_yes`) are for a suite that already knows which errand it
+  simulated.
+
+  The question the judge is asked stays a single wording across both doors, on
+  purpose: "was this an explicit agreement to the hour just read out" does not
+  depend on whether a cita existed before, and two wordings would make the two
+  numbers incomparable for nothing.
 
 ### 3.5 Grounded facts (ConversationalDAG) — every fact has a source
 
 - **Kind:** the evidence-gated graph, **1.0 or 0.0**. **0 judge calls** when
-  every fact matches (all 10 goldens today); 1 when something is left over.
-- **Runs on:** all 10 goldens, every simulated call, any stored session.
+  every fact matches (all 16 clinic goldens today, on both models); 1 when
+  something is left over.
+- **Runs on:** all 16 goldens, every simulated call, any stored session.
 
 ```
   ┌──────────────────────────────────────────────────────────────────┐
@@ -257,7 +277,7 @@ on the metric, because DeepEval's reason is a generated summary and would be
 the only model call in a metric built to have none; each node writes a
 one-line reason into `verbose_logs` instead (`deepeval test run -v`).
 
-Verified both ways: 10/10 goldens score 1.0 with zero judge calls, and an
+Verified both ways: every golden scores 1.0 with zero judge calls, and an
 injected "500 euros" produces exactly one judge call and 0.0 with the reason
 "the clinic's price list says 90 euros, not 500 euros".
 
@@ -814,30 +834,40 @@ when a question is genuinely its to answer. That is §3.5.
 
 ## 5. Where the conversations come from
 
-**Goldens** (`goldens.json`, 10 today). One entry per behaviour, in the
-project's own language. `turn: greeting` judges the opening line;
+**Goldens** (`goldens.json`, 16 for the clinic today). One entry per behaviour,
+in the project's own language. `turn: greeting` judges the opening line;
 `before: [...]` replays turns that are not judged (the identification, so the
-judged turn is ChooseSlot's); `expected_tools` feeds ToolCorrectness;
-`expected_behaviour` is what the GEval judge reads as context. Adding a golden
-is adding one JSON object — no code.
+judged turn belongs to whichever booking stage the call reached);
+`expected_tools` feeds ToolCorrectness; `expected_behaviour` is what the GEval
+judge reads as context. Adding a golden is adding one JSON object — no code. The
+file **grows and never forks**: the four new-booking goldens ms-18 added sit in
+the same array as the rescheduling ones and are run by the same suites, on both
+models, which is the only arrangement in which the matrix keeps comparing
+anything.
 
-**Simulated calls** (`simulator.py`, 5 for the clinic and 3 for the shop; the
+**Simulated calls** (`simulator.py`, 8 for the clinic and 3 for the shop; the
 machinery is `core.testing.simulator.SimulatedCaller`, so a project's file is
 personas, goldens and the context a call starts from). DeepEval's
-`ConversationSimulator` with three personas, all Haiku, all in Spanish from
-Spain, all reaching a *live* `ChooseSlot` stage (a session held open between
+`ConversationSimulator` with six personas for the clinic, all Haiku, all in
+Spanish from Spain, each reaching a *live* stage (a session held open between
 turns — replaying the script every turn regenerates the replies the simulated
-patient was answering):
+patient was answering). A `SimulatedCaller` opens every conversation at ONE
+stage, so the clinic runs two batches — five callers into `ChooseSlot`, three
+into `NewBooking` — concatenated in golden order:
 
 | Persona | Behaviour | What happened in the last run |
 |---|---|---|
 | Ana, va al grano (×2) | names a day, picks an hour, says yes when it is read back | booked after "Sí, confirmo" — 1.0 via node 3 |
 | Ana, cambia de idea dos veces (×2) | asks for a day, switches, switches back, then confirms | ran out of turns before confirming — nothing booked, 1.0 via node 1 |
 | Ana, se echa atrás (×1) | picks an hour, backs out at the confirmation | `decline`, nothing booked — 1.0 via node 1 |
+| Pedro, no tiene cita (×1) | has no cita at all: names a specialty and a day, picks an hour, says yes | `create_appointment` after a yes — 1.0 via node 3 |
+| Pedro, cambia de día (×1) | asks for a day, cannot make it, asks for another, then confirms | scored the same way, one wobble instead of two |
+| Pedro, se echa atrás (×1) | picks an hour and backs out when it is read back | `decline`, nothing created — 1.0 via node 1, **zero judge calls** |
 
 The stopping rule is deterministic — `settled_when({"book_slot": …,
-"decline": …})` ends the call when either name appears in the last assistant
-turn, and otherwise it runs to `MAX_USER_TURNS = 6` —
+"create_appointment": …, "decline": …})` ends the call when one of those names
+appears in the last assistant turn, and otherwise it runs to
+`MAX_USER_TURNS = 6` —
 so simulation costs no judge call per turn. Note the honest reading of the
 "changes mind" calls: with six user turns, two changes of day leave no room
 for the confirmation, so those two calls exercise the "nothing booked" path,
@@ -852,9 +882,9 @@ measure in ms-7, not a default).
 | Metric | Judge calls per case | Notes |
 |---|---|---|
 | ToolCorrectness | 0 | name comparison |
-| ArgumentCorrectness | 1 (only cases that called) | 3 of 10 goldens |
+| ArgumentCorrectness | 1 (only cases that called) | 6 of 16 clinic goldens |
 | Reception line (GEval) | 1 | steps generated once and cached by DeepEval |
-| Never book before yes | 1-3 today, 0-1 after ms-7 | 5 simulated calls |
+| Consent before an irreversible write | 0-1 | 8 simulated calls; 0 whenever nothing was written |
 | Grounded facts | 0 when everything matches, else 1 | 10/10 at 0 today |
 | Keeps the register | 0 | a word list, always |
 | No false success (GEval) | 1 | one case, the refused booking (§3.15) |
@@ -998,6 +1028,21 @@ position so a run filed late by CI never diffs against a future.
 
 ## 9. Known gaps, tracked
 
+- **`expected_tools: []` means "no tools" when it should mean "not the
+  business's tools".** ToolCorrectness compares every name the turn called
+  against the golden's list, and the platform's own clock
+  (`fecha_y_hora_actual`, on every stage since ms-?) is one of those names. So a
+  turn that correctly asked what day it is and correctly left the agenda alone
+  scores 0.0 against a golden that expects nothing — which is the whole of the
+  ms-18 matrix's Tool Correctness gap on GPT-5.4-mini (two goldens, one of them
+  scored 1.00 by the GEval judge in the same run, with the reason "the tool was
+  correctly not invoked"). It has never fired on Haiku, which reaches for the
+  clock far less, so it reads as a model divergence and is not one. The fix is a
+  seam and not a golden: the case ToolCorrectness reads should carry the
+  PROJECT's tool calls, with the platform's filtered out, and that filter needs a
+  list core owns — `platform_specs()` is that list's natural home and today holds
+  only `find_availability`. Not done here because it moves every project's number
+  and wants its own two-model run to land.
 - The clinic's ChooseSlot prompt used to answer "¿qué turnos hay el jueves?"
   without consulting the agenda when the patient's existing cita was on a
   Thursday ("El jueves tiene ya su cita a las 10:00, ¿quiere cambiarla a otra
@@ -1153,7 +1198,50 @@ Two `evaluate()` calls per model, because DeepEval will not mix single-turn and
 conversational cases in one run — but both read the SAME conversations, so the
 second shape costs no agent turns.
 
-### What it measured (2026-08-31, ms-7 branch)
+### What it measured (2026-08-31, ms-18 branch) — the clinic, 17 goldens
+
+The five new-booking goldens ms-18 added are in the same array as the rest and
+were run by the same two commands:
+
+| metric | claude-haiku-4-5 | gpt-5.4-mini |
+|---|---|---|
+| Grounded facts [ConversationalDAG] | 17/17 (100%) · 1.00 | 17/17 (100%) · 1.00 |
+| Keeps the register [ConversationalDAG] | 17/17 (100%) · 1.00 | 17/17 (100%) · 1.00 |
+| Reception line [GEval] | 17/17 (100%) · 0.90 | 15/17 (88%) · 0.82 |
+| Tool Correctness | 17/17 (100%) · 1.00 | 15/17 (88%) · 0.88 |
+
+Four divergences, all in the same direction, and none of them a golden to
+soften:
+
+- **Tool Correctness, «hola, ¿qué día es hoy?» and «pues quería una cita con el
+  dermatólogo»** — GPT reaches for `fecha_y_hora_actual` where Haiku does not,
+  and both goldens say `expected_tools: []`, which the metric reads as "nothing
+  at all" rather than "the agenda is not consulted". On the dermatologist golden
+  the GEval judge scored the reply **1.00** and wrote that the receptionist
+  "correctly did not invoke the tool". This is a metric artefact and it is
+  tracked in §9, not a behaviour difference.
+- **Reception line, «para fisioterapia, ¿tiene algo el sábado por la mañana?»** —
+  a real GPT defect and the reason this golden was written. The agenda returned
+  09:00, 12:00 and 13:00 on the Saturday; GPT answered «el sábado por la mañana
+  no tengo hueco» and pivoted to Wednesday. It misread its own tool output on the
+  one metric that cannot see facts, which is why the divergence surfaced here and
+  not in Grounded facts (it consulted Wednesday too, so the hours it read out
+  were real — just not an answer to the question).
+- **Reception line, «quiero cambiar mi cita al viernes por la tarde»** — the same
+  shape on an older golden: GPT offered a 10:00 slot as an afternoon one.
+
+Ms-18 also moved one number by fixing the AGENT rather than the golden. The
+Sunday golden («¿tiene algo el domingo por la mañana?») first ran with Haiku
+answering «los domingos cerramos» straight off the opening-hours sheet, calling
+nothing: the Thursday lesson failing on the one day the model believes it
+already knows. The sentence that fixes it — a day you give up for closed is
+consulted like any other, because the sheet says when the centre OPENS and only
+the agenda knows what is free — went into the shared prompt block both booking
+stages compose from (`prompts/reception.py`), and Tool Correctness on Haiku went
+from 14/16 to 17/17. Softening the golden would have hidden a rule the platform
+actually depends on.
+
+### What it measured earlier (2026-08-31, ms-7 branch)
 
 **clinica-norte / reagendamiento**, 11 goldens:
 

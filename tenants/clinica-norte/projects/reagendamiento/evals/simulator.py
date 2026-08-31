@@ -1,19 +1,32 @@
-"""Five rescheduling calls nobody scripted: who calls, what should happen, where the call starts.
+"""Eight calls to the clinic nobody scripted: who calls, what should happen, where each starts.
 
 The machinery is `core.testing.simulator` — one live session per conversation, a
 deterministic stopping controller, one call at a time. What lives here is the
-clinic's half of it, and only that: three personas, five goldens, the two tool
-names that settle a rescheduling call, and the context a call starts from.
+clinic's half of it, and only that: the personas, the goldens, the tool names
+that settle a call, and the context each call starts from.
 
-Two of those choices are worth the sentence:
+Two batches, because the clinic has two errands and a `SimulatedCaller` opens
+every conversation at ONE stage. Five callers move a cita they already have and
+three ask for a first one; the two lists are concatenated in that order and
+`simulate_calls()` returns them in the order `goldens()` names them, which is
+how a score is paired back to the call that earned it.
 
-- **The calls start at `ChooseSlot`, already identified.** Every user turn is a
-  Haiku call for the persona and another for the agent, and identification is
-  already pinned by `tests/test_stages.py` with two deterministic turns. Paying
-  five conversations' worth of model time to re-prove it would buy nothing this
-  metric can read: `book_slot` only exists in the stage these calls start in.
-- **`book_slot` and `decline` end the call.** The first means the change went
-  through, the second that the patient said no to it. Neither needs a judge.
+Three of these choices are worth the sentence:
+
+- **The rescheduling calls start at `ChooseSlot`, already identified.** Every
+  user turn is a Haiku call for the persona and another for the agent, and
+  identification is already pinned by `tests/test_stages.py` with two
+  deterministic turns. Paying five conversations' worth of model time to
+  re-prove it would buy nothing this metric can read: `book_slot` only exists in
+  the stage these calls start in. The new-booking calls start at `NewBooking`
+  for the same reason.
+- **`book_slot`, `create_appointment` and `decline` end the call.** The first
+  two mean a cita was written, the third that the patient said no. None of them
+  needs a judge.
+- **The one who backs out of a first cita is the cheapest golden here.** The
+  consent graph's first node is computed, so a conversation where nothing was
+  written ends there: it is scored on every model and in every nightly for
+  nothing (`tests/test_consent_dag.py` counts the judge calls and gets zero).
 """
 
 from deepeval.dataset import ConversationalGolden, Persona
@@ -23,14 +36,19 @@ from core.context import TenantContext
 from core.testing import fake_context
 from core.testing.simulator import SimulatedCaller, settled_when
 
-from ..stages import ChooseSlot, Identify
+from ..stages import ChooseSlot, Identify, NewBooking
 
 TENANT, PROJECT = "clinica-norte", "reagendamiento"
-ANA = "ap-20260903-1000-trau"  # the seeded appointment every simulated call reschedules
+ANA = "ap-20260903-1000-trau"  # the seeded appointment every rescheduling call moves
+PEDRO = {"patient": "Pedro Ramos Gil", "phone": "699000000"}  # nobody the book has held
 
 MAX_USER_TURNS = 6
 SETTLED = {
     "book_slot": "the appointment was moved",
+    "decline": "the patient did not confirm",
+}
+NEW_BOOKING_SETTLED = {
+    "create_appointment": "the appointment was created",
     "decline": "the patient did not confirm",
 }
 
@@ -68,12 +86,53 @@ BACKS_OUT = Persona(
     ),
 )
 
+NEW_VOICE = (
+    "Hablas español de España, por teléfono, en frases cortas. Nunca escribes acotaciones ni "
+    "describes lo que haces: dices tu frase y nada más. Ya has dado tu nombre y tu teléfono al "
+    "empezar la llamada, así que no los repitas si no te los piden."
+)
+
+WANTS_ONE = Persona(
+    name="Pedro, no tiene cita",
+    characteristics=(
+        "Eres Pedro Ramos Gil y llamas a Clínica Norte para pedir cita por primera vez: no "
+        f"tienes ninguna. {NEW_VOICE} Dices para qué especialidad la quieres y qué día te "
+        "viene bien, eliges una de las horas que te ofrezcan y, cuando te lean la hora entera "
+        "y te pregunten si te la reservan, dices que sí con claridad."
+    ),
+)
+WANTS_ONE_ANOTHER_DAY = Persona(
+    name="Pedro, cambia de día",
+    characteristics=(
+        "Eres Pedro Ramos Gil y llamas a Clínica Norte para pedir cita por primera vez: no "
+        f"tienes ninguna. {NEW_VOICE} Pides un día; cuando te ofrezcan horas, dices que ese "
+        "día no puedes y pides otro. Después eliges una hora de las nuevas y, si te la leen "
+        "para reservarla, dices que sí."
+    ),
+)
+WANTS_ONE_THEN_DOESNT = Persona(
+    name="Pedro, se echa atrás",
+    characteristics=(
+        "Eres Pedro Ramos Gil y llamas a Clínica Norte para pedir cita por primera vez: no "
+        f"tienes ninguna. {NEW_VOICE} Eliges una de las horas que te ofrezcan, pero en cuanto "
+        "te la lean para reservarla te echas atrás: dices que no, que lo consultas en casa y "
+        "ya llamarás. No confirmas nada, pase lo que pase."
+    ),
+)
+
 MOVED = "La cita queda cambiada a una hora nueva y el paciente lo sabe."
 NOTHING_MOVED = "No se cambia nada y la cita que el paciente ya tenía sigue en pie."
+CREATED = "El paciente se queda con una cita nueva apuntada y lo sabe."
+NOTHING_CREATED = "No se apunta ninguna cita y el paciente se queda sin ninguna."
 
 
 def goldens() -> list[ConversationalGolden]:
-    """The five calls to simulate: two that go smoothly, two that wobble, one that backs out."""
+    """The eight calls to simulate, rescheduling first and new bookings after."""
+    return [*rescheduling_goldens(), *new_booking_goldens()]
+
+
+def rescheduling_goldens() -> list[ConversationalGolden]:
+    """The five that move a cita: two straightforward, two that wobble, one that backs out."""
     return [
         ConversationalGolden(
             name="colaboradora-jueves",
@@ -108,15 +167,52 @@ def goldens() -> list[ConversationalGolden]:
     ]
 
 
+def new_booking_goldens() -> list[ConversationalGolden]:
+    """The three that create one: a straightforward first cita, a change of day, a refusal."""
+    return [
+        ConversationalGolden(
+            name="cita-nueva-jueves",
+            scenario="El paciente no tiene ninguna cita y quiere una de traumatología el jueves.",
+            expected_outcome=CREATED,
+            persona=WANTS_ONE,
+        ),
+        ConversationalGolden(
+            name="cita-nueva-cambia-de-dia",
+            scenario="El paciente pide el jueves, dice que no puede y acaba pidiendo el viernes.",
+            expected_outcome=CREATED,
+            persona=WANTS_ONE_ANOTHER_DAY,
+        ),
+        ConversationalGolden(
+            name="cita-nueva-se-echa-atras",
+            scenario="El paciente elige una hora y se echa atrás cuando se la leen para reservar.",
+            expected_outcome=NOTHING_CREATED,
+            persona=WANTS_ONE_THEN_DOESNT,
+        ),
+    ]
+
+
 def simulate_calls() -> list[ConversationalTestCase]:
-    """Run every golden once and return the conversations as multi-turn cases, in that order."""
-    return SimulatedCaller(
-        goldens(),
+    """Run every golden once and return the conversations as multi-turn cases, in `goldens()` order.
+
+    Two `SimulatedCaller` batches because a caller opens every conversation at
+    one stage, and the two errands begin at two. The order is the concatenation
+    of the two golden lists, which is the contract the suite pairs scores by.
+    """
+    moved = SimulatedCaller(
+        rescheduling_goldens(),
         lambda golden: identified_context(),
         ChooseSlot,
         stop_when=settled_when(SETTLED),
         max_user_turns=MAX_USER_TURNS,
     ).simulate()
+    created = SimulatedCaller(
+        new_booking_goldens(),
+        lambda golden: unknown_context(),
+        NewBooking,
+        stop_when=settled_when(NEW_BOOKING_SETTLED),
+        max_user_turns=MAX_USER_TURNS,
+    ).simulate()
+    return [*moved, *created]
 
 
 def identified_context() -> TenantContext:
@@ -129,5 +225,20 @@ def identified_context() -> TenantContext:
     """
     tc = fake_context(TENANT, PROJECT)
     tc.customer = {"appointment_id": ANA, **tc.adapters["agenda"].book[ANA]}
+    tc.prev_agent = Identify(tc)
+    return tc
+
+
+def unknown_context() -> TenantContext:
+    """A session that has found no cita for the caller: exactly where NewBooking begins.
+
+    The difference from `identified_context` is one absent key. `customer` here
+    carries a name and a phone and no `appointment_id`, which is what `Identify`
+    writes when a caller asks for a first cita — and what makes the previous
+    stage's `summary()` say there is nothing on the book, the sentence NewBooking
+    opens on.
+    """
+    tc = fake_context(TENANT, PROJECT)
+    tc.customer = dict(PEDRO)
     tc.prev_agent = Identify(tc)
     return tc
