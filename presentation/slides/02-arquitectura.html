@@ -89,7 +89,17 @@
       </svg>
     </figure>
 
-    <p class="proof" data-anim="3">
+    <div data-anim="3" style="border:1px solid var(--rule);border-radius:8px;padding:12px 20px;margin-top:4px;background:var(--card)">
+      <span style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)">La pata telefónica, propia</span>
+      <span style="font:400 13.5px/1.5 var(--sans);color:var(--ink-2);margin-left:12px">
+        número público → operador (troncal SIP) → puente SIP y servidor de medios <strong>propios,
+        autoalojados</strong> → el número marcado decide qué negocio atiende (una fila de configuración,
+        no un despliegue) → y la transferencia a un humano es una operación SIP estándar.
+        La señalización solo se acepta desde las IP publicadas del operador.
+      </span>
+    </div>
+
+    <p class="proof" data-anim="4">
       En operación: dos negocios sobre un único despliegue — telefonía, voz web y chat —
       verificable en https://lk.bernardocastro.dev
     </p>
