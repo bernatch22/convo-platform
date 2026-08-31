@@ -53,8 +53,11 @@ and, when a decision was made, a short essay in its thread.
   end-of-turn at ~0.33s, speculation never hid Haiku's ttft and only spent calls) —
   generation starts on confirmed end of turn. Sonnet 5 is the
   measured alternative in evals, not a default.
-- Call `sanitize_tool_pairing(chat_ctx)` before every generation (orphan
-  `tool_use` bricks the conversation with Anthropic 400s).
+- Orphan `tool_use` bricks a conversation (Anthropic 400s). The framework
+  guards this itself: livekit-agents' `group_tool_calls` /
+  `remove_invalid_tool_calls` drops orphan calls and outputs before every
+  request, for BOTH the anthropic and openai plugins — provider-independent,
+  one layer below us. No `sanitize_tool_pairing` call of ours exists or is needed.
 - STT: Soniox `stt-rt-v5`, `language_hints=["es","en"]`, endpointing
   `level=2 / sensitivity=0.3 / max_endpoint_delay_ms≈1000`, `context=` (Soniox
   silently ignores `keyterms`). Keep `sample_rate=16000` even on PSTN.
