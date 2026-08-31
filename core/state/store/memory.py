@@ -5,7 +5,13 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from core.state.events import Event
-from core.state.store.protocol import PipelineOverride, ProjectVersion, Route, SessionRow
+from core.state.store.protocol import (
+    EvalRun,
+    PipelineOverride,
+    ProjectVersion,
+    Route,
+    SessionRow,
+)
 
 
 @dataclass
@@ -17,6 +23,7 @@ class MemoryStore:
     routing: dict[tuple[str, str], Route] = field(default_factory=dict)
     pins: dict[tuple[str, str], ProjectVersion] = field(default_factory=dict)
     overrides: dict[tuple[str, str, str], PipelineOverride] = field(default_factory=dict)
+    runs: dict[str, EvalRun] = field(default_factory=dict)
 
     def open_session(self, row: SessionRow) -> None:
         self.rows[row.id] = row
@@ -66,3 +73,9 @@ class MemoryStore:
     def set_pipeline_override(self, override: PipelineOverride) -> None:
         stamped = replace(override, updated_at=override.updated_at or time.time())
         self.overrides[(override.tenant, override.project, override.field)] = stamped
+
+    def eval_runs(self) -> list[EvalRun]:
+        return sorted(self.runs.values(), key=lambda r: r.started_at, reverse=True)
+
+    def add_eval_run(self, run: EvalRun) -> None:
+        self.runs[run.id] = run
