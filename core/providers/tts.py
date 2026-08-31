@@ -20,14 +20,21 @@ FORBIDDEN_MODELS = frozenset({"eleven_turbo_v2_5", "eleven_v3"})
 KEY_ENV = "ELEVENLABS_API_KEY"
 
 
-def tts_for(tenant: Tenant, project: Project):
-    """ElevenLabs with the project's voice and model, or None without a key."""
+def tts_for(tenant: Tenant, project: Project, voice: str | None = None):
+    """ElevenLabs with the project's voice and model, or None without a key.
+
+    `voice` overrides the project's for one stage that has its own
+    (`Project.stage_voices`) — the model, the language and the alignment stay
+    the project's, because a second desk is another person at the same business
+    and not another business.
+    """
     key = os.getenv(KEY_ENV)
-    if not key or not project.voice:
+    chosen = voice or project.voice
+    if not key or not chosen:
         return None
     return elevenlabs.TTS(
         api_key=key,
-        voice_id=project.voice,
+        voice_id=chosen,
         model=tts_model(project),
         language=project.language.split("-")[0],
         sync_alignment=True,

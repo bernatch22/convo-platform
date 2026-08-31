@@ -34,6 +34,7 @@ from core.barge_in import backchannels_of, holds_the_floor, is_backchannel
 from core.context import TenantContext
 from core.dates_note import clock_reading, date_note
 from core.observability.voice import TimedWords
+from core.providers.tts import tts_for
 from core.state.log import record
 from core.stt_gate import TranscriptGate, gate_options_for
 
@@ -52,7 +53,12 @@ class TenantAgent(Agent):
         # that one of them can be ABSENT: a project with no `transfer_number`
         # must never be shown a transfer tool it cannot run (`core.agents.human`).
         platform = transfer_tools(tc)
-        super().__init__(instructions=instructions, tools=[*(tools or []), *platform], **kwargs)
+        super().__init__(
+            instructions=instructions,
+            tools=[*(tools or []), *platform],
+            **self._own_voice(tc),
+            **kwargs,
+        )
         self.tc = tc
 
     async def on_enter(self) -> None:
@@ -206,6 +212,23 @@ class TenantAgent(Agent):
     def stage_name(self) -> str:
         """The stage as it appears in logs and, from ms-4, in the event log."""
         return type(self).__name__
+
+    def _own_voice(self, tc: TenantContext) -> dict:
+        """This stage's own TTS when the project gave it one, or nothing at all.
+
+        Nothing at all is the important half: with no key in
+        `Project.stage_voices` the agent is built without a `tts=`, so the
+        session's own TTS is used and a project that never asked for a second
+        voice is byte for byte where it was. The framework builds one TTS per
+        agent that names one, at construction — a stage is built when the
+        conversation reaches it, so a voice nobody is handed to is never
+        connected.
+        """
+        voice = tc.project.stage_voices.get(type(self).__name__)
+        if not voice:
+            return {}
+        speaker = tts_for(tc.tenant, tc.project, voice=voice)
+        return {"tts": speaker} if speaker else {}
 
     async def _read_the_clock(self) -> None:
         """Once per session, put the day in front of the model — as evidence, not as a turn.

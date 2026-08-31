@@ -75,6 +75,11 @@ class Project:
     id: str
     name: str
     voice: str | None = None
+    # One stage, one voice: {"TicketDesk": "<elevenlabs id>"}. A stage not named here
+    # speaks with `voice`. A handoff to a desk with its own voice is the caller hearing
+    # somebody else pick up, which is what a handoff IS — so the voice belongs to the
+    # project's data like every other one, never to the stage's code.
+    stage_voices: dict[str, str] = field(default_factory=dict)
     tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
     stt_provider: str = "soniox"  # soniox | deepgram; see core/providers/stt.py
     llm_model: str | None = None  # None = the platform default; see core/providers/llm.py
