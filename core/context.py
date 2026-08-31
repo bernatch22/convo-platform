@@ -46,12 +46,17 @@ class Project:
     (`core.tools.messages`) in the project's own register and language.
     `backchannels` overrides the murmurs a barge-in filter ignores
     (`core.barge_in.SPANISH_BACKCHANNELS`) — data, so core knows one language.
+    `llm_model` is which model answers for this project. The LLM is a swappable
+    interface driver, so it is project data like the voice and not a constant in
+    `core/providers`, and an eval can measure a second model on the same goldens
+    (`core.testing.report --model`) without editing one of them.
     """
 
     id: str
     name: str
     voice: str | None = None
     tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
+    llm_model: str | None = None  # None = the platform default; see core/providers/llm.py
     language: str = "es"
     keyterms: list[str] = field(default_factory=list)
     backchannels: list[str] = field(default_factory=list)  # [] = the Spanish default
