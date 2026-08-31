@@ -55,6 +55,7 @@ class Project:
     name: str
     voice: str | None = None
     tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
+    llm_model: str | None = None  # None = the platform default; see core/providers/llm.py
     language: str = "es"
     greeting: str = ""  # spoken verbatim on session start (no LLM turn); "" = the model opens
     keyterms: list[str] = field(default_factory=list)

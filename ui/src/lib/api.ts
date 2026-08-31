@@ -139,8 +139,14 @@ export interface SttSnapshot {
 
 /** The LLM leg, with the cache floor that makes caching a no-op below it. */
 export interface LlmSnapshot {
+  /** The family, not a vendor hostname: "anthropic" or "openai". */
   provider: string;
   model: string;
+  /** What the project asked for; null means it takes the platform default. */
+  requested_model: string | null;
+  default_model: string;
+  /** Exactly the models the control plane will accept; anything else is a 422. */
+  allowed_models: string[];
   caching: string | null;
   max_tokens: number;
   cache_minimum_tokens: number;
@@ -201,6 +207,7 @@ export interface PipelineUpdate {
   voice?: string;
   tts_model?: string;
   greeting?: string;
+  llm_model?: string;
 }
 
 /* ── errors ───────────────────────────────────────────────────────────────── */
@@ -268,7 +275,7 @@ export async function getPipeline(
   return request<PipelineSnapshot>(pipelinePath(tenant, project), signal ? { signal } : {});
 }
 
-/** Change voice / tts_model / greeting for the next session; the answer is the new snapshot. */
+/** Change an overridable pipeline field for the next session; the answer is the new snapshot. */
 export async function putPipeline(
   tenant: string,
   project: string,

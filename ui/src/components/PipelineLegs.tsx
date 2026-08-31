@@ -45,9 +45,23 @@ export function SttLeg({ stt }: { stt: SttSnapshot }) {
 export function LlmLeg({ llm }: { llm: LlmSnapshot }) {
   return (
     <Leg role="decides" provider={llm.provider} model={llm.model}>
+      <Row
+        k="requested"
+        v={llm.requested_model ?? `— (platform default: ${llm.default_model})`}
+        note={
+          llm.requested_model
+            ? "what the project asked for; the model above is what the platform will really run"
+            : "the project names no model, so the default runs"
+        }
+      />
       <Row k="caching" v={llm.caching ?? "off"} />
       <Row k="cache floor" v={`${llm.cache_minimum_tokens} tokens`} note={llm.cache_note} />
       <Row k="max tokens" v={String(llm.max_tokens)} note="the ceiling on one spoken answer" />
+      <Row
+        k="allowed"
+        v={llm.allowed_models.join(" · ")}
+        note="an allow-list, not a deny-list: a model the platform runs is a model somebody priced and measured"
+      />
     </Leg>
   );
 }
