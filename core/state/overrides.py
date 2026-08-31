@@ -19,14 +19,24 @@ import dataclasses
 from core.context import Project
 from core.state.store import Store
 
-OVERRIDABLE = ("voice", "tts_model", "greeting", "stt_provider", "llm_model")
+OVERRIDABLE = (
+    "voice",
+    "tts_model",
+    "greeting",
+    "stt_provider",
+    "llm_model",
+    "transfer_number",
+)
 
-# The one field whose empty value MEANS something: no greeting, so the entry
-# stage's prompt opens the call. Everywhere else "" is a value nobody chose —
-# an empty voice builds no TTS and the call is mute — so a blank row is ignored
-# here as well as refused by `core.pipeline.overridable`, and a project stored
-# empty before that rule existed cannot silence a call after this deploy.
-BLANKABLE = ("greeting",)
+# The two fields whose empty value MEANS something. No greeting: the entry
+# stage's prompt opens the call. No transfer_number: the agent is offered no
+# transfer verb at all, which is how the console TAKES the verb away — so an
+# empty row has to reach the project, not be ignored as noise. Everywhere else
+# "" is a value nobody chose — an empty voice builds no TTS and the call is
+# mute — so a blank row is ignored here as well as refused by
+# `core.pipeline.overridable`, and a project stored empty before that rule
+# existed cannot silence a call after this deploy.
+BLANKABLE = ("greeting", "transfer_number")
 
 
 def apply(tenant: str, project: Project, store: Store) -> Project:

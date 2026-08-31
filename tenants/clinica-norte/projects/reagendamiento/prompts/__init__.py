@@ -27,7 +27,14 @@ the expensive one:
 
 from core.context import TenantContext
 from core.security.protocol import SUPERVISOR_PROTOCOL
+from core.telephony import human
 
+from .cancel_or_confirm import (
+    CANCEL_OR_CONFIRM_EXAMPLES,
+    CANCEL_OR_CONFIRM_INSTRUCTIONS,
+    CANCEL_OR_CONFIRM_ROLE,
+    CONFIRM_CANCELLATION_INSTRUCTIONS,
+)
 from .choose_slot import (
     CHOOSE_SLOT_EXAMPLES,
     CHOOSE_SLOT_INSTRUCTIONS,
@@ -42,15 +49,25 @@ from .new_booking import (
     NEW_BOOKING_INSTRUCTIONS,
     NEW_BOOKING_ROLE,
 )
+from .update_contact import (
+    CONFIRM_CONTACT_INSTRUCTIONS,
+    UPDATE_CONTACT_EXAMPLES,
+    UPDATE_CONTACT_INSTRUCTIONS,
+    UPDATE_CONTACT_ROLE,
+)
 
 __all__ = [
+    "cancel_or_confirm_prompt",
     "choose_slot_prompt",
+    "confirm_cancellation_instructions",
+    "confirm_contact_instructions",
     "confirm_instructions",
     "confirm_new_booking_instructions",
     "farewell_prompt",
     "identify_prompt",
     "new_booking_prompt",
     "stage_prompt",
+    "update_contact_prompt",
 ]
 
 
@@ -64,9 +81,23 @@ def choose_slot_prompt(tc: TenantContext) -> str:
     return stage_prompt(tc, CHOOSE_SLOT_ROLE, CHOOSE_SLOT_INSTRUCTIONS, CHOOSE_SLOT_EXAMPLES)
 
 
+def cancel_or_confirm_prompt(tc: TenantContext) -> str:
+    """The stage for the cita a caller already has: read it back, then cancel or confirm it."""
+    return stage_prompt(
+        tc, CANCEL_OR_CONFIRM_ROLE, CANCEL_OR_CONFIRM_INSTRUCTIONS, CANCEL_OR_CONFIRM_EXAMPLES
+    )
+
+
 def new_booking_prompt(tc: TenantContext) -> str:
     """The stage that gives a first cita to a caller the appointment book did not hold."""
     return stage_prompt(tc, NEW_BOOKING_ROLE, NEW_BOOKING_INSTRUCTIONS, NEW_BOOKING_EXAMPLES)
+
+
+def update_contact_prompt(tc: TenantContext) -> str:
+    """The stage that validates the number on file by its last digits and changes it."""
+    return stage_prompt(
+        tc, UPDATE_CONTACT_ROLE, UPDATE_CONTACT_INSTRUCTIONS, UPDATE_CONTACT_EXAMPLES
+    )
 
 
 def confirm_instructions() -> str:
@@ -77,6 +108,16 @@ def confirm_instructions() -> str:
 def confirm_new_booking_instructions() -> str:
     """The same, for a cita being CREATED: there is no earlier hour to promise back."""
     return CONFIRM_NEW_BOOKING_INSTRUCTIONS
+
+
+def confirm_cancellation_instructions() -> str:
+    """The same, for a cita being CANCELLED: what is read back is the cita it is about to lose."""
+    return CONFIRM_CANCELLATION_INSTRUCTIONS
+
+
+def confirm_contact_instructions() -> str:
+    """The same, for a contact number being REPLACED: what is read back is digits, not an hour."""
+    return CONFIRM_CONTACT_INSTRUCTIONS
 
 
 def farewell_prompt(tc: TenantContext) -> str:
@@ -92,6 +133,19 @@ def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str 
     exist ranks its own script above them and ignores the whisper (measured 0/3;
     3/3 with this paragraph — `core.security.protocol`). It is fixed text, so it
     rides inside the cached prefix and costs nothing per turn.
+
+    The transfer paragraph sits just BEFORE it, and `human.protocol` answers ""
+    for a project that never declared the verb, so that rule and its tool appear
+    together — a rule about a tool the model does not have is the surest way to
+    have it reach for one.
+
+    The last slot is the supervisor rule's to keep: the final paragraph is the
+    most recent instruction the model reads, and `SUPERVISOR_PROTOCOL` is the one
+    that exists to outrank the stage script (0/3 without it, 3/3 with —
+    `core.security.protocol`). That is the whole argument for the order. It was
+    ALSO the prime suspect in an ms-20 flake and it was innocent: moving it
+    changed nothing measurable (p=1.0). `core.telephony.human.protocol` carries
+    the 154 runs that say so, and what they blame instead.
     """
     return "\n".join(
         [
@@ -103,6 +157,7 @@ def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str 
             "",
             instructions,
             examples,
+            human.protocol(tc.project),
             SUPERVISOR_PROTOCOL,
         ]
     )

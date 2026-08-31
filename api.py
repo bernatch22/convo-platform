@@ -175,6 +175,8 @@ class PipelineUpdate(BaseModel):
     greeting: str | None = None
     stt_provider: str | None = None
     llm_model: str | None = None
+    # E.164, or "" to take the handover verb away from the agent entirely.
+    transfer_number: str | None = None
 
 
 @app.post("/token")
@@ -306,7 +308,16 @@ async def reservations(
                    "handled_by": str|null, "state": str,
                    "tone": "new"|"changed"|"gone"|"plain",
                    "detail": str|null, "at": float|null, "session": str|null,
-                   "verb": str|null, "confirmed": bool, "channel": str|null}]}`
+                   "verb": str|null, "confirmed": bool, "channel": str|null}],
+         "views": [{"shape": …, "labels": …, "systems": …, "rows": […]}]}`
+
+    `views` is one entry per system of this tenant that offers a record view,
+    in the order the tenant's own factory builds them, and the flat `shape`,
+    `labels`, `systems` and `rows` are the first of them. A shop that keeps its
+    orders in one system and its incidents in another answers with two, each
+    with its own shape and its own words for a state — they are two tables and
+    not a longer one, and deciding which of a business's vocabularies wins is
+    not the platform's to do.
 
     `/outcomes` counts what the platform DID, off the append-only log whose
     summaries are PII-filtered by design. This is the other reading and the one
@@ -622,7 +633,9 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
         "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
                 "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
         "phone": {"fleet": str, "note": str,
-                  "lines": [{"number", "fleet", "channel", "serving": bool}]},
+                  "lines": [{"number", "fleet", "channel", "serving": bool}],
+                  "transfer": {"tool", "number", "declared": bool, "offered": bool,
+                               "unavailable_reasons": {tool: why}, "note": str}},
         "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
         "latency": {"sessions": int, "turns": int,
                     "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",
@@ -636,6 +649,11 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
     fleet: `lines` is empty for a project nobody can call, and `note` says so
     in the words the screen prints. `serving` is false for a number registered
     against another fleet — it exists, and no call on it arrives here.
+
+    `phone.transfer` is the other direction: where the AGENT may hand a call
+    when the caller asks for a person. `offered` false means the model is never
+    shown the verb at all, and `unavailable_reasons` carries the sentence saying
+    which half is missing — the project's opt-in, or the number.
     """
     known, effective = _effective(tenant, project, store)
     return pipeline.snapshot(known, effective, store)
@@ -651,11 +669,14 @@ async def pipeline_set(
     reflecting the change, so the console renders one response instead of
     refetching. A TTS model the platform refuses to run (`eleven_v3`,
     `eleven_turbo_v2_5`) is a 422 naming the rule, an `llm_model` outside the
-    allow-list is a 422 naming the list, and an STT provider that is not
-    `soniox` or `deepgram` is a 422 too; an unknown field is a 422 from the
-    body itself; a body that sets nothing is a 422 too. An empty `voice` is a
-    422 as well: nothing downstream refuses it — `tts_for` absorbs it as "no
-    voice configured" and the next call is mute — so the rule lives here.
+    allow-list is a 422 naming the list, an STT provider that is not
+    `soniox` or `deepgram` is a 422 too, and a `transfer_number` that is not
+    E.164 is a 422 naming the shape a SIP REFER can carry; an unknown field is
+    a 422 from the body itself; a body that sets nothing is a 422 too. An empty
+    `voice` is a 422 as well: nothing downstream refuses it — `tts_for` absorbs
+    it as "no voice configured" and the next call is mute — so the rule lives
+    here. An empty `transfer_number` is the opposite and is stored: it is how
+    the console takes the handover verb away from the agent.
     Every value but the greeting is stripped before it is judged and stored.
 
     One 422 is about the BOX, not the value: this process runs where the worker

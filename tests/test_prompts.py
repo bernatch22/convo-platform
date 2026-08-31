@@ -34,6 +34,8 @@ PROMPTS = "tenants.clinica-norte.projects.reagendamiento.prompts"
 reception = importlib.import_module(f"{PROMPTS}.reception")
 choose_slot = importlib.import_module(f"{PROMPTS}.choose_slot")
 new_booking = importlib.import_module(f"{PROMPTS}.new_booking")
+update_contact = importlib.import_module(f"{PROMPTS}.update_contact")
+cancel_or_confirm = importlib.import_module(f"{PROMPTS}.cancel_or_confirm")
 
 SHARED = (
     reception.SPEAKS_TO_THE_PATIENT,
@@ -42,6 +44,7 @@ SHARED = (
     reception.OFFERS_WHAT_CAME_BACK,
     reception.THE_TOOL_ASKS_FOR_THE_YES,
     reception.SAYS_HOURS_THE_WAY_PEOPLE_DO,
+    reception.ONLY_THE_HOURS_THE_AGENDA_GAVE,
     reception.OUTSIDE_THE_APPOINTMENT,
 )
 BOTH_STAGES = (choose_slot.CHOOSE_SLOT_INSTRUCTIONS, new_booking.NEW_BOOKING_INSTRUCTIONS)
@@ -84,6 +87,7 @@ def test_choose_slot_is_exactly_the_paragraphs_it_declares_in_that_order() -> No
         reception.OFFERS_WHAT_CAME_BACK,
         reception.THE_TOOL_ASKS_FOR_THE_YES,
         reception.SAYS_HOURS_THE_WAY_PEOPLE_DO,
+        reception.ONLY_THE_HOURS_THE_AGENDA_GAVE,
         choose_slot.WHAT_THE_BOOKING_TOOL_SAID,
         reception.OUTSIDE_THE_APPOINTMENT,
     ]
@@ -98,6 +102,7 @@ def test_new_booking_is_exactly_the_paragraphs_it_declares_in_that_order() -> No
         reception.OFFERS_WHAT_CAME_BACK,
         reception.THE_TOOL_ASKS_FOR_THE_YES,
         reception.SAYS_HOURS_THE_WAY_PEOPLE_DO,
+        reception.ONLY_THE_HOURS_THE_AGENDA_GAVE,
         new_booking.WHAT_THE_BOOKING_TOOL_SAID,
         reception.OUTSIDE_THE_APPOINTMENT,
     ]
@@ -111,8 +116,110 @@ def test_what_each_stage_owns_alone_stays_out_of_the_other() -> None:
     assert "no le queda ninguna cita apuntada" in new_booking.WHAT_THE_BOOKING_TOOL_SAID
 
 
-def test_neither_confirmation_prompt_tutea_the_patient_it_is_about_to_write_for() -> None:
+def test_no_confirmation_prompt_tutea_the_patient_it_is_about_to_write_for() -> None:
     """ConfirmTask runs with its own tiny prompt, so the register has to travel with it."""
-    for confirm in (choose_slot.CONFIRM_INSTRUCTIONS, new_booking.CONFIRM_NEW_BOOKING_INSTRUCTIONS):
+    for confirm in (
+        choose_slot.CONFIRM_INSTRUCTIONS,
+        new_booking.CONFIRM_NEW_BOOKING_INSTRUCTIONS,
+        update_contact.CONFIRM_CONTACT_INSTRUCTIONS,
+        cancel_or_confirm.CONFIRM_CANCELLATION_INSTRUCTIONS,
+    ):
         assert "de usted" in confirm
         assert "{question}" in confirm, "the platform renders the sentence, not the model"
+
+
+def test_the_contact_stage_shares_how_the_clinic_speaks_and_nothing_about_the_agenda() -> None:
+    """It is the one stage that never reads the agenda, so the agenda paragraphs stay out.
+
+    Composition is not a reflex here: three of the shared blocks are about
+    consulting a diary, and a stage that cannot book anything would be carrying
+    rules for tools it does not have — the surest way to have a model reach for
+    one.
+    """
+    block = update_contact.UPDATE_CONTACT_INSTRUCTIONS
+
+    assert reception.SPEAKS_TO_THE_PATIENT in block
+    assert reception.OUTSIDE_THE_APPOINTMENT in block
+    assert reception.NEVER_ANSWERS_WITHOUT_THE_AGENDA not in block
+    assert reception.A_NAMED_DAY_IS_ALWAYS_A_LOOKUP not in block
+    assert reception.OFFERS_WHAT_CAME_BACK not in block
+
+
+def test_the_contact_stage_is_exactly_the_paragraphs_it_declares_in_that_order() -> None:
+    assert paragraphs(update_contact.UPDATE_CONTACT_INSTRUCTIONS) == [
+        reception.SPEAKS_TO_THE_PATIENT,
+        update_contact.THE_NUMBER_ON_FILE_IS_NEVER_READ_OUT,
+        update_contact.VALIDATE_FIRST_THEN_TAKE_THE_NEW_ONE,
+        update_contact.THE_CONTACT_TOOL_ASKS_FOR_THE_YES,
+        update_contact.WHAT_THE_CONTACT_TOOL_SAID,
+        reception.OUTSIDE_THE_APPOINTMENT,
+    ]
+
+
+def test_the_stage_that_changes_a_number_is_told_twice_never_to_read_one_out() -> None:
+    """The rule the whole errand turns on, and the one a helpful model breaks unprompted."""
+    block = update_contact.UPDATE_CONTACT_INSTRUCTIONS
+
+    assert "solo puede confirmarse por las últimas cifras" in block
+    assert "no tienes el resto" in block
+    assert "600123456" not in block, "no real number belongs in a prompt about hiding them"
+
+
+def test_the_hour_rule_is_shared_by_three_stages_and_the_booking_rule_by_two() -> None:
+    """Ms-20's split: a stage that reads an hour back but books nothing needs one half.
+
+    The two used to be one paragraph, and the welded pair is exactly what
+    `reception.py` was written to prevent in the other direction — a stage
+    carrying a rule about a tool it does not have is how a model learns it has
+    one. So the spoken-hour rule reaches CancelOrConfirm too, and
+    "only book an hour the agenda gave you" stops at the two stages that book.
+    """
+    settling = cancel_or_confirm.CANCEL_OR_CONFIRM_INSTRUCTIONS
+
+    assert reception.SAYS_HOURS_THE_WAY_PEOPLE_DO in settling
+    assert reception.ONLY_THE_HOURS_THE_AGENDA_GAVE not in settling
+    for block in BOTH_STAGES:
+        assert reception.ONLY_THE_HOURS_THE_AGENDA_GAVE in block
+
+
+def test_the_settling_stage_shares_how_the_clinic_speaks_and_never_reads_an_agenda() -> None:
+    block = cancel_or_confirm.CANCEL_OR_CONFIRM_INSTRUCTIONS
+
+    assert reception.SPEAKS_TO_THE_PATIENT in block
+    assert reception.OUTSIDE_THE_APPOINTMENT in block
+    assert reception.NEVER_ANSWERS_WITHOUT_THE_AGENDA not in block
+    assert reception.A_NAMED_DAY_IS_ALWAYS_A_LOOKUP not in block
+    assert reception.OFFERS_WHAT_CAME_BACK not in block
+
+
+def test_the_settling_stage_is_exactly_the_paragraphs_it_declares_in_that_order() -> None:
+    assert paragraphs(cancel_or_confirm.CANCEL_OR_CONFIRM_INSTRUCTIONS) == [
+        reception.SPEAKS_TO_THE_PATIENT,
+        cancel_or_confirm.THE_CITA_IS_ALWAYS_LOOKED_UP,
+        cancel_or_confirm.READ_IT_BACK_AND_WAIT,
+        cancel_or_confirm.ONE_PATIENT_PER_CALL,
+        cancel_or_confirm.THE_CANCEL_TOOL_ASKS_FOR_THE_YES,
+        cancel_or_confirm.CONFIRMING_TAKES_NOTHING_AWAY,
+        cancel_or_confirm.WHAT_THE_TOOL_SAID,
+        reception.SAYS_HOURS_THE_WAY_PEOPLE_DO,
+        reception.OUTSIDE_THE_APPOINTMENT,
+    ]
+
+
+def test_the_stage_that_cancels_is_told_the_cita_is_looked_up_and_never_recited() -> None:
+    """The rule the whole errand turns on: a cita read off a note has no source in the call."""
+    block = cancel_or_confirm.CANCEL_OR_CONFIRM_INSTRUCTIONS
+
+    assert "antes de decir nada de ella" in block
+    assert "Ni el día, ni la hora, ni el profesional salen de tu cabeza." in block
+    assert "Dra. Irene Campos" not in cancel_or_confirm.CANCEL_OR_CONFIRM_INSTRUCTIONS, (
+        "no real appointment belongs in a prompt about looking one up"
+    )
+
+
+def test_the_two_verbs_are_told_apart_in_the_prompt_that_owns_them_both() -> None:
+    """One stage, two verbs: what parts them is a sentence, and it has to be in there."""
+    block = cancel_or_confirm.CANCEL_OR_CONFIRM_INSTRUCTIONS
+
+    assert "Anular no se deshace" in block
+    assert "no se le quita nada" in block

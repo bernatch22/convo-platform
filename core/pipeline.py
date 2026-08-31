@@ -25,7 +25,7 @@ from core.observability.observers import TURN_METRICS
 from core.providers import llm, stt, tts
 from core.state.overrides import OVERRIDABLE
 from core.state.store import Store
-from core.telephony import lines
+from core.telephony import human, lines
 
 # How many of a project's stored voice sessions the medians are measured over.
 LATENCY_SESSIONS = 20
@@ -62,7 +62,7 @@ def snapshot(tenant: Tenant, project: Project, store: Store) -> dict[str, Any]:
         "stt": stt_view(project),
         "llm": llm_view(project),
         "tts": tts_view(project),
-        "phone": lines.view(store, tenant.id, project.id),
+        "phone": {**lines.view(store, tenant.id, project.id), "transfer": human.view(project)},
         "overrides": [
             {"field": o.field, "value": o.value, "updated_at": o.updated_at}
             for o in store.pipeline_overrides(tenant.id, project.id)
@@ -196,7 +196,7 @@ def cleaned(field: str, value: str) -> str:
 def overridable(field: str, value: str) -> str | None:
     """Why this override is refused, or None when the platform will run it.
 
-    Four rules about the value, and one about the box.
+    Five rules about the value, and one about the box.
 
     The box one is the youngest and it was bought at full price: on 2026-08-31
     the console stored `llm_model=gpt-5.4-mini` — legal, priced, on the
@@ -210,7 +210,7 @@ def overridable(field: str, value: str) -> str | None:
     door: an operator who asks for an ear the box cannot open deserves the
     answer now, not a project quietly running on the other one.
 
-    The four value rules. The voice one exists because an empty id is not refused
+    The five value rules. The voice one exists because an empty id is not refused
     anywhere downstream — it is *absorbed*: `tts_for` reads it as "no voice
     configured", builds no TTS, and the call is silent with a log line blaming
     a missing API key. A rule that only the store can enforce belongs here.
@@ -223,6 +223,10 @@ def overridable(field: str, value: str) -> str | None:
     refusal names them both. The STT one is the same shape: only the providers
     in `core.providers.stt.PROVIDERS` have a factory, so any other name would
     fall back to Soniox and the console would show an ear the caller is not on.
+    The transfer one is the youngest of the five and the only one whose EMPTY
+    value is legal: clearing `transfer_number` is how a console takes the
+    handover verb away from the agent, and anything else has to be a number a
+    SIP REFER can carry (`core.telephony.human.refusal`).
     """
     if field not in OVERRIDABLE:
         return f"{field!r} is not overridable; the console may set {list(OVERRIDABLE)}"
@@ -246,6 +250,8 @@ def overridable(field: str, value: str) -> str | None:
             "(eleven_v3 is not realtime, eleven_turbo_v2_5 is deprecated). "
             f"Use {tts.DEFAULT_MODEL!r} or {tts.LATENCY_MODEL!r}."
         )
+    if field == human.FIELD:
+        return human.refusal(value)
     if field == "stt_provider" and value not in stt.PROVIDERS:
         return (
             f"{value!r} is not an STT provider this platform runs: "

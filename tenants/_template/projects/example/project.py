@@ -19,6 +19,7 @@ refusal would have been the honest answer.
 from dataclasses import dataclass
 
 from core.context import Project, TenantContext
+from core.telephony.human import TRANSFER_TO_HUMAN
 from core.tools.catalog import ToolCatalog
 from core.tools.contract import SideEffect, ToolSpec
 from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
@@ -39,6 +40,10 @@ CANCEL_BOOKING = ToolSpec(
     compensation="restore_booking",
     timeout_s=8.0,
 )
+# The platform's own verb, not this business's: handing the live call to a person.
+# Declaring it here is the opt-in; `transfer_number` below is what turns it on, and an
+# empty one means the model is never offered the tool at all (`core.telephony.human`).
+#
 # The undo of a cancellation is a WRITE, never an irreversible: putting a booking back the
 # way the customer left it must not need a second yes from them.
 RESTORE_BOOKING = ToolSpec(
@@ -80,7 +85,11 @@ PROJECT = ExampleProject(
     name="Reservas",
     language="es-ES",
     voice="UOIqAnmS11Reiei1Ytkc",  # TODO(copy): the ElevenLabs voice id of this business
-    tools=ToolCatalog.of(FIND_BOOKING, CANCEL_BOOKING, RESTORE_BOOKING),
+    tools=ToolCatalog.of(FIND_BOOKING, CANCEL_BOOKING, RESTORE_BOOKING, TRANSFER_TO_HUMAN),
+    # TODO(copy): the E.164 number a call is handed to when the caller asks for a person.
+    # Empty means the agent is never offered the verb, which is the honest default for a
+    # business with nobody on the other end of it.
+    transfer_number="",
     messages=MESSAGES,
     knowledge_seed=knowledge.BUSINESS,
 )

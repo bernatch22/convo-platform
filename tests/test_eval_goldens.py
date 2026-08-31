@@ -52,6 +52,22 @@ def test_a_ring_one_suite_counts_the_goldens_the_run_parametrises_over(client: T
     assert ring1["count"] == len(ring1["goldens"])
 
 
+def test_no_two_goldens_of_a_project_answer_to_the_same_name() -> None:
+    """The name is the join key of the eval matrix, so two goldens cannot share one.
+
+    `core.testing.deepeval.test_case_for` names each case after the golden's
+    input, and `core.testing.matrix` joins two models' runs on that name — so a
+    duplicate does not fail anything, it silently makes one row of the
+    comparison table meaningless. Ms-20 nearly shipped two: a cancellation
+    golden whose caller says "Ana García Ruiz" and a contact-change golden whose
+    caller says exactly the same thing, told apart only by their `before`.
+    """
+    for dataset in ("goldens.json", "ring2_goldens.json"):
+        rows = json.loads((EVALS / dataset).read_text())
+        names = [row.get("input") or row.get("name") for row in rows]
+        assert len(set(names)) == len(names), f"{dataset} has two goldens under one name"
+
+
 def test_a_ring_one_golden_carries_the_line_the_behaviour_and_the_tools(
     client: TestClient,
 ) -> None:

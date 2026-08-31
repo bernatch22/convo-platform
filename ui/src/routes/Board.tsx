@@ -34,9 +34,23 @@ import {
   type BusinessView,
   type OutcomeBoard,
   type OutcomeRow,
+  type RecordTable,
 } from "../lib/api";
 import { sectionPath } from "../lib/nav";
 import { startedAt } from "../lib/sessions";
+
+/** Every table this project has, in the tenant's own order — or one that explains the absence.
+ *
+ * A business may keep its records in more than one system, and those are not
+ * rows of one table: a shop's orders and a shop's incidents have different
+ * columns and different words for a state. The Board draws one section each.
+ * When there is no view at all — or the read failed — a single null table is
+ * still returned, because `Reservations` is what says so in words.
+ */
+function tablesOf(records: BusinessView | null): (RecordTable | null)[] {
+  if (records === null) return [null];
+  return records.views.length > 0 ? records.views : [records];
+}
 
 /** The windows the header offers. Any `?days=` in range works; these are the ones with a button. */
 const WINDOWS = [7, 14, 30, 90] as const;
@@ -101,10 +115,12 @@ export function Board() {
         <Windows tenant={tenant} project={project} days={days} />
       </header>
 
-      <section className="section">
-        <h2 className="section__title">{records?.shape ?? "records"}</h2>
-        <Reservations view={records} error={recordsError} tenant={tenant} project={project} />
-      </section>
+      {tablesOf(records).map((table, index) => (
+        <section className="section" key={table?.shape ?? `records-${index}`}>
+          <h2 className="section__title">{table?.shape ?? "records"}</h2>
+          <Reservations view={table} error={recordsError} tenant={tenant} project={project} />
+        </section>
+      ))}
 
       {board !== null && !empty && (
         <>

@@ -31,7 +31,7 @@ TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --te
 TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
 ```
 
-The clinic takes both errands. Say you want to change the cita you already have
+The clinic takes five errands. Say you want to change the cita you already have
 and reception finds it by name or phone; say you have none —
 
 > «hola, quería pedir cita, no tengo ninguna» · «Pedro Ramos Gil, teléfono
@@ -42,6 +42,68 @@ and reception finds it by name or phone; say you have none —
 agenda, reads the hour back to you and waits for a yes before writing anything.
 Either way `uv run python -m convo sessions show <id>` prints the log: the yes
 before the write, and one line for the cita the booking system created.
+
+The third errand is not an hour at all: the number the clinic rings you on. Say
+it is wrong and reception validates the one on file the way a bank does — by its
+last digits, never whole — takes the new one and reads it back digit by digit
+before writing anything:
+
+> «quiero cambiar mi teléfono, el que tenéis está mal» · «Ana García Ruiz» →
+> «El teléfono que me consta acaba en 456. ¿Es ese el que quiere cambiar?» ·
+> «sí, el nuevo es el 689 000 111» → «Su nuevo teléfono de contacto sería el
+> 689 000 111. ¿Se lo cambio?» · «sí, cámbiemelo»
+
+Ask it for the old number whole and it will not say it. The log of that call has
+a `confirm.granted` for `update_contact` before the write, and the line the write
+left behind names the record and three digits — «now reachable on a number ending
+111» — which is what an auditor needs and all a leak would get.
+
+The last two are what a caller does with the cita they already have and are not
+moving: drop it, or say they will be there. Both start the same way — reception
+looks the cita up in the booking system and reads it back, never off a note —
+and only the ending differs:
+
+> «buenos días, quería anular la cita que tengo» · «Ana García Ruiz» → «Me
+> consta su cita el jueves 3 a las diez de la mañana con la doctora Campos. ¿Es
+> esa la que quiere anular?» · «sí, esa» → «Jueves 3 de septiembre a las diez de
+> la mañana con Dra. Irene Campos, ¿se la anulo?» · «sí, anúlemela»
+
+The hour goes straight back on the agenda: from the moment that write lands,
+`find_availability` offers the ten o'clock you just gave up to whoever asks for
+that Thursday next, so cancelling does not lose the clinic the half hour — which
+is also why the verb declares no undo. (In the demo that is true for the rest of
+the session: the fake book lives in the process, and only the rows cross to the
+console. A real agenda is one system both processes reach, and has no such
+seam.) You can watch it happen without a phone:
+
+```bash
+uv run pytest -m unit -k "cancelled_hour_goes_back_on_offer or yes_drops_the_cita" -v
+```
+
+On the Board the cita is struck through (`tone: gone`); the confirming call
+
+> «hola, llamo para confirmar que voy a mi cita, soy Ana García Ruiz» · «sí, esa
+> misma, que voy a ir»
+
+leaves the same cita where it was and marks it `confirmed` instead. Cancelling
+is the fourth thing the platform will not do without a yes; confirming is not —
+nothing is taken from a patient who rang to say they are coming.
+
+The shop takes three. Ask where an order is («mi pedido es el TS-10432, ¿por
+dónde va?»), ask to cancel it and it reads the order and the amount back and
+waits for a yes — and if what you have is a problem it cannot fix, say so
+(«quiero poner una reclamación por escrito») and it opens an incident with your
+own words and reads you its number:
+
+> «quiero poner una reclamación por escrito» · «llevo tres correos sin
+> respuesta» → «Te la dejo apuntada con el número TS-T0003.»
+
+Hang up, run the console again and ask for that number («¿cómo va la incidencia
+TS-T0003?»): it is still there, because a helpdesk that forgot its tickets
+between calls would not be one — the rows live in `tmp/business.json`
+(`CONVO_LEDGER`), which is what a customer's real helpdesk would be. Both the orders and the incidents show up on the project's **Board**
+in the console, each as its own table with its own columns and its own words for
+a state.
 
 ### Talking to it out loud
 
@@ -293,6 +355,18 @@ did. Warm needs an outbound trunk (`SIP_OUTBOUND_TRUNK_ID`) this box does not
 have yet and says so instead of failing mid-call; cold needs only
 `transfer_mode=enable-all` on the Twilio trunk — `infra/box/README.md` has the
 exact toggles, and `scripts/twilio_trunk.py` reports whether they are set.
+
+**The agent transfers too, and it does not need a supervisor to decide.**
+`transfer_to_human` is a tool of every stage of a project that names a
+`transfer_number` — E.164, set from the Pipeline screen's Control panel — and
+the prompt teaches it to announce the handover («le paso con un compañero, un
+momento») before the REFER goes out. A project with the field empty is never
+offered the tool at all: the model cannot reach for a verb it was never shown,
+and the Phone panel greys it out with the control plane's own sentence saying
+which half is missing. Only a phone call can be moved, so a browser call and a
+chat get an honest refusal and the business's own number instead of a promise
+nobody can keep. Every attempt — moved, refused by the carrier, or never
+attempted — is one more `supervisor.transfer` line in the caller's log.
 
 The same three verbs without a browser, for an escalation rule or a terminal:
 

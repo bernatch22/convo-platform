@@ -95,6 +95,43 @@ class Handover:
         finally:
             await api_client.aclose()
 
+    async def refer(self, to: str) -> Outcome:
+        """The AGENT's own cold transfer: it already said the line, so this only moves the call.
+
+        The same one API call as `run(COLD, …)` with two things deliberately
+        missing. There is no hold line, because the agent announced the handover
+        itself in the turn that called the tool — `core.telephony.human.PROTOCOL`
+        is what teaches it to, and a platform line on top of it is the same
+        sentence said twice on a phone call. And there is no `_explain`, because
+        the tool's own return value is what tells the caller: a failure comes
+        back to the model as a result it must act on, in the same turn, instead
+        of as a note queued for the next one.
+
+        → an `Outcome`, `ok=False` meaning the caller never moved. Raises
+        `TransferRefused` when nothing was attempted at all.
+        """
+        target = destination(to)
+        room, caller = self.room_name(), self.caller()
+        dial_uri(target)  # refuse a destination we cannot dial before touching the SFU
+        api_client = client()
+        try:
+            return await cold(api_client, room, caller, target)
+        finally:
+            await api_client.aclose()
+
+    def on_a_phone(self) -> bool:
+        """Whether the caller is a SIP leg — the only kind of call a REFER can move.
+
+        A browser voice session and a chat both have a room and a caller; what
+        neither has is a leg the carrier can take over. Asked before anything is
+        promised, this is the difference between an honest "I cannot transfer
+        this" and a REFER the SFU refuses mid-call.
+        """
+        return any(
+            getattr(person, "kind", None) == SIP_KIND
+            for person in isolation.peers(self.room).values()
+        )
+
     def room_name(self) -> str:
         """The room this job is running in, or a refusal — a console run transfers nothing."""
         name = str(getattr(self.room, "name", "") or "")

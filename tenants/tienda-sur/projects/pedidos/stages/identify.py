@@ -25,7 +25,16 @@ class Identify(TenantAgent):
         """
         order = self.tc.customer
         if not order:
-            return "Todavía no se ha localizado ningún pedido."
+            # The only way out of this stage without an order is the ticket desk, and an
+            # incident needs no order at all. Answering "todavía no se ha localizado ningún
+            # pedido" sent the next stage back to asking for one — a summary arrives as a
+            # turn the model ANSWERS, so a note about a missing order becomes a question
+            # about it (measured: «¿qué le ha pasado con su pedido?» in a call that had
+            # never mentioned one).
+            return (
+                "No hay ningún pedido localizado en esta llamada, y una incidencia no necesita "
+                "ninguno."
+            )
         return (
             f"Pedido localizado: {order['order_id']}, a nombre de {order['name']}. Es el pedido "
             "del que va esta llamada. Su estado, su fecha de entrega y su seguimiento no están "
@@ -67,3 +76,23 @@ class Identify(TenantAgent):
         from .order_desk import OrderDesk
 
         return self.hand_off(OrderDesk(tc))
+
+    @function_tool
+    async def start_ticket_desk(self, ctx: RunContext[TenantContext]) -> "TenantAgent":
+        """Pasa la llamada al mostrador de incidencias, que es otra parte de la tienda.
+
+        Llámala cuando el cliente hable de una incidencia y no de un pedido: quiere abrir una
+        («quiero poner una reclamación», «el paquete llegó roto») o pregunta por una que ya
+        tiene («¿cómo va mi incidencia?», «tengo el número TS-T algo»). En ese caso no le pidas
+        el número de pedido: para una incidencia no hace falta.
+
+        No la llames porque no encuentres el pedido. Un número mal oído se vuelve a pedir; una
+        incidencia se abre porque el cliente tiene un problema, no porque el sistema no haya
+        encontrado su compra.
+
+        No necesita argumentos: allí le preguntan lo que haga falta.
+        """
+        tc = ctx.userdata
+        from .ticket_desk import TicketDesk
+
+        return self.hand_off(TicketDesk(tc))

@@ -7,6 +7,10 @@
  * read from the customer's own system, through the tenant's adapter, which is
  * exactly where they have always lived and exactly who they are for.
  *
+ * One table, one system: the Board draws this component once per system that
+ * offers a record view, so a shop's orders and a shop's incidents are two
+ * tables with two shapes and never one table with a mixed vocabulary.
+ *
  * Nothing in this file knows what a reservation is called. The business names
  * its records, heads its own columns and picks its own word for a state; the
  * only thing this component decides is how loudly to draw a row, and even that
@@ -17,12 +21,12 @@
 
 import { Link } from "react-router";
 
-import type { BusinessRecord, BusinessView, RecordLabels } from "../lib/api";
+import type { BusinessRecord, RecordLabels, RecordTable } from "../lib/api";
 import { sectionPath } from "../lib/nav";
 import { startedAt } from "../lib/sessions";
 
 interface ReservationsProps {
-  view: BusinessView | null;
+  view: RecordTable | null;
   error: string | null;
   tenant: string;
   project: string;
