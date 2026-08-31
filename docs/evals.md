@@ -950,6 +950,38 @@ single path `deepeval test run` accepts. Ring 2's personas plug in here as one
 more key when ms-13 lands — nothing in `core/evals/` special-cases ring 1, and
 a project that declares nothing simply has no button.
 
+### Reading the datasets on screen (ms-17)
+
+A score is only worth what the case behind it asked, so the same screen carries
+the cases: `?view=datasets` on **Evals** lists every project's suites and every
+golden in them, grouped by the one name a run carries.
+
+`GET /evals/goldens/{tenant}/{project}` is the whole source. It reads three
+files off disk — `evals/suites.json`, `evals/goldens.json` and
+`evals/ring2_goldens.json` — and imports nothing: a project's evals are data,
+and asking what a project evaluates must never pull a tenant module into the
+control plane. An id that could name a folder somewhere else, or a project with
+no `evals/` on disk, is a `404` that lists nothing.
+
+A suite is joined to its dataset by reading its pytest target as TEXT and
+looking for the filename that target names. Three shapes come back:
+
+- `kind: "turn"` — the ring-1 goldens (`goldens.json`): the caller's line, the
+  behaviour expected back, the tools that must have run.
+- `kind: "call"` — the ring-2 goldens (`ring2_goldens.json`): the persona, the
+  objective, the lines said out loud, the hard policies and the turn budget.
+  Ring 2 is the one suite declared by its file (`evals/test_ring2.py`) rather
+  than by `suites.json`, and files its runs under the id `ring2`.
+- `kind: "code"` — a suite whose cases are written in python (a simulator's
+  personas). `count` is null and the screen names the file instead of showing
+  an empty list.
+
+`count` is the number a run of that suite scores, which is why it is computed
+from the dataset rather than written anywhere: add a golden and the screen says
+one more the next time it is opened. The view is READ-ONLY on purpose — a
+golden is edited in git, where the change is reviewed next to the prompt it
+grades.
+
 ### The scores, and where they come from
 
 The run's numbers are read out of deepeval's own `test_run_*.json`

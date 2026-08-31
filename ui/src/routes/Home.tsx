@@ -7,6 +7,7 @@
 import { Navigate } from "react-router";
 
 import { EmptyState } from "../components/EmptyState";
+import { sectionPath } from "../lib/nav";
 
 import { useShellData } from "./Shell";
 
@@ -16,7 +17,7 @@ export function Home() {
   const project = first?.projects[0];
 
   if (first && project) {
-    return <Navigate replace to={`/t/${first.tenant}/${project.id}`} />;
+    return <Navigate replace to={sectionPath(first.tenant, project.id, "talk")} />;
   }
 
   return (

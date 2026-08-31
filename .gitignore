@@ -11,6 +11,9 @@ dist/
 *.ogg
 *.wav
 console-recordings/
+# call recordings: PII. They live under CONVO_RECORDINGS (tmp/recordings by
+# default, /var/lib/convo/recordings on the box) and never in the repo.
+recordings/
 .deepeval/
 eval-runs/
 

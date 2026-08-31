@@ -139,6 +139,8 @@ export interface SessionLine {
   cost_eur: number | null;
   phone: string | null;
   score: SessionScore | null;
+  /** Whether this call left an OGG the console can play — a look on disk, not in the log. */
+  audio: boolean;
 }
 
 /** One fact in the append-only log. A turn's latencies live in `payload.metrics`. */
@@ -355,6 +357,45 @@ export interface ProjectSuites {
   suites: string[];
 }
 
+/** One ring-1 case: the caller's line, the behaviour expected back, the tools that must run. */
+export interface TurnGolden {
+  input: string;
+  turn: string | null;
+  expected_behaviour: string;
+  expected_tools: string[];
+}
+
+/** One ring-2 case: who calls, what they want, and the hard policies the call must survive. */
+export interface CallGolden {
+  name: string;
+  persona: string;
+  objective: string;
+  turns: string[];
+  policies: string[];
+  max_turns: number | null;
+}
+
+/** Where a suite's cases come from: JSON on disk (`turn`, `call`) or python (`code`). */
+export type GoldenKind = "turn" | "call" | "code";
+
+/** One suite and everything it asks: the dataset it reads and every case in it. */
+export interface SuiteGoldens {
+  suite: string;
+  target: string;
+  dataset: string | null;
+  kind: GoldenKind;
+  /** How many cases a run of this suite scores; null when they are written in code. */
+  count: number | null;
+  goldens: Array<TurnGolden | CallGolden>;
+}
+
+/** Every suite of one project, with the goldens it runs — the Datasets view's only source. */
+export interface ProjectGoldens {
+  tenant: string;
+  project: string;
+  suites: SuiteGoldens[];
+}
+
 /** What the console must name before the box spends minutes of paid LLM traffic. */
 export interface EvalRunRequest {
   tenant: string;
@@ -433,6 +474,16 @@ export async function getSession(id: string, signal?: AbortSignal): Promise<Sess
   return { ...line, events: events.length, events_log: events };
 }
 
+/** Where this session's recording is served from — an `<audio src>`, never a fetch.
+ *
+ * The control plane composes the path from the session id on its side; nothing
+ * here knows where an OGG lives on the box, which is the point. A session whose
+ * `audio` is false has no such file and the screen must not ask for one.
+ */
+export function recordingUrl(id: string): string {
+  return `/sessions/${encodeURIComponent(id)}/recording`;
+}
+
 /** Calls in progress on the SFU, phone calls included. Throws ApiError(503) when it is down. */
 export async function listLiveCalls(signal?: AbortSignal): Promise<LiveCall[]> {
   return request<LiveCall[]>("/live-calls", signal ? { signal } : {});
@@ -501,6 +552,16 @@ export async function probe(signal?: AbortSignal): Promise<{ up: boolean; ms: nu
 /** Every routable project and the eval suites it declares — the Run buttons' only source. */
 export async function listEvalSuites(signal?: AbortSignal): Promise<ProjectSuites[]> {
   return request<ProjectSuites[]>("/evals/suites", signal ? { signal } : {});
+}
+
+/** What one project's suites actually ask of the agent, read off disk. Throws ApiError(404). */
+export async function getProjectGoldens(
+  tenant: string,
+  project: string,
+  signal?: AbortSignal,
+): Promise<ProjectGoldens> {
+  const path = `/evals/goldens/${encodeURIComponent(tenant)}/${encodeURIComponent(project)}`;
+  return request<ProjectGoldens>(path, signal ? { signal } : {});
 }
 
 /** Stored eval runs, newest first, each already diffed against the previous run of its suite. */

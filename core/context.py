@@ -61,6 +61,10 @@ class Project:
     where the others show a chip — which is a business decision (a queue whose
     calls are two sentences long, a tenant that has not agreed to it), so it
     lives with the project's data and not in an environment variable.
+    `recording` is the same shape of decision about the call's AUDIO (ms-17):
+    False and no OGG is ever written for this project, so its sessions show no
+    player. It is deliberately not one flag with `scoring` — a tenant may want
+    its calls judged without keeping a recording of the caller's voice.
     """
 
     id: str
@@ -78,6 +82,7 @@ class Project:
     messages: dict[str, str] = field(default_factory=dict)
     knowledge_seed: str = ""
     scoring: bool = True  # False = this project's finished calls are never scored (ms-13)
+    recording: bool = True  # False = this project's calls keep no audio at all (ms-17)
 
     def knowledge(self, tc: "TenantContext") -> str:
         """The stable knowledge block a prompt opens with: the pinned override, else git's seed.

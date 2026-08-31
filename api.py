@@ -25,11 +25,11 @@ import time
 from collections.abc import AsyncIterator
 from typing import Annotated, Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
-from core import control_plane, pipeline, rooms
+from core import control_plane, pipeline, recordings, rooms
 from core.auth import (
     SupervisorCapability,
     mint_caller,
@@ -39,6 +39,7 @@ from core.auth import (
 )
 from core.context import Project, Tenant
 from core.contracts import Channel, SessionMeta
+from core.evals import goldens as eval_goldens_view
 from core.evals import runner as runner_module
 from core.evals import runs as eval_runs_view
 from core.evals import suites as eval_suites
@@ -223,7 +224,7 @@ async def sessions(
     → `[{"id": str, "tenant": str, "project": str, "channel": "voice"|"chat",
          "started_at": float, "ended_at": float|null, "outcome": str|null,
          "events": int, "turns": int, "cost_eur": float|null,
-         "phone": str|null, "score": object|null}]`
+         "phone": str|null, "score": object|null, "audio": bool}]`
 
     `cost_eur` and `outcome` are null while the call is still running.
 
@@ -240,6 +241,11 @@ async def sessions(
     in over the telephone. `channel` cannot say this: a phone call and a browser
     call are both `"voice"`, so this is the only field that separates them in
     the call log.
+
+    `audio` is whether `GET /sessions/{id}/recording` will answer with an OGG:
+    a look on disk, so a chat, a project that opted out of recording and a job
+    killed before its first flush all read false and the console draws no
+    player rather than a broken one.
     """
     return control_plane.sessions(store, tenant=tenant, project=project, limit=limit)
 
@@ -248,7 +254,7 @@ async def sessions(
 async def session(session_id: str, store: Reader) -> dict[str, Any]:
     """One session: the list line, the end-of-call report, and every event in seq order.
 
-    → `{...the /sessions line (`phone` included), "report": object|null,
+    → `{...the /sessions line (`phone` and `audio` included), "report": object|null,
          "events": [{"seq": int, "t_ms": int, "kind": str, "payload": object}]}`
 
     `kind` is the log's own vocabulary (`session.start`, `stt.final`,
@@ -283,6 +289,48 @@ async def score(session_id: str) -> dict[str, Any]:
     the one route in the file that opens its own.
     """
     return await asyncio.to_thread(score_session, session_id)
+
+
+@app.get("/sessions/{session_id}/recording")
+async def session_recording(
+    session_id: str,
+    store: Reader,
+    t: str | None = None,
+    authorization: Annotated[str | None, Header()] = None,
+) -> FileResponse:
+    """The stereo OGG of one call: the caller on the left channel, the agent on the right.
+
+    → `audio/ogg`, `Content-Disposition: inline; filename="<session_id>.ogg"`
+
+    Recordings hold PII, so this is the ONLY way one leaves the box: they live
+    outside git under `CONVO_RECORDINGS`, are never mounted as static files,
+    and are looked up by SESSION ID — the path is composed here from a
+    validated id, never read out of a log payload a job wrote.
+
+    → 404 for a session this deploy has never heard of, and 404 for a session
+    with no audio (a chat, a project that opted out, a job killed before its
+    first flush). Both are "there is nothing to play"; telling them apart
+    would be telling a stranger which session ids exist.
+
+    → 401 when the deploy sets `RECORDINGS_TOKEN` and the request does not
+    present it, as `Authorization: Bearer <token>` or `?t=<token>` — the query
+    form exists because an `<audio src>` cannot send a header. With no such
+    variable set the route is exactly as open as every other read on this API,
+    and `infra/box/README.md` says so out loud.
+    """
+    presented = t or (authorization or "").removeprefix("Bearer ").strip() or None
+    if not recordings.authorised(presented):
+        raise HTTPException(401, "this deploy requires a recordings token")
+    if store.session(session_id) is None:
+        raise HTTPException(404, f"no session {session_id!r}")
+    path = recordings.for_session(session_id)
+    if path is None:
+        raise HTTPException(404, f"session {session_id!r} kept no audio")
+    return FileResponse(
+        path,
+        media_type=recordings.MEDIA_TYPE,
+        headers={"Content-Disposition": f'inline; filename="{session_id}.ogg"'},
+    )
 
 
 @app.get("/sessions/{session_id}/live")
@@ -634,6 +682,34 @@ def eval_suites_declared() -> list[dict[str, Any]]:
         for tenant in load_registry().values()
         for project in tenant.projects.values()
     ]
+
+
+@app.get("/evals/goldens/{tenant}/{project}")
+def eval_goldens(tenant: str, project: str) -> dict[str, Any]:
+    """What each of a project's suites actually asks of the agent, so it is readable on screen.
+
+    → `{"tenant", "project", "suites": [{"suite", "target", "dataset",
+         "kind": "turn"|"call"|"code", "count": int|null, "goldens": [...]}]}`
+
+    A `turn` golden is `{"input", "turn", "expected_behaviour", "expected_tools"}`
+    — one line of a caller and what must come back. A `call` golden is
+    `{"name", "persona", "objective", "turns", "policies", "max_turns"}` — a
+    whole conversation and the hard policies that must survive it. A `code`
+    suite writes its cases in python instead of JSON: `count` is null and
+    `target` says where to read them.
+
+    `suite` is the same id a run carries, so the console can put a suite's
+    goldens next to its runs. Read-only on purpose: goldens are edited in git,
+    where a reviewer sees the change.
+
+    → 404 when nothing on disk answers to that tenant and project. The files are
+    READ, never imported: no tenant module enters this process because somebody
+    asked what a project evaluates.
+    """
+    try:
+        return eval_goldens_view.datasets(tenant, project)
+    except eval_goldens_view.UnknownProject as error:
+        raise HTTPException(404, str(error)) from error
 
 
 @app.get("/evals/runs")

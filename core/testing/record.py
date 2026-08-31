@@ -25,7 +25,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-RECORDINGS = Path("tmp/recordings")
+from core import recordings
 
 # One rescheduling call: identify, ask what is free, take the first hour, say yes.
 # The spare "sí, confirmo" is for the turn Haiku sometimes spends asking again.
@@ -47,7 +47,7 @@ async def record(tenant_id: str, project_id: str, lines: list[str]) -> tuple[str
 
     tc = fake_context(tenant_id, project_id, channel="voice")
     tc.session_id = f"rec-{uuid.uuid4().hex[:8]}"
-    path = RECORDINGS / tc.session_id / "audio.ogg"
+    path = recordings.path_for(tc.session_id)
     attach_log(tc, SQLiteStore())
     async with live_conversation(tc, record=path) as call:
         for line in lines:
