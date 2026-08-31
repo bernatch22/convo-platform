@@ -5,26 +5,29 @@ history across a handoff, so the stage that enters writes a one-line summary of
 the stage it replaces into its own chat context before saying anything: what
 the caller already told us travels, the whole transcript does not.
 
-Two of the framework's nodes are overridden here, once, for every project:
-`transcription_node` reads the agent's words on their way out and times them in
-the log, and `on_user_turn_completed` is the turn boundary — where a
-supervisor's whisper is applied, where a human holding the line cancels the
-reply, and where a murmur that landed on the agent's voice is dropped. All of
-it is audit and turn-taking, not business, so no stage overrides them.
+Three of the framework's nodes are overridden here, once, for every project:
+`stt_node` refuses a transcript no audio can account for, `transcription_node`
+reads the agent's words on their way out and times them in the log, and
+`on_user_turn_completed` is the turn boundary — where a supervisor's whisper is
+applied, where a human holding the line cancels the reply, and where a murmur
+that landed on the agent's voice is dropped. All of it is audit and turn-taking,
+not business, so no stage overrides them.
 """
 
 import logging
 from collections.abc import AsyncGenerator, AsyncIterable
 
-from livekit.agents import Agent, RunContext, StopResponse
+from livekit import rtc
+from livekit.agents import Agent, RunContext, StopResponse, stt
 from livekit.agents.llm import ChatContext, ChatMessage, function_tool
 from livekit.agents.voice.agent import ModelSettings
 
 from core.barge_in import backchannels_of, holds_the_floor, is_backchannel
 from core.context import TenantContext
-from core.dates_note import date_note
+from core.dates_note import clock_reading, date_note
 from core.observability.voice import TimedWords
 from core.state.log import record
+from core.stt_gate import TranscriptGate, gate_options_for
 
 log = logging.getLogger("platform.agents")
 
@@ -39,7 +42,7 @@ class TenantAgent(Agent):
         self.tc = tc
 
     async def on_enter(self) -> None:
-        """Inherit the previous stage's summary, announce the stage, open the turn.
+        """Read the clock, inherit the previous stage's summary, announce the stage, open the turn.
 
         The very first stage of a session speaks the project's `greeting`
         verbatim when one is set: a caller hears the business immediately
@@ -48,9 +51,10 @@ class TenantAgent(Agent):
         sentence a supervisor edits from the console — a paraphrasing model
         would make it uneditable. `say` puts the line in the chat history so
         the model knows what was said. Later stages, and a project with no
-        greeting, still open with `generate_reply`.
+        greeting, still open with `generate_reply` — and that is the shape the
+        date reaches the model in front of, so `_read_the_clock` runs first.
         """
-        await self._note_the_date()
+        await self._read_the_clock()
         await self._inherit_summary()
         log.info("stage.enter %s agent=%s", self.tc.label(), self.stage_name())
         record(self.tc, "stage.enter", {"stage": self.stage_name()})
@@ -60,6 +64,35 @@ class TenantAgent(Agent):
             self.session.say(opener, allow_interruptions=True)
         else:
             self.session.generate_reply()
+
+    async def stt_node(
+        self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
+    ) -> AsyncGenerator[stt.SpeechEvent, None]:
+        """Transcribe as the framework does, dropping any transcript the audio cannot account for.
+
+        A streaming STT invents sentences over a silent line — Soniox put a
+        final "Thank you." into the human's call AJ_rt86KogpPxDa while nobody
+        had spoken, and the agent answered it. `core.stt_gate` measures the very
+        frames going into the STT and refuses a transcript with no voiced audio
+        behind it; the refusal is a `stt.phantom` line in the log, never a
+        silent drop, because a gate nobody can audit is worse than the bug.
+
+        This is the last seam where a transcript can still be stopped: one node
+        later it is an interruption, a user turn and a reply. The price of
+        standing here is the framework's STT-pipeline reuse across a handoff
+        (`AgentActivity._detach_reusable_resources` reuses it only for the
+        DEFAULT `stt_node`), so each stage opens its own STT stream. Frames
+        queue while it connects and none are lost — a handoff is the moment the
+        agent takes the floor, not the caller.
+        """
+        gate = TranscriptGate(gate_options_for(self.tc.project))
+        async for event in super().stt_node(gate.hear(audio), model_settings):
+            if gate.accepts(event):
+                yield event
+                continue
+            evidence = gate.evidence(event)
+            log.warning("stt.phantom %s %s", self.tc.label(), evidence)
+            record(self.tc, "stt.phantom", evidence)
 
     async def transcription_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings
@@ -160,18 +193,22 @@ class TenantAgent(Agent):
         """The stage as it appears in logs and, from ms-4, in the event log."""
         return type(self).__name__
 
-    async def _note_the_date(self) -> None:
-        """Once per session, tell the model what day it is — in the messages, cache-safe.
+    async def _read_the_clock(self) -> None:
+        """Once per session, put the day in front of the model — as evidence, not as a turn.
 
         The system prompt cannot carry the date (the cached prefix must stay
-        byte-identical), and a model with no calendar invents one when asked
+        byte-identical) and a model with no calendar invents one when asked
         "¿hoy qué día es?" — it said "viernes" on a Saturday, on a real call.
+        It cannot be a system message either: the framework rewrites every
+        system item after the first into a USER message, and Haiku then opened
+        the call by answering it. `core.dates_note` carries the measurement and
+        the why; here it is two paired tool items, written before the greeting.
         """
         if self.tc.date_noted:
             return
         self.tc.date_noted = True
         chat_ctx: ChatContext = self.chat_ctx.copy()
-        chat_ctx.add_message(role=SUMMARY_ROLE, content=date_note(self.tc.today))
+        chat_ctx.insert(clock_reading(self.tc.today))
         await self.update_chat_ctx(chat_ctx)
 
     async def _inherit_summary(self) -> None:

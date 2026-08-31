@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { Link, redirect, useLoaderData, useParams, type LoaderFunctionArgs } from "react-router";
 
+import { PhoneLines } from "../components/PhoneLines";
 import { PipelineControls } from "../components/PipelineControls";
 import { LlmLeg, SttLeg, TtsLeg } from "../components/PipelineLegs";
 import { Waterfall } from "../components/Waterfall";
@@ -104,6 +105,19 @@ function Loaded({ snapshot }: { snapshot: PipelineSnapshot }) {
           <LlmLeg llm={shown.llm} />
           <TtsLeg tts={shown.tts} />
         </div>
+      </section>
+
+      <section className="section">
+        <h2 className="section__title">Phone</h2>
+        <p className="note">
+          The number is a route, not a property of this project: one row of the control
+          plane&apos;s <code className="mono">routes</code> table, keyed by the fleet and the
+          number the caller dialled, and the same row{" "}
+          <code className="mono">core/router.py</code> reads to decide who answers. A project with
+          no row is not reachable by phone at all — the other two doors, voice in the browser and
+          chat, are open to every project regardless.
+        </p>
+        <PhoneLines phone={shown.phone} />
       </section>
 
       <section className="section">

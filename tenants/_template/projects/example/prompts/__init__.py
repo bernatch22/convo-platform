@@ -17,6 +17,7 @@ project's `messages`, and in nothing under `core/`.
 """
 
 from core.context import TenantContext
+from core.security.protocol import SUPERVISOR_PROTOCOL
 
 from .desk import CONFIRM_INSTRUCTIONS, DESK_EXAMPLES, DESK_INSTRUCTIONS, DESK_ROLE
 from .reception import RECEPTION_EXAMPLES, RECEPTION_INSTRUCTIONS, RECEPTION_ROLE
@@ -40,7 +41,14 @@ def confirm_instructions() -> str:
 
 
 def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str = "") -> str:
-    """One stage's system prompt: the project's knowledge first, then who this stage is."""
+    """One stage's system prompt: the project's knowledge first, then who this stage is.
+
+    The supervisor protocol closes it: a human listening to the call can whisper
+    an instruction mid-conversation, and a persona that has not been told those
+    exist ranks its own script above them and ignores the whisper (measured 0/3;
+    3/3 with this paragraph — `core.security.protocol`). It is fixed text, so it
+    rides inside the cached prefix and costs nothing per turn.
+    """
     return "\n".join(
         [
             "<business_knowledge>",
@@ -51,5 +59,6 @@ def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str 
             "",
             instructions,
             examples,
+            SUPERVISOR_PROTOCOL,
         ]
     )

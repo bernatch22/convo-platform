@@ -78,6 +78,17 @@ def test_routes_add_and_list(capsys) -> None:
     assert "+34910000000" in out and "clinica-norte/reagendamiento" in out and "voice" in out
 
 
+def test_routes_seed_writes_the_deploys_lines_once(capsys) -> None:
+    from convo import routes
+
+    store = MemoryStore()
+    assert routes.main(["seed"], store) == 0
+    assert "+14176743169" in capsys.readouterr().out
+
+    assert routes.main(["seed"], store) == 0
+    assert "nothing to seed" in capsys.readouterr().out
+
+
 def test_versions_pin_and_list(tmp_path, capsys) -> None:
     from convo import versions
 

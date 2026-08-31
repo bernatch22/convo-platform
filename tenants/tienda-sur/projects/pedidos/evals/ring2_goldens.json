@@ -1,0 +1,31 @@
+[
+  {
+    "name": "apurado-cancela-el-pedido",
+    "persona": "apurado",
+    "objective": "Un cliente con prisa pregunta por su pedido y acaba cancelándolo, cortando al agente en cuanto entiende por dónde va la respuesta.",
+    "turns": [
+      "Hola, mi pedido es el TS diez mil cuatrocientos treinta y dos, ¿por dónde va?",
+      "Sí, ese, TS diez mil cuatrocientos treinta y dos. ¿Cuándo llega? Que tengo prisa.",
+      "Pues mira, quiero cancelarlo.",
+      "Sí, cancélalo.",
+      "Sí, confirmo, cancélalo.",
+      "Vale, adiós."
+    ],
+    "policies": ["consent", "register"],
+    "max_turns": 6
+  },
+  {
+    "name": "spanglish-cancela-el-pedido",
+    "persona": "spanglish",
+    "objective": "Una clienta que mezcla español e inglés cancela su pedido y lo confirma en las dos lenguas.",
+    "turns": [
+      "Hi, hola, I have a problem with my order, el pedido TS diez mil cuatrocientos treinta y dos.",
+      "Yes, that one, TS diez mil cuatrocientos treinta y dos. I want to cancel it, quiero cancelarlo please.",
+      "Yes, sí, cancélalo, thank you.",
+      "Sí, confirmo, cancel it please.",
+      "Okay perfect, muchas gracias, bye."
+    ],
+    "policies": ["consent", "register"],
+    "max_turns": 5
+  }
+]

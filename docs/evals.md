@@ -13,7 +13,7 @@ Everything below is verified against DeepEval 4.2 and the code in
 `deepeval test run tests/evals -n 3`; read the HTML with
 `python -m core.testing.report clinica-norte reagendamiento` (writes
 `tmp/reports/deepeval/`). Add `--model` twice to run the same goldens against
-both allowed models and get the comparison table — §9.
+both allowed models and get the comparison table — §10.
 
 Since ms-5 there are two businesses on this platform and the split above is
 what makes that cheap: the GRAPHS live in core and the WORDS live in each
@@ -27,11 +27,14 @@ consent, grounded facts, register — and share not one sentence of criteria.
 | Ring | What is evaluated | When | Status |
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
-| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: against a real LiveKit room, with personas | offline on demand; live nightly (ms-13) | offline live since ms-6 — §3.9; live planned |
+| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live **nightly on the box, 04:00 Europe/Madrid** (ms-13) | offline since ms-6 — §3.9; live since ms-13 — §3.11, §3.12; nightly since ms-13 — §3.14 |
 | **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; for grounding since ms-7, once tool results carried a summary — §3.6 |
+| **4** | **Every call, automatically.** Four checks decided by code plus at most one Haiku call, written into the call's own log | unasked, by `api.py`, within a minute of the caller hanging up | live since ms-13 — §3.13 |
 
 The metrics are the same in every ring. A ring changes where the conversation
-comes from, never how it is judged.
+comes from, never how it is judged. Rings 1-3 are things a person runs; ring 4
+is the one nobody runs, which is why its budget is a hard number and not a
+habit.
 
 **No judge runs in the unit ring.** `pytest -m unit` is a gate: it has to be
 green three runs out of three or it stops meaning anything, and a judged
@@ -447,7 +450,245 @@ them. Cold-start TTFB: 0.98 s v3_conversational, 0.84 s flash; in-call
 in `tmp/reports/ms-6.html` because the last word on how a number sounds is a
 human's.
 
-### 3.10 No false success (GEval) — the write was refused; was the patient told?
+### 3.10 The phantom turn (voice regression) — a transcript with no audio behind it
+
+- **Kind:** no judge, no model, no key. `tests/test_stt_gate.py` — the arithmetic
+  with the clock in the test's hand, and a real `AgentSession` running the
+  framework's own audio path.
+- **The call it pins.** AJ_rt86KogpPxDa, seq 9 (2026-08-31). During the opening
+  comfort noise Soniox emitted a FINAL `"Thank you."` — language `en`,
+  transcription delay 3.32 s — nobody had spoken, and the agent answered "De
+  nada". A streaming STT is a language model with a microphone; over a silent
+  line it invents, and the invention is different every time, so a blocklist of
+  hallucinated phrases is a diary, not a fix.
+- **What is measured instead.** `core/stt_gate.py` reads the RMS level of the
+  very frames going into the STT, tracks the LINE's own noise floor (fast to
+  fall, slow to rise, so speech cannot lift it) and accepts a transcript only
+  when the last `max_lag_s` seconds carried at least `min_voiced_ms` above that
+  floor. The threshold is clamped into `[-55, -40] dBFS`, so the gate can never
+  demand more of a quiet caller than a bad line can deliver, nor believe hiss on
+  a dead one. Defaults: 100 ms inside 2.5 s, 12 dB of margin — thresholds a
+  project overrides with `Project.stt_gate`, like `backchannels`.
+- **Where it stands.** `TenantAgent.stt_node`, the last seam before a transcript
+  becomes an interruption, a user turn and a reply. The price is the framework's
+  STT-pipeline reuse across a handoff, which `AgentActivity` grants only to the
+  DEFAULT `stt_node`: each stage now opens its own STT stream. Frames queue
+  while it connects and none are lost, and a handoff is the moment the agent
+  takes the floor, not the caller.
+- **The golden runs twice.** Gate on, the phantom never reaches the session and
+  the log carries `stt.phantom` with the evidence (text, language, confidence,
+  voiced ms, threshold). Gate off (`stt_gate={"min_voiced_ms": 0}`), the same
+  script reproduces the bug — `stt.final` in the log. A green run therefore
+  cannot be a test that proves nothing. Real speech in `es` and `en` passes in
+  both directions.
+- **The fake half is reusable:** `core/testing/stt_script.py` — `ScriptedSTT`
+  (an STT that transcribes the script it was handed, not the audio), a
+  `ScriptedMicrophone`, and `comfort_noise` / `speech` frame builders at a
+  level. Nothing in it knows about tenants.
+- **What it does NOT catch:** line echo. If the caller's leg returns the agent's
+  own TTS loudly enough to clear the threshold, the gate sees voiced audio and
+  lets the transcript through — a different failure (the agent transcribing
+  itself) with a different fix. Ring 2's live half against a real room is where
+  that gets measured.
+
+### 3.11 Ring 2 live — a synthetic caller who really speaks
+
+- **What it is:** `core/testing/ring2.py:converse(persona, tenant, project,
+  turns)` — the door and the result — over `core/testing/caller.py:Call`, the
+  room mechanics. It asks `POST /evals/rooms` for a room, joins it as an
+  ordinary participant with a published microphone
+  (`core/testing/speaker.py:VirtualMicrophone`), speaks each line with
+  ElevenLabs, reads both sides off `lk.transcription` and hangs up, returning a
+  `Transcript` of DeepEval `Turn`s with audio and latency on each.
+- **Why the room comes from `api.py`.** DeepEval's `LiveKitConnector` signs its
+  own join token and dispatches with `RoomAgentDispatch(agent_name=…)` and **no
+  metadata** (`voice/connectors/providers/livekit.py:179`). A room it opens by
+  itself therefore reaches a worker that cannot tell which tenant is calling.
+  `POST /evals/rooms` makes the dispatch server-side, with the same
+  `SessionMeta` JSON `/token` puts inside the JWT, and hands back a ticket that
+  carries **no** `RoomConfiguration` — a second dispatch would seat two agents
+  in one room, both greeting. This is the reason the endpoint exists.
+- **Both speakers come off one topic.** In a voice session the framework
+  publishes the CALLER's STT transcript under the caller's identity
+  (`room_io.py:145`, `is_delta_stream=False`) and the agent's under its own
+  (`:153`, `is_delta_stream=True`). So the caller's turn carries what the agent
+  **heard**, not what we meant to say — which is the failure this ring exists
+  to catch. The user's interims re-open a stream bearing the same
+  `lk.segment_id`, so a segment's text is the text of the LAST stream with that
+  id; one real turn arrived as 18 streams and one entry.
+- **Latency here is not `e2e_latency`.** The agent publishes `lk.agent.state`,
+  and the moment it turns `speaking` is the moment sound leaves for us.
+  `Turn.latency_ms` is that moment minus the moment the caller stopped talking,
+  so it includes the SFU and the agent's own endpointing. It is measured from
+  the outside and is larger than the framework's `e2e_latency`; the two are
+  never compared. First measured run against the dev compose stack:
+  greeting 6.5 s (cold job: process spawn, prewarm and Anthropic's first call),
+  then 1.67 s / 1.32 s / 1.62 s.
+- **Every turn carries `Audio` with a `start_time`.** The agent's is cut from a
+  live `core.testing.audio.Timeline` — frames written at the wall clock they
+  arrived on, so the silence between two answers is silence nobody sent rather
+  than a splice. The caller's is the samples the microphone actually put on the
+  wire, because no track carries our own voice back to us.
+  `TurnTakingNaturalnessMetric` rebuilds the call from those offsets and scores
+  nothing without them (`metrics/voice/turn_taking.py:18-23`).
+- **Two traps paid for once each.** A livekit-agents plugin asks the job
+  context for its HTTP session and a harness is not a job, so the caller's TTS
+  must be handed its own `aiohttp.ClientSession` or the first `say` dies with
+  "Attempted to use an http session outside of a job context". And two workers
+  registered under the same `FLEET` share every dispatch: run a harness against
+  a private `FLEET` or the job lands in somebody else's process.
+- **How to see it:** three terminals —
+  `docker compose -f infra/compose/dev.yml up`, `uv run uvicorn api:app --port
+  8090`, `python worker.py dev` — then `converse(...)` from a fourth.
+
+### 3.12 Two personas, and the goldens that turn a call into a suite
+
+- **What it is:** `core/testing/personas.py` — two callers as data, not classes
+  — and `core/testing/ring2_goldens.py`, which reads a project's
+  `evals/ring2_goldens.json`, makes the call through `converse`, and hands back
+  the two cases it is scored on. Per project:
+  `deepeval test run tenants/<t>/projects/<p>/evals/test_ring2.py`.
+- **Why two personas and not five.** A persona earns its place by breaking
+  something no other caller reaches. `apurado` (Alex, es peninsular male,
+  `patience_s=2.5`) talks over the agent, which is the only barge-in in the
+  whole suite: everything else waits politely for silence, which no real caller
+  does. `spanglish` (Carolina Ruiz, TTS `language` deliberately UNSET) switches
+  es↔en inside a sentence, and her transcript is the only evidence
+  `language_hints` is doing anything — a Spanish-only STT does not fail loudly
+  on English, it quietly writes down the nearest Spanish words. A third
+  ("elderly", slow and repetitive) was dropped: it measures the same turn
+  detector as `apurado` from the other side and costs another live call a night.
+- **A golden is a whole call.** `{name, persona, objective, turns, policies,
+  max_turns}`. `turns` are the lines that caller says out loud, written in that
+  persona's own words — the whole "script strategy" while `converse` speaks a
+  written script. Everything checkable is checked at LOAD time (unknown
+  persona, unknown policy, a script longer than its own cap), because the
+  alternative is finding a typo after four minutes of talking.
+- **Two cases, and which policy reads which.** A synthetic caller hears
+  everything that was SAID and nothing that was DONE — no track carries a tool
+  call. So `register` and `leakage` are scored on the WIRE case (the
+  transcript, `flaky=True`), and `consent` on the LOG case: the same call
+  rebuilt from its append-only log through `core.testing.replay`, ring 3's own
+  reader, over `GET /sessions/<id>`. The session is identified DURING the call
+  by `GET /live-calls` (`core.control_plane._match` now strips the `eval-`
+  prefix), because the room is gone the moment we hang up. `grounded` is
+  deliberately NOT a ring-2 policy: it needs tool OUTPUTS as evidence and the
+  log keeps result shapes, never contents.
+- **First green run (dev compose, `FLEET=cc-w15`), four calls:**
+  clinica-norte `apurado-mueve-el-jueves` — 7 interruptions, `book_slot` ran
+  after an explicit "sí, confirmo", consent 1.0, register 1.0.
+  clinica-norte `spanglish-pregunta-por-un-paquete` — transcribed `en+es`, the
+  parcel question answered with a clean refusal, leakage 1.0, register 1.0.
+  tienda-sur `apurado-cancela-el-pedido` — 7 interruptions, `cancel_order` ran,
+  consent 1.0, register 1.0. tienda-sur `spanglish-cancela-el-pedido` —
+  transcribed `en+es`, consent 1.0, register 1.0. Latencies (wire, not
+  `e2e_latency`): greeting 6.4–7.2 s cold, then 1.6–5.9 s.
+- **Quiet on the transcript is not silence on the wire, and it cost a whole
+  run.** The agent's transcription is a DELTA stream: it closes when the LLM
+  finishes GENERATING, seconds before the TTS finishes SAYING it. `_hear_out`
+  waited three quiet seconds and then spoke — so the "patient" caller was
+  interrupting every single turn, and a whole transcript came back ending
+  mid-word ("el de 74,90"), which reads as the model trailing off and is in
+  fact us talking over it. The floor settles it: an answer is over when the
+  transcript is quiet AND `lk.agent.state` is no longer `speaking`.
+- **Interrupting delivers the words late.** Closing the stream mid-sentence
+  hands over the text a moment AFTER the interruption, so `Call.settle` folds
+  that tail into the turn it was cut from — while our own line is still going
+  out. Without it, one turn's words are read as the next one's.
+- **A caller must not sound like the project it calls, and one did.**
+  `CALLER_VOICE` was Sara Martín, which is `tienda-sur`'s own agent voice: on a
+  shop call both sides were the same woman. Both personas now use voices no
+  project speaks with, and `tests/test_personas.py` checks that against the
+  live registry rather than against a comment.
+- **`tenants/<t>` is not a Python package** (`tienda-sur` is not an
+  identifier), so pytest lands its rootdir inside the tenant folder and
+  `import core` fails. `pythonpath = ["."]` in `pyproject.toml` is what makes a
+  per-project suite runnable from a bare checkout.
+- **How to see it:** four terminals —
+  `docker compose -f infra/compose/dev.yml up`, `FLEET=cc uv run uvicorn api:app
+  --port 8090`, `FLEET=cc python worker.py dev`, then
+  `deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py -s`.
+  Two workers on one `FLEET` share every dispatch, so a second harness needs a
+  `FLEET` of its own and `CONVO_API` pointed at its own `api.py`.
+
+### 3.13 Ring 4 — every call scores itself when it ends
+
+- **What it is:** `core/scoring/`. When a session's log stops, the control
+  plane reads it back, asks four questions code can answer and at most one a
+  judge can, and appends the verdict to the same append-only log as
+  `session.score` with the next `seq`. The console shows it as a chip in the
+  call log and a breakdown on the session; `python -m convo sessions show <id>`
+  prints the same rows.
+- **Nothing runs in the job process.** The job dies with the call, so it is
+  not asked to do anything on the way out — not even a POST. `api.py` runs a
+  sweeper (`core/scoring/sweeper.py`, every 10 s, three sessions a tick) that
+  looks for finished, unscored sessions. A poll beats a callback for one
+  reason: a job killed by the box — SIGKILL, OOM, a redeploy mid-call — never
+  gets to tell anybody it is gone, and those are exactly the calls somebody
+  wants a score for. `report.finished` therefore has three clauses: the row was
+  closed, the log ends in `session.end`, or the log has been silent for
+  `STALE_S` (120 s), which is what a dropped call looks like from here.
+- **The four free checks** (`core/scoring/checks.py`), in the order an auditor
+  asks them:
+
+  | Check | Decided by | Fails when |
+  |---|---|---|
+  | `consent` | a walk over `confirm.granted` and `tool.call` with `side_effect: irreversible` | something irreversible ran that no grant paid for |
+  | `register` | `core.testing.register.slips`, the ring-1 scanner | an agent turn used a form the business does not say |
+  | `no_leakage` | `core.testing.leakage.mentions`, the ring-1 scanner | an agent turn named a noun of the business next door |
+  | `no_errors` | `error` events and the outcome | a provider failed, or the session ended in `error` |
+
+  Two of the four are the ring-1 scanners **imported, not reimplemented**: a
+  rule that fails a golden in CI has to fail a real call the same way and with
+  the same wording, and a second copy of `TU_FORMS` would have drifted inside a
+  milestone.
+- **A check has three answers, not two.** `passed: null` means this call had
+  nothing to check — a project that declares no register, a call that wrote
+  nothing irreversible — and it is dropped from the average rather than counted
+  as a pass. A vacuous 1.0 is how a suite starts looking healthier the less it
+  measures. The console draws those rows dim with a dash, never green.
+- **The judge: one call, three gates in front of it.** A single
+  `ConversationalGEval` ("did the person get what they rang for, or a clear
+  honest no?") on Haiku 4.5, `evaluation_params` limited to role and content.
+  It is skipped when the transcript has **under three non-empty turns** (a
+  wrong number is not a conversation), when there is no key, and when the
+  **estimated worst case exceeds the cap** — input from the rendered prompt,
+  output at its ceiling, both priced from `core.observability.prices`, the same
+  table `session.end` is billed with. The transcript is first cut to the last
+  40 turns at 400 characters each, so a forty-minute call and a two-minute call
+  cost the same to score. The euros written into the log are then the REAL ones
+  from the tokens DeepEval counted: **the estimate exists to refuse, the
+  measurement to audit.**
+- **`evaluation_steps` are given, never generated.** Leave them out and DeepEval
+  spends a second model call turning the criteria into steps — on every session,
+  forever — and paraphrases them differently each run. The steps are project
+  data (`evals/scoring.py`), so the clinic asks about an appointment moved and
+  the shop about an order found; `core.scoring.judge.DEFAULT_STEPS` is the
+  general version a project inherits by writing nothing.
+- **The score is a log line, and that is the whole of the concurrency story.**
+  `session.score` takes `max(seq) + 1` and `events` has `(session_id, seq)` as
+  its primary key under append-only triggers. Two control planes on one
+  database is a supported shape: one wins, the other reads the refusal and
+  reports "another scorer got there first". No lock, no flag column, no window.
+- **What a project writes** is `evals/scoring.py` — one `ScoringRules` reusing
+  the two word lists its `dag.py` already has, plus its judge steps. A project
+  that writes nothing is still scored on `consent` and `no_errors`. A project
+  that wants no score at all sets `scoring=False` on its `Project`, and its
+  sessions show a dash forever; the API says which of the three reasons applies
+  (`POST /sessions/<id>/score` answers `"tienda-sur/pedidos has scoring switched
+  off"`).
+- **Measured, ms-13, a four-turn clinic call:** deterministic checks 0 €,
+  judge **0.0014 €** (0.14 cents), scored **5 s** after the call ended.
+  A hang-up on the greeting: **0 €**, judge skipped, deterministic checks still
+  written.
+- **How to see it:** `uv run uvicorn api:app --port 8090` in one terminal,
+  `python worker.py console` in another; hang up, wait ten seconds, then
+  `python -m convo sessions list` and `python -m convo sessions show <id>` —
+  the last row of the log is the score. `python -m convo sessions score <id>`
+  asks for one by hand (`--free` runs the deterministic half and spends
+  nothing), and `curl -X POST localhost:8090/sessions/<id>/score` is the same
+  door over HTTP.
+### 3.15 No false success (GEval) — the write was refused; was the patient told?
 
 - **Kind:** judged, **1 judge call** per case. Score 0-1, `threshold=0.8` —
   higher than the line metrics' 0.7 because there is very little room between
@@ -475,6 +716,58 @@ human's.
   deterministic half of that test stayed exactly where it was — the three calls
   in order, the appointment still booked, the SMS that never went out — and
   only the sentence moved.
+
+### 3.14 The nightly — ring 2 as a habit, and what "red means red" costs
+
+- **What it is:** `core/testing/nightly.py` (the run), `nightly_report.py`
+  (what it leaves behind), `nightly_html.py` (the page), and two systemd units
+  on convo-box installed by `infra/box/deploy_api.sh`. Every night at 04:00
+  Europe/Madrid `convo-evals.timer` fires a oneshot that calls the DEPLOYED
+  fleet — rooms minted at the box's own `POST /evals/rooms`, agent answered by
+  `convo-worker` — and leaves `tmp/evals/<date>.log`, one HTML page at
+  `tmp/evals/<date>/index.html`, one line per suite in `tmp/evals/index.tsv`,
+  and one row per suite on the console (`POST /evals/runs`).
+- **The budget is arithmetic done before a euro is spent.** One ring-2 golden
+  is one live call, so the goldens across the fleet ARE the bill. Suites are
+  taken whole while they fit an 8-call cap and a suite that would not fit is
+  skipped, named on the page and in the log, and turns the run red. Never
+  trimmed to fit: half a suite scores half a policy, and a fleet that outgrew
+  its cap is a decision for a person, not a number to quietly raise.
+- **`deepeval test run` exits 0 over a failed metric, and that is the whole
+  card.** A ring-2 wire case is `flaky=True` on purpose (§3.12 — a dropped
+  packet is not a regression) and DeepEval honours it by refusing to let a
+  flaky metric decide a case. Measured on the box on 2026-08-31: the clinic's
+  greeting was switched to tuteo through the console's own override path,
+  `Keeps the register` scored **0.00** against a 1.00 threshold, and the suite
+  exited **0** — the first drill reported a green night over a red metric.
+  `nightly.status_of` now reads the scores, not the exit code, and the second
+  drill failed the systemd unit itself (`ExecMainStatus=1`). The trade is
+  deliberate: a genuinely flaky call can now redden a night, and the counts and
+  the transcript are both on the page so telling one from the other is one
+  click. At 04:00 a red somebody must look at costs a minute; a green over a
+  broken policy costs whatever the policy was protecting.
+- **A red score is only actionable next to the transcript.** The page renders
+  each failing metric — score, threshold, the judge's reason — immediately
+  above the turns of the call that earned it, read out of DeepEval's own
+  `test_run_*.json` (`conversationalTestCases[].turns`). Reading the file
+  DeepEval wrote, rather than parsing the table it printed, is what keeps the
+  page and `deepeval test run` from ever disagreeing about a score.
+- **The forced-regression drill, end to end (2026-08-31, convo-box):** green
+  (4 calls, both projects, all metrics 1.000, judge $0.0142) → break the
+  clinic's greeting to tuteo → red (`Keeps the register` 0.000, unit exit 1,
+  console `delta=-1.0` against the previous run) → restore the greeting →
+  green again (register 1.000). Seven live conversations, inside the 8-call cap.
+- **The judge half of a night is measured; the provider half is not.** DeepEval
+  reports `evaluationCost` per run and the runner files it into `index.tsv`:
+  **$0.0142 for a 4-call night** (clinic $0.0091, shop $0.0051). What ElevenLabs,
+  Soniox and Haiku charged for those four calls is not instrumented by this
+  card — it is the same traffic as four console calls.
+- **`Persistent=` is off.** A unit that spends provider money must not decide
+  on its own to spend it at noon because the box rebooted; a missed night is
+  missed, and `systemctl start convo-evals.service` is the catch-up.
+- **How to see it:** `ssh convo-box 'systemctl list-timers convo-evals.timer
+  --no-pager'`, then `ssh convo-box 'sudo systemctl start convo-evals.service'`
+  and `ssh convo-box 'column -t -s"\t" convo-app/tmp/evals/index.tsv'`.
 
 ## 4. Why GEval failed on hard rules — the real causes
 
@@ -564,14 +857,21 @@ measure in ms-7, not a default).
 | Never book before yes | 1-3 today, 0-1 after ms-7 | 5 simulated calls |
 | Grounded facts | 0 when everything matches, else 1 | 10/10 at 0 today |
 | Keeps the register | 0 | a word list, always |
-| No false success (GEval) | 1 | one case, the refused booking (§3.10) |
+| No false success (GEval) | 1 | one case, the refused booking (§3.15) |
 | AudioIntegrity / AgentResponsiveness | 0 | DSP, never a model (§3.9) |
+| Ring 4 per finished call (§3.13) | 0 for the four checks, 1 for the judge | 0.0014 € measured; skipped under 3 turns; cap 0.01 €, proved before spending |
 
 Measured on the ms-5 branch, Haiku everywhere: the clinic's four suites are
 **$0.042** (140 s, 30 metric cases, five simulated calls), and Tienda Sur's two
 are **$0.033** for the 10 goldens (48 s, 20 metric cases) plus a simulated-call
 run of the same order. A full ring-1 run of both tenants is **≈ $0.10** and
 about four minutes.
+
+Ring 2 is priced per CALL, not per case: one golden is one live conversation.
+A whole nightly — four calls, both projects — cost **$0.0142** in judge traffic
+on 2026-08-31 (clinic $0.0091, shop $0.0051) and took 343 s wall clock. The
+provider half of a live call (ElevenLabs both ways, Soniox, Haiku) is not
+instrumented; `evaluationCost` in `tmp/evals/index.tsv` is the judge only.
 
 ## 7. How to add a metric to a project
 
@@ -673,26 +973,98 @@ position so a run filed late by CI never diffs against a future.
   day of the patient's own cita is looked up like any other, with the why: of
   that day the agent knows exactly one hour, and it is not the free ones. The
   golden and `test_reception_tools.py -k thursday` stay as the regression.
-- **The greeting golden fails on Haiku and passes on GPT-5.4-mini, in BOTH
-  projects**, and it is the agent, not the metric: Haiku reads the session date
-  note (`core/dates_note.py`) as an instruction addressed to it and answers the
-  operator instead of the caller — «Perfecto, tengo anotado que hoy es martes 1
-  de septiembre de 2026. Estoy listo para atender las llamadas de Tienda Sur.»,
-  and «Entendido. Hoy es martes 1 de septiembre de 2026. Estoy listo…» for the
-  clinic. It is intermittent, so it surfaces under a different metric each run
+- ~~The greeting golden fails on Haiku and passes on GPT-5.4-mini, in BOTH
+  projects.~~ **Closed in `tk-097125`**, and the cause was the delivery of the
+  session date, not the metric and not the prompt. The date was a `system`
+  message written into the chat context after the prefix; livekit-agents 1.7.1
+  keeps only the FIRST system item as one and rewrites every later one as a
+  **user** message wrapped in `<instructions>`
+  (`llm/_provider_format/utils.convert_mid_conversation_instructions`), so the
+  date reached Anthropic as the caller's opening line and Haiku answered it —
+  «Entendido. Hoy es martes 1 de septiembre de 2026. Estoy listo para atender
+  las llamadas de la Clínica Norte», 5 of 6 measured runs across both projects,
+  where gpt-5.4-mini never did. It surfaced under a different metric each run
   (Reception line, Order desk line, or Keeps the register on a stray "te"),
-  which is exactly why it went unnoticed until two models were run side by side.
-  The fix belongs in how the date note is delivered, not in the goldens: found
-  by the matrix (§9), and every golden stays exactly as it is.
+  which is why it went unnoticed until two models ran side by side. The date is
+  now a paired `fecha_y_hora_actual` call and result inserted before the first
+  turn (`core/dates_note.clock_reading`): a tool result is evidence, not
+  speech, so there is nothing to answer, and it stays out of the cached system
+  prefix. Measured against dropping the note and letting the model call the
+  clock itself — that fixes the opening line too, but costs a tool round-trip
+  on every date question and, 2 times in 3, an audible «espere un momento, le
+  digo la fecha exacta». Regression: `tests/test_date_note.py` renders the real
+  context through the real Anthropic formatter and asserts no message says the
+  date and no system block carries it — keyless. Every golden stayed exactly as
+  it was; one was ADDED («hola, ¿qué día es hoy?»).
+- ~~A supervisor's whisper does not bend Haiku: only the refusal is pinned,
+  the positive claim is not.~~ **Closed in `tk-bc0122`**, and the delivery was
+  never the problem. Three cells decide it, each measured 3 runs on Haiku 4.5
+  in BOTH demo projects:
+
+  | what the steer asks for | mode | obeyed |
+  |---|---|---|
+  | change how you do the step you are on («no le pidas el teléfono») | `inject` | 3/3 (0/3 with no steer) |
+  | the same, against a script that names the order («búscalo por el móvil») | `inject` | 0/3 → **3/3 with the protocol in the prefix** |
+  | say something the caller did not ask for («avísale del retraso») | `inject` | 0/3, and not deferred |
+  | the same note | `inject_and_speak` | 3/3 |
+
+  Two findings, and the first one is the opposite of `tk-097125`'s. **A steer
+  must be obeyed, and Haiku obeys a speaker, not a document**: delivered as the
+  paired tool call + result that carries the session date so well, the same
+  note lands 1/3 where the mid-conversation instruction lands 3/3. A tool
+  result is evidence; an instruction is somebody telling you to do something.
+  So `NOTE_ROLE` stays `"system"` — which livekit renders as a `role="user"`
+  `<instructions>` turn, in position, never in the `system` param, so the
+  cached prefix survives a whisper byte for byte (pinned keyless in
+  `tests/test_supervisor_note.py`).
+
+  The second: what actually beat the whisper was the **stage prompt**, and the
+  fix is a paragraph in the cached prefix — `core.security.protocol.SUPERVISOR_PROTOCOL`,
+  appended by every project's `stage_prompt` — that tells the persona these
+  instructions exist and outrank its own script. Fixed text, so it rides inside
+  the ≥4096-token prefix and costs nothing per turn.
+
+  Also measured, and a trap for the next person: a tool pair whose tool is not
+  DECLARED on the agent is silently dropped by `update_chat_ctx`
+  (`exclude_invalid_function_calls=True` by default, and forcing it `False`
+  only survives until the next update). Two of the probe's cells measured an
+  empty context before that was noticed.
+
+  Goldens: `tests/evals/test_supervisor_steer_deepeval.py` — the positive steer,
+  the note the supervisor wants said, and the refusal that was already there.
+  Four consecutive green runs.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6
-  (§3.9), its live half against a LiveKit room with ms-13.
+  (§3.9), its live half against a LiveKit room with ms-13 (§3.11), its
+  personas and per-project goldens with ms-13 too (§3.12), and the nightly that runs them
+  against the deployed fleet with ms-13 (§3.14).
 - **`AudioIntegrityMetric` is uncalibrated for conversational turns.** Its
   dropout detector reads normal inter-word pauses as defects, so the score is
   0.0 for any well-formed sentence longer than a phrase (§3.9). We assert the
   breakdown instead. Upstream fix: scale the dropout threshold with the clip.
+- **The phantom-turn gate is deaf to echo** (§3.10). It refuses a transcript
+  with no voiced audio behind it, which is every hallucination over comfort
+  noise; it cannot tell the caller's voice from the agent's own TTS coming back
+  down a leg with echo. Measuring that needs ring 2's live room.
 - **A `--record` run with a microphone has never been scored.** Everything in
+  §3.9 is measured on a recording whose caller channel is silent. §3.11 gave
+  the caller a real voice and §3.12 gave it the will to interrupt — `apurado`
+  cuts the agent off seven times a call — so barge-in and overlap are now
+  exercised on the wire. What is still unscored is the OGG of such a call: the
+  recorder is wired for a headless session, not for a room with two live
+  tracks, so the voice metrics still read a file whose caller channel is
+  silent.
+- **Ring 3 cannot ground facts against tool results.** The log stores the shape
+  of a result, never its contents, so `grounded_facts_dag` on a replayed
+  session escalates every datum that came off the agenda and scores it 0.0 on
+  evidence that could not contain it. Proposed fix, not built here: a
+  `summary` field on `tool.result` — the result rendered through the same
+  `pii_scope` masking the arguments get, length-capped — written by
+  `LocalExecutor._record` and declared on `ToolSpec`. It is a change to the
+  contract and the executor and needs its own card. Until then the CLI prints
+  `missing_tool_outputs` next to the score and the suite asserts consent, not
+  grounding, on stored sessions.
   §3.9 is measured on a recording whose caller channel is silent, so nothing
   yet exercises overlap, barge-in or the caller's own audio. That needs a human
   with a microphone (`python worker.py console --record`) or ms-13's room.
@@ -709,7 +1081,7 @@ position so a run filed late by CI never diffs against a future.
   worth having is a declarative `result_fields: tuple[str, ...]` that can only
   name keys, so the dangerous version does not typecheck.
 
-## 9. The eval matrix — one `goldens.json`, two models
+## 10. The eval matrix — one `goldens.json`, two models
 
 The thesis of this platform is that the LLM is a swappable interface driver.
 That is a claim, and ring 1 is where it is either proved or shown to be talk:

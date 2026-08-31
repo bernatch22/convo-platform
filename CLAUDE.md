@@ -56,12 +56,36 @@ and, when a decision was made, a short essay in its thread.
   measured alternative in evals, not a default.
 - Call `sanitize_tool_pairing(chat_ctx)` before every generation (orphan
   `tool_use` bricks the conversation with Anthropic 400s).
+- **A `system` message added to a live chat context is not a system message.**
+  `convert_mid_conversation_instructions` keeps only the FIRST system item as
+  one and rewrites every later one as a **user** message wrapped in
+  `<instructions>` — the agent's prompt is that first item, so anything added
+  afterwards arrives as the caller speaking. Haiku answers it (`tk-097125`: the
+  session date opened 5 of 6 calls). Context the model must READ but nobody
+  said goes in as a paired tool call + result (`core.dates_note.clock_reading`);
+  a `tool_use.id` must match `^[a-zA-Z0-9_-]+$` or the request 400s, and the
+  tool must be DECLARED on the agent or `update_chat_ctx` drops the pair.
+- **Context to be READ is a tool result; context to be OBEYED is an
+  instruction.** A supervisor's whisper stays in the mid-conversation
+  instruction channel (`role="system"` → a user `<instructions>` turn on the
+  wire): as a tool result the same note is filed and not acted on (1/3 vs 3/3,
+  `tk-bc0122`). And a whisper only outranks the stage script because every
+  project's prefix ends with `core.security.protocol.SUPERVISOR_PROTOCOL` —
+  without it, 0/3. `inject` bends the next answer; a note the supervisor wants
+  SAID needs `inject_and_speak`.
 - STT: Soniox `stt-rt-v5`, `language_hints=["es","en"]`, endpointing
   `level=2 / sensitivity=0.3 / max_endpoint_delay_ms≈1000`, `context=` (Soniox
   silently ignores `keyterms`). Keep `sample_rate=16000` even on PSTN.
   The provider is a slot (`Project.stt_provider`, overridable from the console):
   the alternative is Deepgram Flux `flux-general-multi` via the plugin's `STTv2`
   (`/v2/listen`) — never `flux-general-en`, which 400s on a `language_hint`.
+- Every transcript passes `core.stt_gate` in `TenantAgent.stt_node`: a streaming
+  STT hallucinates over comfort noise (real call AJ_rt86KogpPxDa: a final
+  "Thank you." into an empty line), so a final with no voiced audio behind it in
+  the last 2.5 s is refused and logged as `stt.phantom`. Never a phrase
+  blocklist — the invention changes every time. Thresholds are project data
+  (`Project.stt_gate`). Overriding `stt_node` forfeits the framework's
+  STT-pipeline reuse across a handoff; that price is paid knowingly.
 - TTS: ElevenLabs `eleven_v3_conversational` (primary) / `eleven_flash_v2_5`
   (latency profile), `sync_alignment=True`. Never `eleven_turbo_v2_5`
   (deprecated) and never `eleven_v3` (non-realtime). On interruption the
@@ -76,6 +100,12 @@ and, when a decision was made, a short essay in its thread.
   voice test cases `flaky=True`; hard policies use `ConversationalDAGMetric`,
   not `GEval`; eval rooms are created by `api.py` with dispatch metadata (the
   `LiveKitConnector` cannot pass metadata).
+- Ring 4 (`core/scoring/`) scores every finished call from `api.py`, never from
+  the job process: four checks decided by code, then AT MOST one Haiku call,
+  whose worst case is priced against `SCORING_CAP_EUR` BEFORE it is made and
+  skipped under three turns. The verdict is `session.score`, one more
+  append-only log line at `max(seq)+1`. `Project.scoring=False` opts a project
+  out; `SCORING_SWEEP=0` opts a deploy out.
 - Secrets only from env. Never commit `.env*` except `.env.example`.
 
 ## Layout

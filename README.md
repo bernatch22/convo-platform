@@ -129,6 +129,20 @@ uv run python -m convo sessions eval <id>                     # the project's DA
 uv run deepeval test run tests/evals/test_dispatch_ring.py    # the same, as a test
 ```
 
+And every call scores itself without being asked. While `api.py` is up it
+sweeps for calls that have ended and writes a verdict into their own log as
+`session.score` — four checks decided by code (consent, register, cross-tenant
+leakage, provider errors) and at most one Haiku call, about 0.0014 € and only
+when the transcript is worth judging:
+
+```bash
+uv run python -m convo sessions show <id>    # the score is the last row
+uv run python -m convo sessions score <id>   # ask for one by hand (--free skips the judge)
+```
+
+A project opts out with `scoring=False` on its `Project`, and its sessions show
+a dash. The whole design is [`docs/evals.md`](docs/evals.md) §3.13.
+
 `tests/evals/test_dispatch_ring.py` skips itself when no routed session is in
 the store: `scripts/dev_call.py` is its fixture, and a suite that failed
 because nobody started a server would be reporting on the laptop.
@@ -153,6 +167,38 @@ uv run python -m core.testing.report clinica-norte reagendamiento \
     --model claude-haiku-4-5 --model gpt-5.4-mini
 ```
 
+Ring 2 (live voice) calls the agent out loud with a synthetic caller, so it
+needs the dev stack up in three other terminals (compose, `api.py`,
+`worker.py dev`) plus `ELEVENLABS_API_KEY` and `SONIOX_API_KEY`:
+
+```bash
+uv run deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py -s
+uv run deepeval test run tenants/clinica-norte/projects/reagendamiento/evals/test_ring2.py -s
+```
+
+Two callers phone each project: `apurado`, who talks over the agent, and
+`spanglish`, who switches es↔en mid-sentence. `-s` prints the transcript, the
+latencies, how many answers were interrupted and which languages came back
+transcribed. `CONVO_API` points the caller at another control plane.
+
+The same suites run themselves on the box every night at 04:00 Europe/Madrid
+(`convo-evals.timer`), against the DEPLOYED fleet, capped at eight live
+conversations and killed at twenty minutes. Locally it is one command:
+
+```bash
+uv run python -m core.testing.nightly --dry-run   # what a night would spend
+uv run python -m core.testing.nightly             # run it; --only tenant/project narrows it
+```
+
+A night leaves `tmp/evals/<date>.log`, one page at `tmp/evals/<date>/index.html`
+with every red metric above the transcript that earned it, one line per suite in
+`tmp/evals/index.tsv`, and one row per suite on the console's evals screen. It
+goes red on a failed METRIC and not on pytest's exit code — a ring-2 wire case is
+`flaky=True`, so `deepeval test run` passes a suite whose register just broke.
+
+[`docs/evals.md`](docs/evals.md) explains every metric and how to add one;
+[`infra/box/README.md`](infra/box/README.md) covers the nightly on the box.
+
 A run also has a screen: the console's Evals page lists every run with its
 scores, diffs it against the previous run of the same suite, and can launch one
 on the box (one at a time, killed at fifteen minutes, log tail on screen).
@@ -163,10 +209,17 @@ a project declares the suites the console can run (§8); §9 is the model matrix
 ## The web UI
 
 `ui/` is the operator console: the tenant/project switcher, Talk (the three
-channels — WebRTC voice, web chat, and the phone line on **+1 417 674 3169**),
-Sessions, Pipeline, Evals (every stored run with its per-metric diff, and the
-button that launches another on the box) and the Supervisor desk. Vite + React +
+channels — WebRTC voice, web chat, and the SIP trunk), Sessions, Pipeline (the
+three providers, plus the phone line this project answers on, or the fact that
+it has none), Evals (every stored run with its per-metric diff, and the button
+that launches another on the box) and the Supervisor desk. Vite + React +
 TypeScript + react-router; no state library, no CSS framework.
+
+A number belongs to a project, never to the fleet: it is one row of the control
+plane's `routes` table (`python -m convo routes list | seed | add`), the same
+row `core/router.py` reads to decide who answers an inbound call. Today exactly
+one number is registered — **+1 417 674 3169**, clinica-norte/reagendamiento —
+and the console says so per project instead of printing it fleet-wide.
 
 **The Supervisor desk** (`/supervisor`) lists every call live on the fleet,
 phone calls included. Clicking one joins that room with a short-lived,
