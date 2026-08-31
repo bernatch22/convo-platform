@@ -185,11 +185,20 @@ async def test_a_compensated_cancellation_spends_the_yes_it_was_given() -> None:
 def test_every_tool_the_project_can_call_declares_what_it_does_to_the_world() -> None:
     catalog = project_module.PROJECT.tools
 
-    assert catalog.names() == ["cancel_order", "find_order", "restore_order", "send_sms"]
+    assert catalog.names() == [
+        "cancel_order",
+        "find_order",
+        "open_ticket",
+        "restore_order",
+        "send_sms",
+        "ticket_status",
+    ]
     assert catalog.get("cancel_order").side_effect is SideEffect.IRREVERSIBLE
     assert catalog.get("cancel_order").needs_confirmation() is True
     assert catalog.get("cancel_order").compensation == "restore_order"
     assert catalog.get("find_order").needs_confirmation() is False
+    assert catalog.get("open_ticket").side_effect is SideEffect.WRITE
+    assert catalog.get("open_ticket").needs_confirmation() is False
     assert catalog.get("find_availability") is None, "the shop has no agenda to consult"
 
 
@@ -229,11 +238,20 @@ def test_identify_hands_the_next_stage_the_order_but_never_its_state(tc) -> None
 
 def test_order_desk_hands_the_farewell_the_cancellation_that_now_exists(tc) -> None:
     stage = desk(tc)
-    assert "Todavía no" in stage.summary()
 
     stage.cancelled = tc.customer
     assert "TS-10432 cancelado" in stage.summary()
     assert "74,90 euros" in stage.summary()
+
+
+def test_order_desk_hands_the_ticket_desk_the_order_and_not_a_non_cancellation(tc) -> None:
+    """The summary is a turn the model ANSWERS, so "nothing was cancelled" gets said out loud."""
+    said = desk(tc).summary()
+
+    assert "TS-10432" in said
+    assert "Marta Alonso Gil" in said
+    assert "no vuelvas a pedir el número" in said
+    assert "no se lee en voz alta" in said
 
 
 # --- the model --------------------------------------------------------------

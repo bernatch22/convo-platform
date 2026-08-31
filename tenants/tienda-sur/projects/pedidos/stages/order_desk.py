@@ -28,13 +28,35 @@ class OrderDesk(TenantAgent):
         self.cancelled: dict[str, str] | None = None
 
     def summary(self) -> str:
-        """What Farewell needs: the cancellation that now exists, in the words to read out."""
-        if not self.cancelled:
-            return "Todavía no se ha cancelado nada."
+        """What the next stage needs: the cancellation if there is one, the order if there is not.
+
+        Two stages read this now and they need different halves of it. Farewell
+        arrives only after a cancellation and needs it in the words to read out.
+        TicketDesk arrives from a customer with a problem and needs the ORDER,
+        so that nobody is asked twice for a number they have already given.
+
+        The not-cancelled branch used to answer "todavía no se ha cancelado
+        nada", which was harmless while Farewell was the only reader and became
+        a defect the moment it was not: a summary reaches the model as a turn to
+        ANSWER (a system message added mid-conversation is rewritten as a user
+        one — see CLAUDE.md), so a customer who had just asked to file a written
+        complaint was greeted with «el pedido sigue en pie, no se ha cancelado
+        nada. ¿Qué prefieres hacer?» — every word true, about something nobody
+        had raised. Measured at 0.4 on the line metric before this was written.
+        """
+        if self.cancelled:
+            return (
+                f"Pedido {self.cancelled['order_id']} cancelado. El importe de "
+                f"{self.cancelled['total']} vuelve por donde se pagó en tres a cinco días "
+                "laborables y el SMS de confirmación ya se ha enviado."
+            )
+        order = self.tc.customer or {}
+        if not order:
+            return "Todavía no se ha localizado ningún pedido."
         return (
-            f"Pedido {self.cancelled['order_id']} cancelado. El importe de "
-            f"{self.cancelled['total']} vuelve por donde se pagó en tres a cinco días "
-            "laborables y el SMS de confirmación ya se ha enviado."
+            f"Pedido localizado: {order['order_id']}, a nombre de {order['name']}. Es el pedido "
+            "del que va esta llamada, así que no vuelvas a pedir el número ni el móvil. Nada se "
+            "ha cancelado. Esta nota es para ti: no se lee en voz alta ni se resume al cliente."
         )
 
     @function_tool
@@ -94,6 +116,26 @@ class OrderDesk(TenantAgent):
             return tools.NOTICE_FAILED if failure.step == SMS_STEP else tools.CANCEL_FAILED
         self.cancelled = order
         return self.hand_off(Farewell(tc))
+
+    @function_tool
+    async def start_ticket_desk(self, ctx: RunContext[TenantContext]) -> "TenantAgent":
+        """Pasa la llamada al mostrador de incidencias, con el pedido que ya tienes localizado.
+
+        Llámala cuando lo que le pasa al cliente no se arregla mirando ni cancelando el pedido
+        y hay que dejarlo por escrito para que un compañero lo siga: el paquete consta
+        entregado y no lo tiene, ha llegado roto o cambiado, falta una prenda, el transportista
+        no aparece, o pide poner una reclamación. Llámala también si pregunta por una
+        incidencia suya que ya está abierta.
+
+        No la llames para lo que sí sabes hacer aquí: decir por dónde va el pedido, decir
+        cuándo llega o cancelarlo mientras esté en el almacén.
+
+        No necesita argumentos: el pedido localizado viaja con la llamada.
+        """
+        tc = ctx.userdata
+        from .ticket_desk import TicketDesk
+
+        return self.hand_off(TicketDesk(tc))
 
     async def _reload(self, tc: TenantContext) -> dict[str, str] | None:
         """The order as the system holds it right now, kept on the context for the next turn."""

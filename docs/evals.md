@@ -848,9 +848,9 @@ judged turn belongs to whichever booking stage the call reached);
 `expected_tools` feeds ToolCorrectness; `expected_behaviour` is what the GEval
 judge reads as context. Adding a golden is adding one JSON object — no code. The
 file **grows and never forks**: the four new-booking goldens ms-18 added sit in
-the same array as the rescheduling ones and are run by the same suites, on both
-models, which is the only arrangement in which the matrix keeps comparing
-anything.
+the same array as the rescheduling ones, and ms-20's five incident goldens sit
+in the shop's alongside its orders — same suites, both models, which is the only
+arrangement in which the matrix keeps comparing anything.
 
 **Simulated calls** (`simulator.py`, 8 for the clinic and 3 for the shop; the
 machinery is `core.testing.simulator.SimulatedCaller`, so a project's file is
@@ -1316,6 +1316,45 @@ the agenda knows what is free — went into the shared prompt block both booking
 stages compose from (`prompts/reception.py`), and Tool Correctness on Haiku went
 from 14/16 to 17/17. Softening the golden would have hidden a rule the platform
 actually depends on.
+
+### What ms-20 added (2026-08-31, `tk-383750`) — the shop's incident desk, 5 new goldens
+
+`tienda-sur/pedidos` grew a fourth stage (`TicketDesk`) and five goldens for it
+in the SAME `goldens.json`, taking the file from 11 to 16. They are the branch
+(«quiero poner una reclamación por escrito» → `start_ticket_desk`), the open
+(`open_ticket`), a status by number (`ticket_status` on `TS-T0001`), a status
+that finds nothing (`TS-T9999`), and the one about what gets WRITTEN DOWN — the
+subject must be the caller's own words and must never pick up a noun from
+another customer's incident.
+
+All five are **green on claude-haiku-4-5 and on gpt-5.4-mini**, and the whole
+shop suite ran 32/32 on gpt. Three things they caught, none of them softened:
+
+- **A summary is a turn the model answers.** `OrderDesk.summary()` said
+  "todavía no se ha cancelado nada" when nothing had been cancelled — harmless
+  while Farewell was its only reader, and a defect the moment `TicketDesk` was
+  the other one: a customer who had just asked to file a complaint was greeted
+  with «el pedido sigue en pie, no se ha cancelado nada. ¿Qué prefieres
+  hacer?». Every word true, about something nobody had raised. 0.4 on the line
+  metric; fixed in the summary, not in the golden.
+- **A stage needs to be told what its FIRST sentence is.** With the summary
+  fixed, Haiku read it out instead («el pedido TS-10432 de Marta Alonso Gil ya
+  está localizado… estoy listo para abrir la incidencia»). 0.3. The fix is one
+  paragraph in the stage's own prompt, the same one `OrderDesk` has always had.
+- **A golden has to test the branch and not a coin flip.** The first version of
+  the branch golden said «quiero poner una reclamación por escrito, que llevo
+  tres días esperando» and Haiku called `order_status` — correctly, because
+  "llevo tres días esperando" IS a status question. The golden was rewritten to
+  a complaint no status read can answer («llevo tres correos sin respuesta»);
+  the prompt was not weakened to swallow the ambiguous one.
+
+The consent graph is unchanged and that is the design: `open_ticket` is a
+`write`, not an irreversible, so a ticket call ends at node 1 of
+`consent_graph` and costs **zero judge calls** — pinned keyless by
+`tests/test_tienda_tickets.py`, which counts the prompts a fake judge receives.
+Grounding grew one extractor: an incident number (`TS-T0003`) is checked
+against the CALL and never against the sheet, because it does not exist until
+the helpdesk mints it.
 
 ### What it measured earlier (2026-08-31, ms-7 branch)
 
