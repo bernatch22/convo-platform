@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo — Plataforma conversacional transaccional</title>
+  <style>
+    :root {
+      --paper: #FBFAF7; --ink: #1F1E1A; --ink-2: #4A4842; --muted: #8B887E;
+      --rule: #D6D2C7; --accent: #5C6B22; --accent-soft: #F0F2E5;
+      --sans: -apple-system, "Helvetica Neue", "Segoe UI", sans-serif;
+      --mono: "SF Mono", ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 28px 64px; }
+    .eyebrow { font: 500 11px var(--mono); letter-spacing: .09em; text-transform: uppercase;
+               color: var(--accent); margin-bottom: 14px; }
+    h1 { font: 600 34px/1.15 var(--sans); letter-spacing: -.015em; margin: 0 0 8px; }
+    .sub { font: 400 16px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 28px; max-width: 70ch; }
+    .player { border: 1.5px solid var(--accent); border-radius: 14px; overflow: hidden;
+              background: #000; aspect-ratio: 16 / 9; }
+    .player video { display: block; width: 100%; height: 100%; }
+    .links { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 24px; padding-top: 18px;
+             border-top: 1px solid var(--rule); font: 400 14px/1.5 var(--sans); color: var(--ink-2); }
+    .links a { color: var(--accent); font: 500 14px var(--mono); text-decoration: none; }
+    .links a:hover { text-decoration: underline; }
+    .links strong { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="eyebrow">Prueba técnica · Principal Platform Architect · ABAI</div>
+    <h1>Plataforma conversacional transaccional con IA — demo</h1>
+    <p class="sub">Una llamada real de punta a punta: el agente identifica, ejecuta acciones
+    de negocio con consentimiento, y la operación lo ve todo — supervisión en vivo,
+    grabación, coste y nota de calidad.</p>
+
+    <div class="player">
+      <!-- Drop the video as ui/public/demo.mp4 (or replace src). -->
+      <video controls preload="metadata" src="/demo.mp4"></video>
+    </div>
+
+    <div class="links">
+      <span>Consola en vivo: <a href="https://lk.bernardocastro.dev">lk.bernardocastro.dev</a></span>
+      <span>Por teléfono: <strong>+1 417 674 3169</strong> — atiende la clínica</span>
+      <span>Cómo se construyó: <a href="https://taskops.bernardocastro.dev/convo">taskops.bernardocastro.dev/convo</a></span>
+    </div>
+  </div>
+</body>
+</html>
