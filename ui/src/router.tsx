@@ -10,7 +10,7 @@ import { createBrowserRouter } from "react-router";
 import { Crash } from "./routes/Crash";
 import { Evals } from "./routes/Evals";
 import { Home } from "./routes/Home";
-import { Pipeline } from "./routes/Pipeline";
+import { Pipeline, pipelineLoader } from "./routes/Pipeline";
 import { SessionDetail, sessionDetailLoader } from "./routes/SessionDetail";
 import { Sessions, sessionsLoader } from "./routes/Sessions";
 import { Shell, shellLoader } from "./routes/Shell";
@@ -28,7 +28,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: "t/:tenant/sessions", element: <Sessions />, loader: sessionsLoader },
       { path: "t/:tenant/sessions/:id", element: <SessionDetail />, loader: sessionDetailLoader },
-      { path: "t/:tenant/pipeline", element: <Pipeline /> },
+      { path: "t/:tenant/pipeline", element: <Pipeline />, loader: pipelineLoader },
       { path: "t/:tenant/:project", element: <Talk /> },
       { path: "evals", element: <Evals /> },
       { path: "supervisor", element: <Supervisor /> },

@@ -229,7 +229,7 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
         "llm": {"provider", "model", "caching", "max_tokens",
                 "cache_minimum_tokens", "cache_note"},
         "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
-                "forbidden_models", "voice", "sync_alignment"},
+                "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
         "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
         "latency": {"sessions": int, "turns": int,
                     "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",
