@@ -3,18 +3,20 @@
  * One GET answers the whole screen: the STT / LLM / TTS legs as the NEXT
  * session will run them (overrides already applied by the control plane), the
  * medians its stored calls measured, and the three fields a supervisor may
- * set. The project lives in the query string, so a screen is shareable and
- * switching project is a navigation, not a store write.
+ * set. The project is in the path — `/t/<tenant>/<project>/pipeline` — so this
+ * screen never guesses which project it is configuring, and switching project
+ * is a navigation, not a store write.
  */
 
 import { useState } from "react";
-import { Link, redirect, useLoaderData, useParams, type LoaderFunctionArgs } from "react-router";
+import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
 
 import { PhoneLines } from "../components/PhoneLines";
 import { PipelineControls } from "../components/PipelineControls";
 import { LlmLeg, SttLeg, TtsLeg } from "../components/PipelineLegs";
 import { Waterfall } from "../components/Waterfall";
-import { ApiError, getPipeline, listTenants, type PipelineSnapshot } from "../lib/api";
+import { ApiError, getPipeline, type PipelineSnapshot } from "../lib/api";
+import { sectionPath } from "../lib/nav";
 import { voiceName } from "../lib/voices";
 
 import { useShellData } from "./Shell";
@@ -22,45 +24,36 @@ import { useShellData } from "./Shell";
 /** What this screen renders: one project's snapshot, or the refusal that replaced it. */
 export interface PipelineData {
   tenant: string;
-  project: string | null;
+  project: string;
   snapshot: PipelineSnapshot | null;
   error: string | null;
 }
 
-/** Read one project's pipeline; with no `?project=` in the URL, redirect to the tenant's first. */
-export async function pipelineLoader({
-  params,
-  request,
-}: LoaderFunctionArgs): Promise<PipelineData> {
-  const tenant = params.tenant ?? "";
-  const wanted = new URL(request.url).searchParams.get("project");
-
-  if (!wanted) {
-    const first = (await listTenants()).find((row) => row.tenant === tenant)?.projects[0];
-    if (!first) {
-      return { tenant, project: null, snapshot: null, error: `${tenant} has no projects` };
-    }
-    throw redirect(`/t/${tenant}/pipeline?project=${encodeURIComponent(first.id)}`);
-  }
+/** Read the pipeline of the project the path names — there is nothing left to default. */
+export async function pipelineLoader({ params }: LoaderFunctionArgs): Promise<PipelineData> {
+  const tenant = params["tenant"] ?? "";
+  const project = params["project"] ?? "";
 
   try {
-    return { tenant, project: wanted, snapshot: await getPipeline(tenant, wanted), error: null };
+    return { tenant, project, snapshot: await getPipeline(tenant, project), error: null };
   } catch (cause) {
     const error = cause instanceof ApiError ? cause.detail : String(cause);
-    return { tenant, project: wanted, snapshot: null, error };
+    return { tenant, project, snapshot: null, error };
   }
 }
 
 export function Pipeline() {
-  const { tenant = "" } = useParams();
   const data = useLoaderData() as PipelineData;
+  const { tenant, project } = data;
   const { tenants } = useShellData();
   const projects = tenants.find((row) => row.tenant === tenant)?.projects ?? [];
 
   return (
     <div className="page">
       <header className="page__head">
-        <div className="page__eyebrow">{tenant} · pipeline</div>
+        <div className="page__eyebrow">
+          {tenant} / {project} · pipeline
+        </div>
         <h1 className="page__title">{data.snapshot?.name ?? "Pipeline"}</h1>
         <p className="page__lede">
           The three legs of a voice turn as data, not as prose: what hears, what decides, what
@@ -72,20 +65,20 @@ export function Pipeline() {
 
       {projects.length > 1 && (
         <nav className="tabs" aria-label="Projects">
-          {projects.map((project) => (
+          {projects.map((row) => (
             <Link
-              key={project.id}
-              to={`/t/${tenant}/pipeline?project=${encodeURIComponent(project.id)}`}
-              className={project.id === data.project ? "tabs__tab is-active" : "tabs__tab"}
+              key={row.id}
+              to={sectionPath(tenant, row.id, "pipeline")}
+              className={row.id === project ? "tabs__tab is-active" : "tabs__tab"}
             >
-              {project.id}
+              {row.id}
             </Link>
           ))}
         </nav>
       )}
 
       {data.snapshot ? (
-        <Loaded key={data.project} snapshot={data.snapshot} />
+        <Loaded key={project} snapshot={data.snapshot} />
       ) : (
         <p className="ctl__error">{data.error}</p>
       )}
