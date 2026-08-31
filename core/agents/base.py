@@ -42,6 +42,22 @@ log = logging.getLogger("platform.agents")
 
 SUMMARY_ROLE = "system"
 
+# The first line of every inherited summary, and the only one the platform writes.
+# A stage's prompt teaches it to open a call, because for the first stage that is
+# exactly right; reached by a handoff, the same prompt greets a caller who has been
+# talking for two minutes, and a call that says "Tienda Sur, buenos días" for the
+# third time sounds like it restarted (real session, 2026-09-01: a customer bounced
+# between the order desk and the incident desk was greeted at every arrival). Only
+# the platform knows whether this stage is the beginning, so this sentence is the
+# platform's and not a rule each project has to remember to write.
+MID_CALL = (
+    "La llamada ya viene de antes y tú no eres el principio: no saludes, no te presentes, "
+    "no digas el nombre del negocio otra vez y no vuelvas a preguntar lo que ya te han dicho. "
+    "Sigue donde se quedó. Lo que va detrás de esta frase es una nota interna para ti: no la "
+    "leas en voz alta, no la resumas, no la comentes y no hables del cliente en tercera "
+    "persona. Le hablas a él, directamente, de lo que te acaba de decir."
+)
+
 
 class TenantAgent(Agent):
     """One conversation stage of a project, with its own prompt and tools."""
@@ -253,5 +269,5 @@ class TenantAgent(Agent):
         if previous is None or previous is self or not hasattr(previous, "summary"):
             return
         chat_ctx: ChatContext = self.chat_ctx.copy()
-        chat_ctx.add_message(role=SUMMARY_ROLE, content=previous.summary())
+        chat_ctx.add_message(role=SUMMARY_ROLE, content=f"{MID_CALL} {previous.summary()}")
         await self.update_chat_ctx(chat_ctx)
