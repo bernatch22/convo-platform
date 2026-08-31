@@ -23,6 +23,14 @@ for the wrong reason:
   just its name. A judge shown a bare call has to guess what the tool wanted
   and cannot tell an hour read off the agenda from an hour invented — and it
   guesses wrong, confidently, in both directions.
+- `expected_tools` is about the BUSINESS's tools, so the case ToolCorrectness
+  reads carries the business's calls. A golden that expects nothing expects the
+  agenda to be left alone; it does not expect the agent to be struck dumb, and
+  the platform's own clock is not a name any golden should have to list. The
+  filter is `business_calls`, it is driven by `ToolSpec.infrastructure`, and it
+  applies to `test_case_for` alone: `turn_tool_calls` and the conversational
+  case keep every call, because the grounding metric reads a tool's OUTPUT as
+  evidence and the clock reading is the evidence for what day it is.
 """
 
 import importlib
@@ -38,6 +46,7 @@ from livekit.agents.voice.run_result import RunResult
 
 from core.context import TenantContext
 from core.testing.harness import Conversation, Exchange, PlatformCall, text_of
+from core.tools.catalog import infrastructure_names
 
 GREETING_TURN = "greeting"
 
@@ -118,6 +127,26 @@ def tool_calls_of(
     ]
 
 
+def business_calls(calls: Sequence[ToolCall]) -> list[ToolCall]:
+    """The calls a golden is about: everything except the platform's own infrastructure.
+
+    `expected_tools` names the tools of the BUSINESS — the agenda, the order
+    book — and a golden that lists none of them is saying "this turn must not
+    touch the business", not "this turn must call nothing at all". Until this
+    filter existed, a model that asked what day it is before answering scored
+    0.0 on such a golden while a GEval judge, reading the same turn, wrote that
+    the tool was "correctly not invoked" (docs/evals.md §9): two goldens of the
+    clinic's ms-18 matrix on gpt-5.4-mini, a divergence that was never a
+    behaviour difference.
+
+    What counts as infrastructure is DECLARED, never matched: a `ToolSpec` with
+    `infrastructure=True`, which today is `core.tools.catalog.CLOCK` and
+    tomorrow is whatever a project marks. Nothing here knows a tool name.
+    """
+    platform = infrastructure_names()
+    return [call for call in calls if call.name not in platform]
+
+
 def call_named(calls: Sequence[ToolCall], name: str) -> ToolCall | None:
     """The first call to a NAMED tool in a turn, or None — never `tools_called[0]`.
 
@@ -154,6 +183,12 @@ def test_case_for(
     arguments: what the model should pass is judged by ArgumentCorrectness or
     by an assertion the project writes itself, and an expected argument written
     here would show up in the report as a value the model never had to produce.
+
+    `tools_called` is what the turn called MINUS the platform's infrastructure
+    (`business_calls`), because this is the case ToolCorrectness scores against
+    a list of the business's tools. Nothing is hidden from the graders that want
+    the clock: the whole-call case keeps every call, and so does
+    `turn_tool_calls`.
     """
     expected = [ToolCall(name=name) for name in golden.get("expected_tools", [])]
     context = [f"Expected behaviour: {golden['expected_behaviour']}"]
@@ -176,7 +211,7 @@ def test_case_for(
         name=golden["input"],
         input=golden["input"],
         actual_output=text_of(result),
-        tools_called=tool_calls_of(result, descriptions),
+        tools_called=business_calls(tool_calls_of(result, descriptions)),
         expected_tools=expected,
         context=context,
     )

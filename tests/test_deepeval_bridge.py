@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from deepeval.metrics import ToolCorrectnessMetric
 
 from core.testing import deepeval as bridge
 from core.testing.harness import Conversation, Exchange, PlatformCall, fake_context
@@ -232,6 +233,69 @@ def test_a_golden_that_must_not_call_still_reports_what_the_turn_did_call() -> N
 
     assert case.expected_tools == []
     assert [t.name for t in case.tools_called] == ["find_availability"]
+
+
+# --- the platform's clock is not the business's tool -------------------------
+
+
+CLOCK = "fecha_y_hora_actual"
+NO_BUSINESS_CALL = {
+    "input": "hola, ¿qué día es hoy?",
+    "expected_behaviour": "Dice el día sin tocar la agenda.",
+    "expected_tools": [],
+}
+
+
+def scored_by_tool_correctness(case) -> float:
+    """What DeepEval's deterministic ToolCorrectness makes of a case — no judge, no key."""
+    metric = ToolCorrectnessMetric(threshold=0.9)
+    metric.measure(case)
+    return metric.score
+
+
+def test_the_platform_clock_does_not_count_against_a_golden_that_expects_no_business_tool() -> None:
+    """The ms-18 divergence that was never one: GPT asks the clock, Haiku does not."""
+    result = FakeResult([call(CLOCK, "{}"), message("Hoy es martes 1 de septiembre.")])
+
+    case = bridge.test_case_for(NO_BUSINESS_CALL, conversation_of("", result))
+
+    assert [t.name for t in case.tools_called] == []
+    assert scored_by_tool_correctness(case) == 1.0
+
+
+def test_a_business_tool_the_golden_expected_is_still_missing_when_only_the_clock_ran() -> None:
+    """The other half: the filter must not turn every turn into a passing one."""
+    result = FakeResult([call(CLOCK, "{}"), message("El jueves le viene bien, seguro.")])
+
+    case = bridge.test_case_for(GOLDEN, conversation_of("", result))
+
+    assert [t.name for t in case.expected_tools] == ["find_availability"]
+    assert scored_by_tool_correctness(case) < 0.9
+
+
+def test_the_business_tools_of_a_turn_survive_the_filter_in_the_order_they_were_called() -> None:
+    result = FakeResult(
+        [
+            call(CLOCK, "{}", call_id="c1"),
+            call("find_availability", '{"date": "mañana"}', call_id="c2"),
+            call("find_patient", '{"phone": "600"}', call_id="c3"),
+        ]
+    )
+
+    kept = bridge.business_calls(bridge.tool_calls_of(result))
+
+    assert [c.name for c in kept] == ["find_availability", "find_patient"]
+
+
+def test_the_whole_call_case_still_shows_the_clock_to_the_graders_that_read_outputs() -> None:
+    """Grounding reads a tool's OUTPUT as evidence: the date came off the clock, not the model."""
+    result = FakeResult([call(CLOCK, "{}"), output("Hoy es martes 1 de septiembre de 2026.")])
+
+    case = bridge.conversational_test_case_for(conversation_of("Clínica Norte.", result))
+
+    called = case.turns[-1].tools_called
+    assert [c.name for c in called] == [CLOCK]
+    assert "martes" in called[0].output
 
 
 # --- the project's own metrics ----------------------------------------------
