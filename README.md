@@ -31,6 +31,18 @@ TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --te
 TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
 ```
 
+The clinic takes both errands. Say you want to change the cita you already have
+and reception finds it by name or phone; say you have none —
+
+> «hola, quería pedir cita, no tengo ninguna» · «Pedro Ramos Gil, teléfono
+> 699000000» · «para traumatología, ¿qué tiene el jueves?» · «la primera» ·
+> «sí, resérvemela»
+
+— and the call goes down the other branch, asks what the cita is for, reads the
+agenda, reads the hour back to you and waits for a yes before writing anything.
+Either way `uv run python -m convo sessions show <id>` prints the log: the yes
+before the write, and one line for the cita the booking system created.
+
 ### Talking to it out loud
 
 Drop `--text` and the console runs in **audio mode**: it opens the laptop

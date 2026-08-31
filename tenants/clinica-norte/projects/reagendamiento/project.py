@@ -1,9 +1,15 @@
-"""Reagendamiento: reschedule an existing appointment.
+"""Reagendamiento: move the cita a patient already has, or give them a first one.
 
 ms-3 turns the conversation into a process — Identify, ChooseSlot, Farewell —
 and gives it the right to write: `book_slot` is irreversible and unreachable
 without a confirmation token, and the three writes that make up a rebooking run
 as a saga so a failure halfway leaves the patient's old appointment standing.
+
+ms-18 adds the second errand and, with it, the second irreversible door.
+`Identify` now has two exits and `create_appointment` opens a cita for somebody
+the book had never held — through the same guard, the same `ConfirmTask` and a
+saga of its own. The project keeps its name: what a caller asks reception for is
+an appointment, and whether one already existed is the platform's problem.
 
 The catalog below is the whole of what this project may call. It is data the
 platform reads before every call, not documentation: a tool missing from here
@@ -63,6 +69,19 @@ BOOK_SLOT = ToolSpec(
     timeout_s=8.0,
     result_summary=summarise_change,
 )
+# The other irreversible write of this project: a cita for somebody the book did not
+# hold. Same shape as BOOK_SLOT and deliberately its own spec — `create_appointment`
+# creates the patient's record, so the consent metric watches it by its own name, and a
+# reader of the catalog sees two irreversible doors instead of one door with a flag.
+CREATE_APPOINTMENT = ToolSpec(
+    name="create_appointment",
+    side_effect=SideEffect.IRREVERSIBLE,
+    idempotency_key="slot_id",
+    pii_scope=frozenset({"phone", "patient"}),
+    compensation="cancel_slot",
+    timeout_s=8.0,
+    result_summary=summarise_change,
+)
 # The undo of a cancel is a write, never an irreversible: the platform is putting
 # things back the way the patient left them, and asking for a second yes to do
 # that is not a conversation anybody wants.
@@ -105,9 +124,9 @@ class ReagendamientoProject(Project):
 
     def stages(self, tc: TenantContext) -> list:
         """Every stage of the call, in order — the project's whole tool surface for evals."""
-        from .stages import ChooseSlot, Farewell, Identify
+        from .stages import ChooseSlot, Farewell, Identify, NewBooking
 
-        return [Identify(tc), ChooseSlot(tc), Farewell(tc)]
+        return [Identify(tc), ChooseSlot(tc), NewBooking(tc), Farewell(tc)]
 
 
 PROJECT = ReagendamientoProject(
@@ -119,7 +138,13 @@ PROJECT = ReagendamientoProject(
     tts_model="eleven_flash_v2_5",  # latency profile: ~100ms ttfb vs ~700ms measured on v3 (PSTN)
     tools=platform_specs().merge(
         ToolCatalog.of(
-            FIND_AVAILABILITY, FIND_PATIENT, CANCEL_SLOT, BOOK_SLOT, REBOOK_SLOT, SEND_SMS
+            FIND_AVAILABILITY,
+            FIND_PATIENT,
+            CANCEL_SLOT,
+            BOOK_SLOT,
+            CREATE_APPOINTMENT,
+            REBOOK_SLOT,
+            SEND_SMS,
         )
     ),
     messages=MESSAGES,

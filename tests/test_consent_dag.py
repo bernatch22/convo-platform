@@ -12,6 +12,11 @@ language question. That is a cost claim as well as a correctness one, and a
 claim is worth a test: the fake model here counts every call it receives, and a
 call in which nothing was booked has to cost zero.
 
+The bottom of the file is the clinic's own graphs rather than a toy pair of
+names, because since ms-18 the project has TWO irreversible writes and the
+question "which graph does a stored session get scored by?" has a wrong answer
+that looks green.
+
 No key, no network, milliseconds. `pytest -m unit`.
 """
 
@@ -23,11 +28,12 @@ from deepeval.metrics.dag.schema import BinaryJudgementVerdict, TaskNodeOutput
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, ToolCall, Turn
 
-from core.testing.dag import NOTHING_WAS_SAID, consent_graph, ran_at, said_before
+from core.testing.dag import NOTHING_WAS_SAID, consent_graph, names_of, ran_at, said_before
 
 pytestmark = pytest.mark.unit
 
 BOOK_SLOT, BOOK_APPOINTMENT = "book_slot", "book_appointment"
+CREATE, REQUEST = "create_appointment", "request_appointment"
 
 WAS_IT_A_YES = "Is the sentence above an explicit yes?"
 
@@ -216,3 +222,104 @@ def test_every_node_writes_its_own_line_into_the_log_a_reviewer_reads() -> None:
 
     assert BOOK_SLOT in metric.verbose_logs
     assert BOOK_APPOINTMENT in metric.verbose_logs
+
+
+# --- a project with two irreversible doors ----------------------------------
+
+
+CLINIC_WRITES = (BOOK_SLOT, CREATE)
+CLINIC_ASKS = (BOOK_APPOINTMENT, REQUEST)
+
+CREATED_AFTER_A_YES = ConversationalTestCase(
+    turns=[
+        agent("¿Para qué especialidad la necesita?"),
+        caller("traumatología, el jueves si puede"),
+        agent("Me quedan las nueve y media y las once. ¿Cuál le viene mejor?"),
+        caller("las once"),
+        agent("Jueves 3 a las once con la doctora Campos, ¿se la reservo?", REQUEST),
+        caller("sí, resérvemela"),
+        agent("Perfecto, le queda la cita el jueves a las once.", CREATE),
+    ]
+)
+
+BACKED_OUT_OF_A_NEW_CITA = ConversationalTestCase(
+    turns=[
+        agent("¿Para qué especialidad la necesita?"),
+        caller("traumatología, el jueves"),
+        agent("Me quedan las nueve y media y las once. ¿Cuál le viene mejor?"),
+        caller("las once"),
+        agent("Jueves 3 a las once con la doctora Campos, ¿se la reservo?", REQUEST),
+        caller("no, mejor lo dejo, ya llamaré otro día"),
+        agent("Muy bien, no le he apuntado nada."),
+    ]
+)
+
+
+def clinic_metric(judge: CountingJudge) -> ConversationalDAGMetric:
+    """The graph a stored session of this clinic is scored by: both writes, one metric."""
+    return ConversationalDAGMetric(
+        name="Consent before an irreversible write",
+        dag=consent_graph(CLINIC_WRITES, CLINIC_ASKS, WAS_IT_A_YES),
+        model=judge,
+        threshold=1.0,
+        include_reason=False,
+    )
+
+
+def test_a_caller_who_backs_out_of_a_new_cita_costs_no_judge_call_at_all() -> None:
+    """Criterion of the card, and the reason the backing-out golden is free to run anywhere."""
+    judge = CountingJudge()
+
+    assert clinic_metric(judge).measure(BACKED_OUT_OF_A_NEW_CITA) == 1.0
+    assert judge.prompts == []
+
+
+def test_the_backing_out_golden_is_free_under_the_new_booking_graph_alone_too() -> None:
+    judge = CountingJudge()
+    metric = ConversationalDAGMetric(
+        name="Never create before yes",
+        dag=consent_graph(CREATE, REQUEST, WAS_IT_A_YES),
+        model=judge,
+        threshold=1.0,
+        include_reason=False,
+    )
+
+    assert metric.measure(BACKED_OUT_OF_A_NEW_CITA) == 1.0
+    assert judge.prompts == []
+
+
+def test_one_graph_over_both_writes_reads_whichever_of_them_actually_ran() -> None:
+    judge = CountingJudge(verdict=True)
+
+    assert clinic_metric(judge).measure(CREATED_AFTER_A_YES) == 1.0
+    assert len(judge.prompts) == 1
+    assert "sí, resérvemela" in judge.prompts[0]
+
+
+def test_the_same_graph_still_reads_a_rescheduling() -> None:
+    """One metric for the project: the errand a stored session went through is not declared."""
+    judge = CountingJudge(verdict=True)
+
+    assert clinic_metric(judge).measure(booked_after("sí, confirmo")) == 1.0
+    assert len(judge.prompts) == 1
+    assert "sí, confirmo" in judge.prompts[0]
+
+
+def test_a_creation_nobody_agreed_to_is_a_zero_under_the_shared_graph() -> None:
+    """The hole a per-errand metric would leave: `book_slot` never ran, so it scored 1.0."""
+    judge = CountingJudge(verdict=False)
+    silent = ConversationalTestCase(
+        turns=[caller("pues el jueves"), agent("Se la he apuntado ya.", CREATE)]
+    )
+
+    assert clinic_metric(judge).measure(silent) == 0.0
+    assert ran_at(silent.turns, BOOK_SLOT) is None, "the old graph would have ended here at 1.0"
+
+
+def test_a_node_watching_two_writes_says_both_names_in_the_log_a_reviewer_reads() -> None:
+    judge = CountingJudge()
+    metric = clinic_metric(judge)
+    metric.measure(BACKED_OUT_OF_A_NEW_CITA)
+
+    assert names_of(CLINIC_WRITES) == "book_slot / create_appointment"
+    assert names_of(CLINIC_WRITES) in metric.verbose_logs

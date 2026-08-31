@@ -5,6 +5,12 @@ one-sentence role, long stable knowledge first, instructions that explain why,
 success described instead of prohibitions, a few examples in <example> tags,
 prose over bullets (the prompt's format leaks into spoken output).
 
+The paragraphs the two booking stages share — always consult the agenda, offer
+what came back, let the tool ask for the yes — live in `reception.py` and are
+composed, never copied. The split that created it was byte-identical, so a new
+errand joined the project without moving the ring underneath the old one; what
+each stage is made of is pinned by `tests/test_prompts.py`.
+
 Every stage assembles its prompt through `stage_prompt`, which puts the same
 `<clinic_knowledge>` block first, byte for byte. Two reasons, and the second is
 the expensive one:
@@ -30,12 +36,20 @@ from .choose_slot import (
 )
 from .farewell import FAREWELL_EXAMPLES, FAREWELL_INSTRUCTIONS, FAREWELL_ROLE
 from .identify import IDENTIFY_EXAMPLES, IDENTIFY_INSTRUCTIONS, IDENTIFY_ROLE
+from .new_booking import (
+    CONFIRM_NEW_BOOKING_INSTRUCTIONS,
+    NEW_BOOKING_EXAMPLES,
+    NEW_BOOKING_INSTRUCTIONS,
+    NEW_BOOKING_ROLE,
+)
 
 __all__ = [
     "choose_slot_prompt",
     "confirm_instructions",
+    "confirm_new_booking_instructions",
     "farewell_prompt",
     "identify_prompt",
+    "new_booking_prompt",
     "stage_prompt",
 ]
 
@@ -50,9 +64,19 @@ def choose_slot_prompt(tc: TenantContext) -> str:
     return stage_prompt(tc, CHOOSE_SLOT_ROLE, CHOOSE_SLOT_INSTRUCTIONS, CHOOSE_SLOT_EXAMPLES)
 
 
+def new_booking_prompt(tc: TenantContext) -> str:
+    """The stage that gives a first cita to a caller the appointment book did not hold."""
+    return stage_prompt(tc, NEW_BOOKING_ROLE, NEW_BOOKING_INSTRUCTIONS, NEW_BOOKING_EXAMPLES)
+
+
 def confirm_instructions() -> str:
-    """The prompt ConfirmTask asks with, in the clinic's own register."""
+    """The prompt ConfirmTask asks with when a cita is being MOVED, in the clinic's register."""
     return CONFIRM_INSTRUCTIONS
+
+
+def confirm_new_booking_instructions() -> str:
+    """The same, for a cita being CREATED: there is no earlier hour to promise back."""
+    return CONFIRM_NEW_BOOKING_INSTRUCTIONS
 
 
 def farewell_prompt(tc: TenantContext) -> str:

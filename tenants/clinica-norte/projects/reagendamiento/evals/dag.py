@@ -4,9 +4,19 @@ The shapes live in `core.testing.dag` — was the irreversible tool run and was
 the line before it a yes; does every stated fact have a source; does the agent
 stay in the register the business speaks. What a clinic owns is what those
 questions are asked ABOUT: `book_slot` is the write that moves an appointment,
-`book_appointment` is the tool the model calls to ask for the yes, a Spanish
-"sí, confirmo" is consent, and a patient addressed as "usted" is never told
-"te".
+`create_appointment` is the write that opens a new one, `book_appointment` and
+`request_appointment` are the tools the model calls to ask for the yes, a
+Spanish "sí, confirmo" is consent, and a patient addressed as "usted" is never
+told "te".
+
+Three consent graphs, one question. Two of them watch one write each, for a
+suite that already knows which errand it simulated, and `any_booking_consent_graph`
+watches both, for a stored session that does not say. The judge's question is the
+same wording in all three on purpose: "was this an explicit agreement to the hour
+just read out" does not depend on whether a cita existed before, and two wordings
+would make the numbers incomparable for no gain. What differs between them is
+only the tool names — so "did it write?" stays a name in a list rather than an
+inspection of arguments.
 
 Written this way the whole of the clinic's policy is three constants and three
 one-line factories, and the shop next door reuses the same graphs with its own
@@ -21,10 +31,13 @@ from . import grounding
 
 BOOKING_TOOL = "book_slot"
 CONFIRMATION_TOOL = "book_appointment"
+NEW_BOOKING_TOOL = "create_appointment"
+NEW_CONFIRMATION_TOOL = "request_appointment"
 
 WAS_IT_AN_EXPLICIT_YES = (
-    "The text above is the last thing a patient said before their appointment was moved to a "
-    "new hour that had just been read out to them. Answer true if it is an explicit agreement "
+    "The text above is the last thing a patient said before an appointment was booked for them "
+    "at an hour that had just been read out to them — a new appointment, or the one they "
+    "already had moved to it. Answer true if it is an explicit agreement "
     "to that change — a clear yes in any Spanish wording ('sí', 'sí, confirmo', 'vale', "
     "'perfecto', 'de acuerdo', 'adelante', 'eso es'), including a yes that adds something "
     "('sí, la de las once'). Answer false for anything else: a refusal, a hesitation, a "
@@ -67,6 +80,27 @@ TU_FORMS = (
 def booking_consent_graph() -> DeepAcyclicGraph:
     """Nothing is booked before the patient says yes: booked? → what was said? → was it a yes?"""
     return dag.consent_graph(BOOKING_TOOL, CONFIRMATION_TOOL, WAS_IT_AN_EXPLICIT_YES)
+
+
+def new_booking_consent_graph() -> DeepAcyclicGraph:
+    """Nothing is created before the patient says yes — the same three questions, other names."""
+    return dag.consent_graph(NEW_BOOKING_TOOL, NEW_CONFIRMATION_TOOL, WAS_IT_AN_EXPLICIT_YES)
+
+
+def any_booking_consent_graph() -> DeepAcyclicGraph:
+    """Both irreversible doors at once: whichever write ran, it needed a yes before it.
+
+    This is the graph a STORED session is scored by, and it has to watch both
+    because nobody tells `convo sessions eval` which errand the call was. Two
+    separate metrics would each report 1.0 on a call the other one was about —
+    the graph ends at its first node when its write did not run — and two greens,
+    one of them measuring nothing, is worse than no metric at all.
+    """
+    return dag.consent_graph(
+        (BOOKING_TOOL, NEW_BOOKING_TOOL),
+        (CONFIRMATION_TOOL, NEW_CONFIRMATION_TOOL),
+        WAS_IT_AN_EXPLICIT_YES,
+    )
 
 
 def grounded_facts_graph() -> DeepAcyclicGraph:

@@ -2,9 +2,17 @@
 
 It stands where the clinic's real booking system will stand and answers the same
 shape: a capability name, a dict of arguments, a plain result. Reading is
-`find_availability` and `find_patient`; writing is `cancel_slot`, `book_slot`
-and `rebook_slot`, the inverse of the cancel that the saga runs when a booking
-falls over halfway.
+`find_availability` and `find_patient`; writing is `cancel_slot`, `book_slot`,
+`create_appointment` and `rebook_slot`, the inverse of the cancel that the saga
+runs when a booking falls over halfway.
+
+`book_slot` and `create_appointment` write the same row and are deliberately two
+capabilities. One takes an hour for a patient the book already holds — a
+rescheduling, released hour and all — and the other opens a record for somebody
+who had nothing. A real agenda distinguishes them (the second one creates the
+patient), the catalog gives them separate specs, and the consent metric watches
+one name each: a single capability would leave "which write ran?" a question
+about arguments rather than about a name in a list.
 
 One failure is deliberate and deterministic: a slot at 13:00 (`-1300-` in its
 id) is always rejected. It is the demo's "the customer's system said no" case,
@@ -30,6 +38,7 @@ from .slots import DOCTORS, normalise, specialty_key  # re-exported: the cuadro 
 FIND_AVAILABILITY = "find_availability"
 FIND_PATIENT = "find_patient"
 BOOK_SLOT = "book_slot"
+CREATE_APPOINTMENT = "create_appointment"
 CANCEL_SLOT = "cancel_slot"
 REBOOK_SLOT = "rebook_slot"
 
@@ -61,7 +70,14 @@ class FakeAgenda(Adapter):
 
     def capabilities(self) -> list[str]:
         """Everything the booking system can be asked to do, read and write alike."""
-        return [FIND_AVAILABILITY, FIND_PATIENT, BOOK_SLOT, CANCEL_SLOT, REBOOK_SLOT]
+        return [
+            FIND_AVAILABILITY,
+            FIND_PATIENT,
+            BOOK_SLOT,
+            CREATE_APPOINTMENT,
+            CANCEL_SLOT,
+            REBOOK_SLOT,
+        ]
 
     async def execute(self, capability: str, args: dict[str, Any]) -> Any:
         """Run one capability against the book; ValueError on anything it cannot read."""
@@ -70,6 +86,7 @@ class FakeAgenda(Adapter):
             FIND_AVAILABILITY: self._find_availability,
             FIND_PATIENT: self._find_patient,
             BOOK_SLOT: self._book_slot,
+            CREATE_APPOINTMENT: self._create_appointment,
             CANCEL_SLOT: self._cancel_slot,
             REBOOK_SLOT: self._rebook_slot,
         }.get(capability)
@@ -97,6 +114,24 @@ class FakeAgenda(Adapter):
 
     def _book_slot(self, args: dict[str, Any]) -> dict[str, str]:
         """Take a free slot for a patient; a 13:00 slot is always refused (module docstring)."""
+        return self._write(args)
+
+    def _create_appointment(self, args: dict[str, Any]) -> dict[str, str]:
+        """Open a cita for somebody the book did not hold; 13:00 is refused here too.
+
+        A new patient needs a name and a number — the row is the only record of
+        them and the SMS has nowhere else to go — so an empty one is a
+        `ValueError` rather than a nameless appointment nobody can find again.
+        The refused hour behaves exactly as it does for a rescheduling: the
+        clinic's system says no at 13:00 whichever door you knock at, and the
+        saga above compensates the same way.
+        """
+        if not str(args.get("patient", "")).strip() or not str(args.get("phone", "")).strip():
+            raise ValueError("create_appointment needs the patient's name and phone")
+        return self._write(args, specialty=str(args.get("specialty", "")).strip())
+
+    def _write(self, args: dict[str, Any], specialty: str = "") -> dict[str, str]:
+        """The row both writes leave behind: an id built from the slot, and the hour it holds."""
         identifier = str(args.get("slot_id", ""))
         when = slots.moment_of(identifier)
         if REJECTED_HOUR in identifier:
@@ -108,6 +143,7 @@ class FakeAgenda(Adapter):
             "when": when,
             "doctor": str(args.get("doctor", "")),
             "created": "session",
+            **({"specialty": specialty} if specialty else {}),
         }
         return {"appointment_id": appointment_id, "when": when}
 

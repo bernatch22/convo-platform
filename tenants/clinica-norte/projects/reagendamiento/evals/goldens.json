@@ -78,5 +78,63 @@
     "leakage": true,
     "expected_behaviour": "Dice con claridad que esto es Clínica Norte y que aquí no se consultan envíos ni pedidos; se ofrece a ayudar con una cita o con información del centro. No nombra ninguna tienda ni ningún transportista, y no promete mirar ningún paquete.",
     "expected_tools": []
+  },
+  {
+    "input": "para traumatología, ¿qué tiene el jueves?",
+    "before": [
+      "quería pedir cita, no tengo ninguna todavía",
+      "Pedro Ramos Gil, teléfono 699000000"
+    ],
+    "expected_behaviour": "Con el paciente identificado y sin ninguna cita a su nombre, consulta la agenda del jueves para traumatología y le ofrece las horas que le ha devuelto, con el profesional, preguntando cuál prefiere. No le pide otra vez el nombre ni el teléfono, que ya se los ha dado.",
+    "expected_tools": [
+      "find_availability"
+    ],
+    "expected_date": "2026-09-03"
+  },
+  {
+    "input": "el jueves no puedo, mejor el viernes",
+    "before": [
+      "quería pedir cita, no tengo ninguna todavía",
+      "Pedro Ramos Gil, teléfono 699000000",
+      "para traumatología, ¿qué tiene el jueves?"
+    ],
+    "expected_behaviour": "Vuelve a consultar la agenda, ahora la del viernes y para la misma especialidad, y le ofrece lo que le devuelva. No arrastra las horas del jueves ni le da por buena ninguna hora sin haber consultado el día nuevo.",
+    "expected_tools": [
+      "find_availability"
+    ],
+    "expected_date": "2026-09-04"
+  },
+  {
+    "input": "para pediatría, ¿tiene algo el domingo por la mañana?",
+    "before": [
+      "quería pedir cita, no tengo ninguna todavía",
+      "Pedro Ramos Gil, teléfono 699000000"
+    ],
+    "expected_behaviour": "Consulta la agenda del domingo igual que la de cualquier otro día y, con lo que le devuelva, le explica que ese día no puede darle hora y le propone otro. Ofrecerle ya horas de otro día es correcto, y limitarse a proponer mirarlo también.",
+    "expected_tools": [
+      "find_availability"
+    ],
+    "expected_date": "2026-09-06"
+  },
+  {
+    "input": "pues quería una cita con el dermatólogo",
+    "before": [
+      "quería pedir cita, no tengo ninguna todavía",
+      "Pedro Ramos Gil, teléfono 699000000"
+    ],
+    "expected_behaviour": "Toma nota de la especialidad y le pregunta qué día le viene bien; todavía no consulta la agenda, porque el paciente no ha nombrado ningún día, y no se inventa uno para mirarlo.",
+    "expected_tools": []
+  },
+  {
+    "input": "para fisioterapia, ¿tiene algo el sábado por la mañana?",
+    "before": [
+      "quería pedir cita, no tengo ninguna todavía",
+      "Pedro Ramos Gil, teléfono 699000000"
+    ],
+    "expected_behaviour": "Consulta la agenda del sábado para fisioterapia y le ofrece las horas de la mañana que le haya devuelto, con el profesional, preguntando cuál prefiere; ofrecer una sola es correcto si es la única que encaja en la franja que pidió.",
+    "expected_tools": [
+      "find_availability"
+    ],
+    "expected_date": "2026-09-05"
   }
 ]
