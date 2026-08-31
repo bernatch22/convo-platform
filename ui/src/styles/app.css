@@ -384,6 +384,65 @@
   color: var(--accent);
 }
 
+/* ── the project's inbound line, wherever it is shown ────────────────────── */
+
+/* One block, two frames: a strip under a page title (Talk) and a stacked panel
+ * body (Pipeline). The row inside is the same markup in both, so the number
+ * cannot be spelled one way on one screen and another way on the other. */
+.dial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2) var(--s3);
+}
+
+.dial--header {
+  margin-top: var(--s4);
+}
+
+.dial--panel {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.dial__label {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dial__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2) var(--s3);
+}
+
+/* The number is a real address a stranger can dial — the one accent this block spends. */
+.dial__number {
+  color: var(--accent);
+  font-size: var(--text-lg);
+}
+
+.dial__meta {
+  font-size: var(--text-sm);
+}
+
+/* No line at all, and a line another fleet answers: both are warnings, not blanks. */
+.dial__none,
+.dial__warn {
+  margin: 0;
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.dial__warn {
+  flex-basis: 100%;
+}
+
 /* ── badges + mono bits ──────────────────────────────────────────────────── */
 
 .badge {
