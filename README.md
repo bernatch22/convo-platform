@@ -221,11 +221,28 @@ a project declares the suites the console can run (§8); §9 is the model matrix
 ## The web UI
 
 `ui/` is the operator console: the tenant/project switcher, Talk (the three
-channels — WebRTC voice, web chat, and the SIP trunk), Sessions, Pipeline (the
-three providers, plus the phone line this project answers on, or the fact that
-it has none), Evals (every stored run with its per-metric diff, and the button
-that launches another on the box) and the Supervisor desk. Vite + React +
+channels — WebRTC voice, web chat, and the SIP trunk), Sessions, Board, Pipeline
+(the three providers, plus the phone line this project answers on, or the fact
+that it has none), Evals (every stored run with its per-metric diff, and the
+button that launches another on the box) and the Supervisor desk. Vite + React +
 TypeScript + react-router; no state library, no CSS framework.
+
+**The Board** (`/t/<tenant>/<project>/board`) is the business half of the same
+evidence: every *irreversible* thing the platform did — appointments booked,
+orders cancelled — counted straight off the append-only log, by verb and by
+day, each row linking to the call that did it. There is no rollup table: a
+transaction is one `tool.call` whose `side_effect` is `irreversible`, and the
+verb is the tool's own name, so a project that declares a new irreversible tool
+appears here the first time it runs with nothing changed in the console. The
+window is in the URL (`?days=30`). A laptop that has only ever been talked to
+has no transactions to show; `scripts/seed_board_demo.py` writes three real
+ones through the real executor, with no LLM and no keys:
+
+```bash
+CONVO_DB=tmp/board-demo.db uv run python scripts/seed_board_demo.py
+CONVO_DB=tmp/board-demo.db uv run uvicorn api:app --port 8090
+open http://localhost:8090/t/clinica-norte/reagendamiento/board
+```
 
 A number belongs to a project, never to the fleet: it is one row of the control
 plane's `routes` table (`python -m convo routes list | seed | add`), the same
@@ -265,7 +282,7 @@ curl -XPOST localhost:8090/supervise/verb -H 'content-type: application/json' \
 ```
 
 Two ways to run it. In development the vite server serves the app and proxies
-`/tenants`, `/token`, `/sessions`, `/pipeline` and `/evals` to the control
+`/tenants`, `/token`, `/sessions`, `/outcomes`, `/pipeline` and `/evals` to the control
 plane:
 
 ```bash

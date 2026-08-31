@@ -1,0 +1,196 @@
+/* The Board. Layout, density and one bar chart — every colour comes from tokens.css.
+ *
+ * The accent is spent exactly twice on this screen: on the bars (what the
+ * platform did) and on a granted yes (what authorised it). Everything else is
+ * ink. A verb gets no colour of its own — there is one accent in this palette
+ * and inventing a second to label a tool would be a lie about how much the
+ * distinction matters — so the verbs are separated by row, not by hue.
+ */
+
+/* ── the window picker ────────────────────────────────────────────────────── */
+
+.windows {
+  display: flex;
+  gap: var(--s1);
+  margin-top: var(--s4);
+}
+
+.windows__pick {
+  padding: var(--s1) var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+}
+
+.windows__pick:hover {
+  border-color: var(--line-strong);
+  color: var(--text-dim);
+}
+
+.windows__pick.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* ── the counters ─────────────────────────────────────────────────────────── */
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--s3);
+}
+
+.counter {
+  padding: var(--s4) var(--s5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+/* The fleet-level tile: the same box, one step back, so a verb reads first. */
+.counter--quiet {
+  background: transparent;
+}
+
+.counter__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.counter__name {
+  margin-top: var(--s1);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+}
+
+.counter__foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-top: var(--s3);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.counter__bad {
+  color: var(--warn);
+}
+
+/* ── bars by day, one strip per verb ──────────────────────────────────────── */
+
+.bars {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4) var(--s5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.bars__row,
+.bars__axis {
+  display: grid;
+  grid-template-columns: 140px 1fr 40px;
+  align-items: end;
+  gap: var(--s4);
+}
+
+.bars__name {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bars__track {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bars__day {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 3px;
+}
+
+.bars__fill {
+  width: 100%;
+  border-radius: 1px 1px 0 0;
+  background: var(--accent);
+}
+
+.bars__count {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bars__axis {
+  align-items: center;
+  padding-top: var(--s1);
+}
+
+.bars__span {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* ── the transactions table ───────────────────────────────────────────────── */
+
+.table--board td.id,
+.table--board td.mono {
+  white-space: nowrap;
+}
+
+.table--board td.did {
+  color: var(--text-dim);
+  max-width: 480px;
+}
+
+.table--board th:last-child,
+.table--board td:last-child {
+  padding-right: var(--s5);
+}
+
+/* The one yes that authorised something irreversible — the second place the accent is spent. */
+.granted {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+}
+
+.granted--yes {
+  color: var(--accent);
+}
+
+.granted--none {
+  color: var(--danger);
+}
+
+/* `outcome--failed` already exists in sessions.css; these are the two this screen adds. */
+.outcome--done {
+  color: var(--text);
+}
+
+.outcome--pending {
+  color: var(--text-faint);
+}
