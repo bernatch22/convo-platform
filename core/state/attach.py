@@ -9,6 +9,7 @@ the one artefact that does not exist until the call is over.
 import time
 from typing import Any
 
+from core import pipeline
 from core.context import TenantContext
 from core.state.log import EventLog
 from core.state.store import SessionRow, Store
@@ -21,6 +22,12 @@ def attach_log(tc: TenantContext, store: Store, sip: dict[str, str] | None = Non
     phone: the dialled number, the carrier's call id and the headers the trunk
     was told to keep. They belong on the very first event — an audit asks which
     number was dialled long before it asks what was said.
+
+    `pipeline` is the other half of that: the voice, the two models and the ear
+    this session really resolved to, AFTER the console's overrides. Without it
+    a supervisor who changes the voice has no artefact saying which voice the
+    next call spoke with, and "I picked Carolina and heard someone else" cannot
+    be answered from the log.
     """
     store.open_session(
         SessionRow(
@@ -40,6 +47,7 @@ def attach_log(tc: TenantContext, store: Store, sip: dict[str, str] | None = Non
             "channel": tc.channel,
             "git_sha": tc.git_sha,
             "project_version": tc.project_version,
+            "pipeline": pipeline.running(tc.project, tc.channel),
             **({"sip": dict(sip)} if sip else {}),
         },
     )
