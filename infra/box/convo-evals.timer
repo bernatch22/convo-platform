@@ -1,0 +1,22 @@
+# Ring 2, every night at 04:00 Europe/Madrid.
+#
+# The hour is the carrier-quiet-hours lesson applied to something that is not a carrier:
+# 04:00 is when a real call is least likely to be sharing the box's CPU with four
+# synthetic ones. The timezone is written into OnCalendar rather than left to the box,
+# which runs on UTC — spelling it out is what keeps the run at 04:00 local on both
+# sides of a DST change.
+#
+# Persistent is deliberately OFF. A missed night is missed: this unit spends money on
+# provider traffic, and a box that reboots at noon must not decide by itself to spend it
+# at noon. `systemctl start convo-evals.service` is how a person asks for the catch-up.
+[Unit]
+Description=Nightly ring-2 evals at 04:00 Europe/Madrid
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Europe/Madrid
+Persistent=false
+AccuracySec=1min
+Unit=convo-evals.service
+
+[Install]
+WantedBy=timers.target

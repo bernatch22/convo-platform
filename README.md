@@ -181,7 +181,23 @@ Two callers phone each project: `apurado`, who talks over the agent, and
 latencies, how many answers were interrupted and which languages came back
 transcribed. `CONVO_API` points the caller at another control plane.
 
-[`docs/evals.md`](docs/evals.md) explains every metric and how to add one.
+The same suites run themselves on the box every night at 04:00 Europe/Madrid
+(`convo-evals.timer`), against the DEPLOYED fleet, capped at eight live
+conversations and killed at twenty minutes. Locally it is one command:
+
+```bash
+uv run python -m core.testing.nightly --dry-run   # what a night would spend
+uv run python -m core.testing.nightly             # run it; --only tenant/project narrows it
+```
+
+A night leaves `tmp/evals/<date>.log`, one page at `tmp/evals/<date>/index.html`
+with every red metric above the transcript that earned it, one line per suite in
+`tmp/evals/index.tsv`, and one row per suite on the console's evals screen. It
+goes red on a failed METRIC and not on pytest's exit code — a ring-2 wire case is
+`flaky=True`, so `deepeval test run` passes a suite whose register just broke.
+
+[`docs/evals.md`](docs/evals.md) explains every metric and how to add one;
+[`infra/box/README.md`](infra/box/README.md) covers the nightly on the box.
 
 A run also has a screen: the console's Evals page lists every run with its
 scores, diffs it against the previous run of the same suite, and can launch one
