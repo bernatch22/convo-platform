@@ -4,8 +4,9 @@ One definition, built once per job by `core.router.resolve`, carried as the
 session's `userdata` and reachable from every tool as `ctx.userdata`.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, time
 from typing import TYPE_CHECKING, Any
 
 from core.contracts import Channel
@@ -49,6 +50,10 @@ class Project:
     The fields named in `core.state.overrides.OVERRIDABLE` are the ones a
     supervisor may change from the console without a deploy: `core.state.overrides`
     replaces them on the way out of the router (`core.state.store.PipelineOverride`).
+    `llm_model` is which model answers for this project. The LLM is a swappable
+    interface driver, so it is project data like the voice and not a constant in
+    `core/providers`, and an eval can measure a second model on the same goldens
+    (`core.testing.report --model`) without editing one of them.
     """
 
     id: str
@@ -103,9 +108,15 @@ class TenantContext:
     log: "EventLog | None" = None
     confirmation_token: "ConfirmationToken | None" = None
     knowledge_override: str | None = None
+    date_noted: bool = False  # the session-start date note is written once, by the entry stage
+    clock: "Callable[[], datetime] | None" = None  # tests freeze it; None = the machine's clock
     customer: dict[str, Any] | None = None
     pii_values: set[str] = field(default_factory=set)
     prev_agent: Any = None
+
+    def now(self) -> time:
+        """The time of day this session believes it is; tests freeze it through `clock`."""
+        return (self.clock() if self.clock else datetime.now()).time()
 
     def label(self) -> str:
         """Short identifier for logs: `tenant/project#session`."""

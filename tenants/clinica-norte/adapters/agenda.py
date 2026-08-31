@@ -36,7 +36,19 @@ REBOOK_SLOT = "rebook_slot"
 REJECTED_HOUR = "-1300-"  # the demo's deterministic failure: the system refuses 13:00
 ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
-__all__ = ["DOCTORS", "FakeAgenda", "normalise", "specialty_key"]
+NO_SLOTS = "no free slots that day"
+NO_PATIENT = "no appointment on the book for that caller"
+NOTHING_WRITTEN = "the booking system returned nothing"
+
+__all__ = [
+    "DOCTORS",
+    "FakeAgenda",
+    "normalise",
+    "specialty_key",
+    "summarise_availability",
+    "summarise_change",
+    "summarise_patient",
+]
 
 
 class FakeAgenda(Adapter):
@@ -113,6 +125,58 @@ class FakeAgenda(Adapter):
             raise ValueError(f"unknown appointment {appointment_id!r}")
         appointment["status"] = status
         return {"appointment_id": appointment_id, "status": status}
+
+
+def summarise_availability(slots: list[dict[str, str]] | None) -> str:
+    """What `find_availability` may leave in the session log: the hours and who consults them.
+
+    Every field of a slot is clinic data — an ISO moment, a professional, an
+    opaque id — and none of it identifies the person on the phone, so the rows
+    can be kept whole. That is what lets a replayed call prove an hour the
+    receptionist read out came off the agenda instead of out of the model.
+    """
+    if not slots:
+        return NO_SLOTS
+    return f"{len(slots)} free slots: " + "; ".join(
+        f"{slot.get('when', '?')} {slot.get('doctor', '?')}" for slot in slots
+    )
+
+
+def summarise_patient(appointment: dict[str, str] | None) -> str:
+    """What `find_patient` may leave in the log: when, with whom, and a name the mask blanks.
+
+    The appointment the caller already has is the fact a replayed call could
+    never ground — reception reads it back in the first minute of every
+    rescheduling call — and it is also the one result here that carries a
+    person. The name is rendered anyway and the executor masks it, so the log
+    ends up holding `An*************`: enough for an auditor to see that
+    somebody was found and which of two callers it was, and nothing more. The
+    phone is simply not rendered; a masked number would say the same thing
+    twice.
+    """
+    if not appointment:
+        return NO_PATIENT
+    return (
+        f"appointment {appointment.get('appointment_id', '?')} "
+        f"for {appointment.get('patient', '?')} "
+        f"on {appointment.get('when', '?')} with {appointment.get('doctor', '?')}"
+    )
+
+
+def summarise_change(change: dict[str, str] | None) -> str:
+    """What a write did to the book: the appointment it touched, and how it now stands.
+
+    `book_slot`, `cancel_slot` and `rebook_slot` all answer with an appointment
+    id and one more field — the moment it now holds, or the status it now has —
+    so one renderer covers the three and a saga's undo reads in the log as
+    plainly as the write it undid. Nothing here names a person: the patient and
+    the phone were arguments, and the log already carries them masked.
+    """
+    if not change:
+        return NOTHING_WRITTEN
+    identifier = change.get("appointment_id", "?")
+    standing = change.get("when") or change.get("status") or "?"
+    return f"appointment {identifier} now {standing}"
 
 
 def _parse_day(value: Any) -> datetime.date:

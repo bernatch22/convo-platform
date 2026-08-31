@@ -144,6 +144,13 @@ Evals (ring 1, needs `ANTHROPIC_API_KEY`; the judge is Claude Haiku, set
 ```bash
 uv run pytest -m unit                     # includes LLM-judged tests when the key is present
 uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-tenant leakage pair
+
+# the same goldens against the other allowed model — nothing in the suite is edited
+CONVO_EVAL_MODEL=gpt-5.4-mini uv run deepeval test run tests/evals -n 3
+
+# HTML per model plus the metric x model comparison table (needs OPENAI_API_KEY too)
+uv run python -m core.testing.report clinica-norte reagendamiento \
+    --model claude-haiku-4-5 --model gpt-5.4-mini
 ```
 
 A run also has a screen: the console's Evals page lists every run with its
@@ -151,7 +158,7 @@ scores, diffs it against the previous run of the same suite, and can launch one
 on the box (one at a time, killed at fifteen minutes, log tail on screen).
 
 [`docs/evals.md`](docs/evals.md) explains every metric, how to add one, and how
-a project declares the suites the console can run (§8).
+a project declares the suites the console can run (§8); §9 is the model matrix.
 
 ## The web UI
 
