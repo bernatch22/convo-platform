@@ -3,23 +3,117 @@
 
     <div class="head-block" data-anim="1">
       <div class="eyebrow">13 <span class="sep">·</span> Entregable 11 — infraestructura cloud y despliegue</div>
-      <h2 class="head">Infraestructura y despliegue</h2>
+      <h2 class="head" style="max-width:40ch">Una caja hoy, y cada palanca con su disparador escrito</h2>
+      <p class="lede" style="max-width:104ch">
+        Todo el runtime cabe en una VM: SFU, SIP, Redis y Caddy bajo compose; el worker y el plano de
+        control como units de systemd que comparten directorio y, por tanto, la misma base. Un dominio,
+        un certificado, ninguna GPU. Escalar no es un adjetivo: cada palanca lleva escrito el hecho que la
+        dispara.
+      </p>
     </div>
 
-    <div class="todo" data-anim="2">
-      <div class="who">Sin escribir <span class="sep">·</span> card tk-e69363 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
-      <ul>
-        <li>Qué corre hoy: LiveKit autohospedado (SFU + SIP), Redis, MinIO, Caddy, los workers y el plano de control.</li>
-        <li>Ninguna GPU, a propósito: el detector de turno es un modelo local de CPU.</li>
-        <li>Escalado con disparadores nombrados, no con adjetivos: qué métrica mueve qué palanca y a qué valor.</li>
-        <li>CI/CD con las evals como gate: un cambio de prompt que tira un golden no sale.</li>
-        <li>Coste: lo que cuesta una llamada en proveedores y lo que cuesta la caja al mes.</li>
-      </ul>
-      <div class="note"><b>Figura:</b> Diagrama de despliegue pequeño en SVG, o tabla de las unidades del compose. Lámina profunda.</div>
-      <div class="note">
-        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
-        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+    <div class="grid-5-7 fill">
+
+      <figure class="fig" data-anim="2">
+        <svg viewBox="0 0 560 384" role="img" aria-label="Topología de convo-box">
+          <rect class="box" x="8" y="6" width="252" height="38" rx="2"/>
+          <text class="lbl-sm" x="22" y="23">PSTN · TWILIO ELASTIC TRUNK</text>
+          <text class="lbl-sm" x="22" y="37">5060/udp · CIDR del carrier</text>
+
+          <rect class="box" x="300" y="6" width="252" height="38" rx="2"/>
+          <text class="lbl-sm" x="314" y="23">NAVEGADOR — WEBRTC Y CHAT</text>
+          <text class="lbl-sm" x="314" y="37">wss + https, 443</text>
+
+          <path class="edge" d="M134 44 L134 78"/>
+          <path class="edge" d="M426 44 L426 78"/>
+
+          <rect class="box" x="8" y="78" width="544" height="232" rx="2"/>
+          <text class="lbl-sm" x="22" y="98">CONVO-BOX · E2-STANDARD-4 · IP ESTÁTICA · LK.BERNARDOCASTRO.DEV</text>
+
+          <rect class="box" x="22" y="106" width="252" height="44" rx="2"/>
+          <text class="lbl" x="36" y="126">caddy 2</text>
+          <text class="lbl-sm" x="36" y="141">443 · TLS y un solo origen</text>
+
+          <rect class="box" x="286" y="106" width="252" height="44" rx="2"/>
+          <text class="lbl" x="300" y="126">livekit-sip 1.12</text>
+          <text class="lbl-sm" x="300" y="141">5060/udp · rtp 10000-20000</text>
+
+          <rect class="box" x="22" y="158" width="252" height="44" rx="2"/>
+          <text class="lbl" x="36" y="178">livekit-server 1.9.1</text>
+          <text class="lbl-sm" x="36" y="193">7880 signalling · SFU</text>
+
+          <rect class="box" x="286" y="158" width="252" height="44" rx="2"/>
+          <text class="lbl" x="300" y="178">redis 7</text>
+          <text class="lbl-sm" x="300" y="193">loopback · nadie más lo alcanza</text>
+
+          <rect class="box-accent" x="22" y="210" width="252" height="44" rx="2"/>
+          <text class="lbl" x="36" y="230">convo-worker.service</text>
+          <text class="lbl-sm" x="36" y="245">worker.py start · 1 proceso/vCPU</text>
+
+          <rect class="box-accent" x="286" y="210" width="252" height="44" rx="2"/>
+          <text class="lbl" x="300" y="230">convo-api.service</text>
+          <text class="lbl-sm" x="300" y="245">uvicorn 8090 · consola y control</text>
+
+          <rect class="box" x="22" y="262" width="516" height="40" rx="2"/>
+          <text class="lbl" x="36" y="281">tmp/convo.db</text>
+          <text class="lbl-sm" x="36" y="296">SQLite WAL — un escritor (api), un lector (worker por HTTP)</text>
+
+          <path class="edge-accent" d="M280 310 L280 338"/>
+          <rect class="box" x="8" y="338" width="544" height="40" rx="2"/>
+          <text class="lbl-sm" x="22" y="356">PROVEEDORES, SALIENTE — ANTHROPIC · SONIOX · ELEVENLABS</text>
+          <text class="lbl-sm" x="22" y="370">detector de turno y VAD locales, en CPU: no hay GPU en el inventario</text>
+        </svg>
+        <figcaption>Lo que corre hoy · infra/compose/box.yml + dos units</figcaption>
+      </figure>
+
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0" data-anim="3">
+        <table class="plain">
+          <thead>
+            <tr>
+              <th style="width:38%">El disparador — un hecho, no un adjetivo</th>
+              <th>La palanca que se mueve, y por qué todavía no</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Llamadas simultáneas ≈ procesos preacondicionados <span class="note">uno por vCPU; cuatro hoy</span></td>
+              <td>Segunda caja con la misma unit: el worker <b>sale</b> hacia el SFU y el reparto lo hace el
+                dispatch por <code>agent_name</code>, sin balanceador ni estado que replicar. Falta el
+                <code>load_fnc</code> propio — reconocido en ms-10, no hecho.</td>
+            </tr>
+            <tr>
+              <td>Un segundo proceso que <b>escriba</b></td>
+              <td>SQLite → Postgres. Con un escritor y un lector no hay contención a esta carga; migrar antes
+                habría sido ceremonia.</td>
+            </tr>
+            <tr>
+              <td>Una red que bloquea UDP de salida</td>
+              <td>Escucha TURN/TLS en 443. Diferido por evidencia: la prueba de aceptación se hizo desde 3G y
+                el medio llegó directo al SFU. Card <code>tk-bc2d5d</code>.</td>
+            </tr>
+            <tr>
+              <td>Un número fuera de esta región</td>
+              <td>Segundo SFU coordinado por el mismo Redis, con la troncal originando contra el más cercano.
+                Hoy el RTT del medio lo paga quien llama de lejos.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note">
+          <b>CI/CD.</b> <code>ci.yml</code> corre ruff y <code>pytest -m unit</code> en cada push, y el anillo
+          1 entero cuando hay clave: un cambio de prompt que tira un golden no sale. La guarda de la clave es
+          condición de <em>paso</em> y no de job — <code>secrets</code> no existe en
+          <code>jobs.&lt;id&gt;.if</code>, y mientras lo fue el anillo se saltaba en silencio.
+        </div>
       </div>
+
+    </div>
+
+    <div class="proof" data-anim="4">
+      <b>Validación.</b> <b>ssh convo-box 'sudo docker ps'</b> y <b>systemctl status convo-worker
+      convo-api</b> — cuatro contenedores y dos units, verificados el <span class="n">31-08-2026</span>. El
+      número <span class="n">+1 417 674 3169</span> entra por 5060 y lo contesta esta caja. El coste marginal
+      de una llamada telefónica no lo manda el modelo: el LLM pone <span class="n">≈ 0,01 €</span> y la pata
+      PSTN de Twilio <span class="n">≈ 0,0085 $/min</span>.
     </div>
 
   </div>

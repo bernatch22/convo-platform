@@ -3,23 +3,113 @@
 
     <div class="head-block" data-anim="1">
       <div class="eyebrow">12 <span class="sep">·</span> Entregable 9 — observabilidad, auditoría, replay y QA</div>
-      <h2 class="head">Observabilidad, QA y billing</h2>
+      <h2 class="head" style="max-width:40ch">Cuatro anillos, un solo vocabulario — y toda llamada se puntúa sola</h2>
+      <p class="lede" style="max-width:104ch">
+        Un anillo cambia de dónde viene la conversación, nunca cómo se juzga: las mismas métricas puntúan un
+        golden en CI, una llamada de madrugada, una sesión real reproducida y la llamada que acaba de colgar.
+        El anillo 4 es el que nadie ejecuta: su techo de gasto se comprueba antes de gastarlo.
+      </p>
     </div>
 
-    <div class="todo" data-anim="2">
-      <div class="who">Sin escribir <span class="sep">·</span> card tk-e69363 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
-      <ul>
-        <li>Los cuatro anillos de evaluación, del test unitario a la llamada real juzgada — y cuál de ellos es gate de CI.</li>
-        <li>Toda llamada se puntúa a sí misma: cuatro checks deterministas decididos por código más como mucho un juicio de Haiku, escrito en el mismo log como session.score dentro del minuto siguiente a colgar.</li>
-        <li>Ese juicio costó 0,0018 € contra un techo de 0,0100 € comprobado antes de hacer la llamada.</li>
-        <li>Replay: el log basta para re-ejecutar los turnos sin el audio.</li>
-        <li>El billing va por la misma tubería: coste por llamada en euros, en la misma fila que el score.</li>
-      </ul>
-      <div class="note"><b>Figura:</b> screenshots/evals.png (el delta contra la corrida anterior) y screenshots/session-detail.png (los cinco checks). Dos figuras, una fila.</div>
-      <div class="note">
-        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
-        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+    <div class="grid-5-7 fill">
+
+      <div class="rows" style="--row-pad:7px" data-anim="2">
+        <div class="row">
+          <div class="idx">01</div>
+          <div class="txt">Goldens por proyecto <span class="tag ok">gate de CI</span>
+            <span class="why"><code>deepeval test run tests/evals</code> en cada push, junto a ruff y
+              <code>pytest -m unit</code>. Los dos negocios enteros: ≈ 0,10 $ y cuatro minutos.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">02</div>
+          <div class="txt">Voz — la nocturna a las 04:00 Europe/Madrid
+            <span class="why">Llama de verdad a la flota desplegada. Tope de <b>8 llamadas</b>: las goldens
+              <em>son</em> la factura, y una suite que no cabe se salta, se nombra y pone la noche en rojo.
+              Noche del 31-08: 0,0142 $ de juez, 343 s.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">03</div>
+          <div class="txt">Sesiones reales, reproducidas
+            <span class="why"><code>convo sessions eval &lt;id&gt;</code>: el log append-only basta para
+              re-ejecutar los turnos sin el audio y pasarles las métricas del anillo 1.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">04</div>
+          <div class="txt">Toda llamada, sin que nadie lo pida
+            <span class="why">Cuatro checks decididos por código —consentimiento, registro, fuga entre
+              tenants, errores de proveedor— más como mucho un juicio de Haiku: <b>0,0014 €</b> medidos,
+              <b>0 €</b> si colgaron en el saludo. Queda como <code>session.score</code> con el siguiente
+              <code>seq</code>, cinco segundos después de colgar.</span>
+          </div>
+        </div>
       </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px;min-height:0" data-anim="3">
+        <table class="plain">
+          <thead>
+            <tr>
+              <th style="width:44%">Mismos goldens, mismos umbrales — el modelo es la variable</th>
+              <th style="width:28%">claude-haiku-4-5</th>
+              <th style="width:28%">gpt-5.4-mini</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="3" style="padding-bottom:2px"><b>clinica-norte / reagendamiento</b> — 12 goldens</td>
+            </tr>
+            <tr>
+              <td>Grounded facts · Keeps the register <span class="note">[DAG]</span></td>
+              <td>12/12 · 1,00</td>
+              <td>12/12 · 1,00</td>
+            </tr>
+            <tr>
+              <td>Reception line <span class="note">[GEval]</span></td>
+              <td>11/12 (92 %) · 0,84</td>
+              <td>9/12 (75 %) · 0,80</td>
+            </tr>
+            <tr>
+              <td>Tool Correctness</td>
+              <td>12/12 · 1,00</td>
+              <td>11/12 (92 %) · 0,92</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding-bottom:2px"><b>tienda-sur / pedidos</b> — 11 goldens</td>
+            </tr>
+            <tr>
+              <td>Grounded facts <span class="note">[DAG]</span></td>
+              <td>10/11 (91 %) · 0,91</td>
+              <td>11/11 · 1,00</td>
+            </tr>
+            <tr>
+              <td>Order desk line <span class="note">[GEval]</span></td>
+              <td>9/11 (82 %) · 0,85</td>
+              <td>9/11 (82 %) · 0,83</td>
+            </tr>
+            <tr>
+              <td>Tool Correctness</td>
+              <td>10/11 (91 %) · 0,91</td>
+              <td>10/11 (91 %) · 0,91</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note">
+          <em>Keeps the register</em> puntúa 11/11 · 1,00 en los dos modelos y por eso no ocupa fila. Ocho
+          divergencias sobre 23 goldens, en las dos direcciones: una golden que pasa en un modelo y falla en
+          el otro es un <b>hallazgo</b>, nunca una golden que ablandar.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="proof" data-anim="4">
+      <b>Validación.</b> Tabla del <span class="n">31-08-2026, 18:31 y 18:33</span> —
+      <b>python -m core.testing.report clinica-norte reagendamiento --model claude-haiku-4-5 --model gpt-5.4-mini</b>.
+      El billing va por la misma tubería: seis sesiones reales del 30 y 31-08 cuestan entre
+      <span class="n">0,0017 €</span> y <span class="n">0,0106 €</span> de LLM —medio céntimo a un céntimo por
+      llamada corta— escritos en el <code>session.end</code>, en la misma fila que el score.
     </div>
 
   </div>
