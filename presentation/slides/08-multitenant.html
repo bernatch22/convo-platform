@@ -1,0 +1,25 @@
+<section class="slide" data-title="Configuración multi-cliente" data-entregable="7">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">08 <span class="sep">·</span> Entregable 7 — configuración por cliente y proyecto</div>
+      <h2 class="head">Configuración multi-cliente</h2>
+    </div>
+
+    <div class="todo" data-anim="2">
+      <div class="who">Sin escribir <span class="sep">·</span> card tk-f0aadc <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
+      <ul>
+        <li>El tenant es dato, no un despliegue: una flota, muchos negocios, resueltos desde los metadatos del dispatch a un único TenantContext.</li>
+        <li>Código frente a configuración: qué vive en tenants/<t>/projects/<p>/ y qué vive en las tablas del plano de control.</li>
+        <li>Overrides en caliente: un proyecto cambia su pipeline sin desplegar, y la consola enseña el pipeline que la PRÓXIMA llamada va a correr de verdad.</li>
+        <li>Radio de daño: un tenant roto queda no enrutable, no tumba la flota (core/registry.py importa cada tenant en try/except).</li>
+      </ul>
+      <div class="note"><b>Figura:</b> screenshots/pipeline.png — muestra el pipeline resuelto con la allow-list y el modelo que la plataforma se NIEGA a correr. Lámina profunda.</div>
+      <div class="note">
+        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
+        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+      </div>
+    </div>
+
+  </div>
+</section>

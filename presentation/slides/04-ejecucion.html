@@ -1,0 +1,25 @@
+<section class="slide" data-title="Ejecución de una conversación" data-entregable="3">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">04 <span class="sep">·</span> Entregable 3 — modelo de ejecución</div>
+      <h2 class="head">Ejecución de una conversación</h2>
+    </div>
+
+    <div class="todo" data-anim="2">
+      <div class="who">Sin escribir <span class="sep">·</span> card tk-14fc29 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
+      <ul>
+        <li>La secuencia: STT interim → cierre de turno → LLM → tool → guard → ConfirmTask → TTS, con el log escrito durante el turno.</li>
+        <li>La detección de turno como decisión: quién cierra un turno y qué pasa cuando el llamante interrumpe.</li>
+        <li>Latencia real por tramo, de una llamada real: ttft 0,64 s (máx 1,01), transcripción 0,47 s, tts ttfb 0,11 s, e2e 3,31 s (sesión AJ_rdrkYph3FaeS).</li>
+        <li>Los caminos de fallo en el mismo diagrama: error de proveedor, tool_use huérfano, y la llamada que se cae a mitad de la saga.</li>
+      </ul>
+      <div class="note"><b>Figura:</b> Diagrama de secuencia en SVG — la segunda figura obligatoria. Las latencias reales al lado, no la captura (la lámina 12 posee esa imagen).</div>
+      <div class="note">
+        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
+        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+      </div>
+    </div>
+
+  </div>
+</section>

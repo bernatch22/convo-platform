@@ -1,0 +1,25 @@
+<section class="slide" data-title="Tools y contratos" data-entregable="4">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">05 <span class="sep">·</span> Entregable 4 — diseño de tools y contratos</div>
+      <h2 class="head">Tools y contratos</h2>
+    </div>
+
+    <div class="todo" data-anim="2">
+      <div class="who">Sin escribir <span class="sep">·</span> card tk-a66bd0 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
+      <ul>
+        <li>ToolSpec entero: side_effect (read|write|irreversible), idempotency_key, pii_scope, timeout_s, compensation.</li>
+        <li>El docstring es el esquema que ve el modelo: el contrato se lee dos veces, una por el guard y otra por el LLM.</li>
+        <li>ToolError frente a cualquier otra excepción: qué puede aprender el modelo de un fallo y qué no debe ver jamás.</li>
+        <li>Tool local, adapter y tool remota: el mismo contrato, tres ejecutores.</li>
+      </ul>
+      <div class="note"><b>Figura:</b> pre.code con el ToolSpec real y una tool declarada al lado. Dos columnas.</div>
+      <div class="note">
+        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
+        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+      </div>
+    </div>
+
+  </div>
+</section>

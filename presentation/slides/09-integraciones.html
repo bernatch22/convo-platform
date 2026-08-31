@@ -1,0 +1,26 @@
+<section class="slide" data-title="Integraciones y el protocolo remote-tenant" data-entregable="8">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">09 <span class="sep">·</span> Entregable 8 — integración con sistemas externos</div>
+      <h2 class="head">Integraciones y el protocolo remote-tenant</h2>
+    </div>
+
+    <div class="todo" data-anim="2">
+      <div class="who">Sin escribir <span class="sep">·</span> card tk-f0aadc <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
+      <ul>
+        <li>Hoy: el tenant es un paquete en nuestro árbol. Puertos de adapter, el registry, el adapter REST genérico. Honestos sobre lo que eso le cuesta al cliente.</li>
+        <li>Mañana: el agente del cliente corre en SU proceso, conectado por un WebSocket SALIENTE — ni agujero de firewall entrante ni webhook que asegurar.</li>
+        <li>Core pasa a ser el runtime que le da vida.</li>
+        <li>Las tramas, escritas: hello / register(manifest) / invoke / result, y qué ocurre si se cae la conexión a mitad de un invoke.</li>
+        <li>Por qué saliente y no webhooks, en una línea sobre quién tiene que abrir un puerto. Los specs de las cards dropeadas de ms-12 son el insumo.</li>
+      </ul>
+      <div class="note"><b>Figura:</b> El bloque .compare: hoy a la izquierda, mañana a la derecha, con las mismas etiquetas de fila. Lámina profunda.</div>
+      <div class="note">
+        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
+        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+      </div>
+    </div>
+
+  </div>
+</section>

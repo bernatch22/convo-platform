@@ -1,0 +1,26 @@
+<section class="slide" data-title="Gestión de estado" data-entregable="6">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">07 <span class="sep">·</span> Entregable 6 — gestión de estado</div>
+      <h2 class="head">Gestión de estado</h2>
+    </div>
+
+    <div class="todo" data-anim="2">
+      <div class="who">Sin escribir <span class="sep">·</span> card tk-a66bd0 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
+      <ul>
+        <li>Log append-only con seq por sesión, escrito durante la llamada para que un SIGKILL no se lleve la etapa.</li>
+        <li>Las sesiones se re-enganchan, no se reanudan: una llamada caída es una sala nueva y un job nuevo. Decir por qué «reanudar» es mentira.</li>
+        <li>El snapshot: ChatContext + etapa, indexado por el número del llamante, rehidratado en la siguiente entrante dentro de N minutos.</li>
+        <li>Qué es estado, qué es derivado y qué no se persiste a propósito.</li>
+        <li>El handoff entre etapas no copia historia: el resumen se reconstruye en on_enter.</li>
+      </ul>
+      <div class="note"><b>Figura:</b> screenshots/sessions.png — una fila por conversación, con turnos, eventos y coste.</div>
+      <div class="note">
+        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
+        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+      </div>
+    </div>
+
+  </div>
+</section>
