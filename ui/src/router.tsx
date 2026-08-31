@@ -15,7 +15,6 @@ import { SessionDetail, sessionDetailLoader } from "./routes/SessionDetail";
 import { Sessions, sessionsLoader } from "./routes/Sessions";
 import { Shell, shellLoader } from "./routes/Shell";
 import { Supervisor } from "./routes/Supervisor";
-import { Talk } from "./routes/Talk";
 
 export const router = createBrowserRouter([
   {
@@ -29,7 +28,12 @@ export const router = createBrowserRouter([
       { path: "t/:tenant/sessions", element: <Sessions />, loader: sessionsLoader },
       { path: "t/:tenant/sessions/:id", element: <SessionDetail />, loader: sessionDetailLoader },
       { path: "t/:tenant/pipeline", element: <Pipeline />, loader: pipelineLoader },
-      { path: "t/:tenant/:project", element: <Talk /> },
+      {
+        // The only screen that needs the SFU client, so it is the only one that downloads
+        // it: livekit-client is half the bundle and no other screen touches a room.
+        path: "t/:tenant/:project",
+        lazy: async () => ({ Component: (await import("./routes/Talk")).Talk }),
+      },
       { path: "evals", element: <Evals /> },
       { path: "supervisor", element: <Supervisor /> },
     ],

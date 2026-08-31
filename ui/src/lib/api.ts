@@ -286,7 +286,12 @@ export function watchSession(
   const source = new EventSource(`/sessions/${encodeURIComponent(id)}/live?after=${after}`);
 
   source.addEventListener("open", (event) => {
-    onFrame({ type: "open", session: parse<SessionLine>(event) });
+    // EventSource fires its OWN "open" when the socket connects, and it collides with
+    // the server's `event: open` frame. The native one carries no data; only the frame
+    // does, so the data is what tells them apart.
+    const data = (event as MessageEvent<string>).data;
+    if (typeof data !== "string") return;
+    onFrame({ type: "open", session: JSON.parse(data) as SessionLine });
   });
   source.addEventListener("append", (event) => {
     onFrame({ type: "append", event: parse<SessionEvent>(event) });
