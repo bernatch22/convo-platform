@@ -154,10 +154,43 @@ def latency(store: Store, tenant: str, project: str, limit: int = LATENCY_SESSIO
     return {"sessions": len(rows), "turns": turns, "medians": medians}
 
 
+def running(project: Project, channel: str) -> dict[str, Any]:
+    """The four provider choices this session really runs on, small enough for one event.
+
+    Written onto `session.start` so a call can be traced back to the voice it
+    spoke with: the console may change any of these between two calls, and
+    without them on the log there is no artefact tying a supervisor's pick to
+    what the caller heard. A chat session builds neither STT nor TTS
+    (`core.session.build_session` gates both on the channel), so the audio half
+    is null there rather than a voice nobody was ever spoken to in.
+    """
+    audible = channel == "voice"
+    return {
+        "voice": project.voice if audible else None,
+        "tts_model": tts.tts_model(project) if audible else None,
+        "stt_provider": stt.provider_for(project) if audible else None,
+        "llm_model": llm.llm_model(project),
+    }
+
+
+def cleaned(field: str, value: str) -> str:
+    """The value as it will be stored: an id loses its stray whitespace, a greeting keeps it.
+
+    A pasted voice id arrives with a trailing space often enough to matter, and
+    a value that is only whitespace has to reach `overridable` as the empty
+    string it is, or the refusal below never fires.
+    """
+    return value if field == "greeting" else value.strip()
+
+
 def overridable(field: str, value: str) -> str | None:
     """Why this override is refused, or None when the platform will run it.
 
-    Two rules. The TTS one the platform has always enforced: `eleven_v3` is not
+    Four rules. The voice one exists because an empty id is not refused
+    anywhere downstream — it is *absorbed*: `tts_for` reads it as "no voice
+    configured", builds no TTS, and the call is silent with a log line blaming
+    a missing API key. A rule that only the store can enforce belongs here.
+    The TTS one the platform has always enforced: `eleven_v3` is not
     realtime and `eleven_turbo_v2_5` is deprecated, so neither may be stored —
     `tts_model()` would silently ignore them at build time and the console would
     show a model the caller never hears. The LLM one is an allow-list rather
@@ -169,6 +202,13 @@ def overridable(field: str, value: str) -> str | None:
     """
     if field not in OVERRIDABLE:
         return f"{field!r} is not overridable; the console may set {list(OVERRIDABLE)}"
+    if field == "voice" and not value:
+        return (
+            "an empty voice id is not a voice: `tts_for` cannot tell one from a missing "
+            "ELEVENLABS_API_KEY, so it builds no TTS at all and the next call comes up mute "
+            "while the worker log blames a key that is present. Name an ElevenLabs voice id — "
+            "the console's escape hatch stores whatever you type, but not nothing."
+        )
     if field == "llm_model" and value not in llm.ALLOWED_MODELS:
         return (
             f"{value!r} is not a model this platform runs: the allowed models are "
