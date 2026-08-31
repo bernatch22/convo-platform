@@ -53,6 +53,18 @@ export interface ObserverTicket {
   token: string;
 }
 
+/** What a supervisor asked to be allowed to do in a live room. The token is the answer. */
+export type SupervisorCapability = "listen" | "whisper" | "takeover";
+
+/** One supervisor's short-lived ticket into one live call. `identity` is always `sup:<uid>`. */
+export interface SupervisorTicket {
+  url: string;
+  room: string;
+  identity: string;
+  capability: SupervisorCapability;
+  token: string;
+}
+
 /* ── /sessions ────────────────────────────────────────────────────────────── */
 
 /** One line of the call log. `outcome` and `cost_eur` are null while the call runs.
@@ -254,6 +266,18 @@ export async function mintToken(req: TokenRequest): Promise<SessionTicket> {
 /** Mint a hidden, listen-only ticket into a room somebody else is already in. */
 export async function observe(room: string): Promise<ObserverTicket> {
   return request<ObserverTicket>("/observe", json("POST", { room }));
+}
+
+/** Mint a supervisor's short-lived, role-scoped ticket into one live room. */
+export async function supervise(
+  room: string,
+  capability: SupervisorCapability = "listen",
+  userId = "",
+): Promise<SupervisorTicket> {
+  return request<SupervisorTicket>(
+    "/supervise",
+    json("POST", { room, capability, user_id: userId }),
+  );
 }
 
 /** The call log, newest first, optionally narrowed to one tenant or project. */
