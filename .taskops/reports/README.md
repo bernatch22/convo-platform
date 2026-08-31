@@ -23,3 +23,4 @@ sheets) live under `tmp/reports/` and are not versioned.
 | ms-8 LiveKit server locally — rooms, tokens, dispatch by metadata | landed | [ms-8.md](ms-8.md) |
 | ms-11 telephone — a real number answered by the platform | landed | [ms-11.md](ms-11.md) |
 | ms-9 the console — three channels on screen, the pipeline governable | landed | [ms-9.md](ms-9.md) |
+| ms-15 the supervisor — authority is a signature, the model is the last skeptic | landed | [ms-15.md](ms-15.md) |
