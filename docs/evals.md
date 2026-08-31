@@ -112,15 +112,22 @@ measured.
 ### 3.1 ToolCorrectness — did it call the agenda exactly when it should?
 
 - **Kind:** deterministic, **0 judge calls**.
-- **Compares:** the names of the tools called in the turn against
-  `expected_tools` in the golden. Both directions count: expected nothing and
-  called nothing → 1.0; expected nothing and called `find_availability` → 0.0.
-  This is what makes the "must not call" goldens (price, headache, weather,
-  insult) worth running.
+- **Compares:** the names of the **business's** tools called in the turn
+  against `expected_tools` in the golden. Both directions count: expected
+  nothing and called nothing → 1.0; expected nothing and called
+  `find_availability` → 0.0. This is what makes the "must not call" goldens
+  (price, headache, weather, insult) worth running.
+- **What it does not count:** the platform's own plumbing. Every agent inherits
+  a clock (`fecha_y_hora_actual`), and a golden that lists no tool is saying
+  "do not touch the agenda", not "do not think". A `ToolSpec` marked
+  `infrastructure=True` is dropped from the case this metric reads
+  (`core.testing.deepeval.business_calls`, `tk-18c659`); nothing else is
+  filtered anywhere, and the whole-call case a grounding metric reads keeps
+  every call and every output. §9 has the failure that paid for this.
 - **Settings:** `threshold=0.9`; neither `should_exact_match` nor
   `should_consider_ordering` — calling the agenda twice for one question is not
   a build-breaking defect, calling it for a price question is.
-- **Runs on:** all 16 clinic goldens.
+- **Runs on:** all 17 clinic goldens.
 
 ### 3.2 ArgumentCorrectness — do the arguments match what the patient said?
 
@@ -1028,21 +1035,46 @@ position so a run filed late by CI never diffs against a future.
 
 ## 9. Known gaps, tracked
 
-- **`expected_tools: []` means "no tools" when it should mean "not the
-  business's tools".** ToolCorrectness compares every name the turn called
-  against the golden's list, and the platform's own clock
-  (`fecha_y_hora_actual`, on every stage since ms-?) is one of those names. So a
-  turn that correctly asked what day it is and correctly left the agenda alone
-  scores 0.0 against a golden that expects nothing — which is the whole of the
-  ms-18 matrix's Tool Correctness gap on GPT-5.4-mini (two goldens, one of them
-  scored 1.00 by the GEval judge in the same run, with the reason "the tool was
-  correctly not invoked"). It has never fired on Haiku, which reaches for the
-  clock far less, so it reads as a model divergence and is not one. The fix is a
-  seam and not a golden: the case ToolCorrectness reads should carry the
-  PROJECT's tool calls, with the platform's filtered out, and that filter needs a
-  list core owns — `platform_specs()` is that list's natural home and today holds
-  only `find_availability`. Not done here because it moves every project's number
-  and wants its own two-model run to land.
+- ~~**`expected_tools: []` means "no tools" when it should mean "not the
+  business's tools".**~~ **Closed in `tk-18c659`**, and closing it also showed
+  that one of the two goldens it was blamed for had a real defect underneath.
+  ToolCorrectness compared every name the turn called against the golden's
+  list, and the platform's own clock — `fecha_y_hora_actual`, which every
+  stage inherits from `TenantAgent` — is one of those names, so a turn that
+  correctly asked what day it is and correctly left the agenda alone scored
+  0.0 against a golden that expects nothing.
+
+  The fix is a seam and not a golden. `ToolSpec.infrastructure` is a DECLARED
+  flag — the platform's plumbing, not the customer's business —
+  `core.tools.catalog.CLOCK` carries it, and `infrastructure_names()` derives
+  the set from the flag rather than from a list of names written somewhere
+  else, so a project that declares plumbing of its own is answered too.
+  `core.testing.deepeval.business_calls` applies it, and it applies to
+  `test_case_for` ALONE, which is the case ToolCorrectness reads. The
+  conversational case and `turn_tool_calls` keep every call: grounding reads a
+  tool's OUTPUT as evidence, and the clock reading is the evidence for what day
+  it is. The filter can only ever REMOVE a call from the comparison, and no
+  golden in either project lists an infrastructure tool, so it cannot fail a
+  golden that passed — which is the argument that made a re-run cheap to trust
+  and the two unit tests that pin it (`tests/test_deepeval_bridge.py`, one for
+  each direction) worth more than the run.
+
+  Where the clock does NOT live: `platform_specs()`, which this gap used to
+  name as the filter's natural home.
+  A project's catalog is the list of names the executor accepts, and the clock
+  never reaches the executor — livekit runs it as a `@function_tool` on the
+  agent. Declaring it there would promise a call the platform cannot route, and
+  it would put a tool nobody wrote an adapter for into two tenants' catalogs.
+
+  Measured on gpt-5.4-mini after the change — one turn per golden through
+  `run_conversation`, printing `tool_calls_of` next to `business_calls` —
+  «hola, ¿qué día es hoy?» calls `['fecha_y_hora_actual']` and the
+  business list is empty — Tool Correctness 1.00 where it was 0.00. «pues
+  quería una cita con el dermatólogo» calls `['find_availability']`, no clock
+  in it at all, and still fails: with no day named the agenda must not be
+  consulted, which is what that golden says and what GPT does anyway. The
+  artefact was hiding a real difference, and it is now on the table as one —
+  §10.
 - The clinic's ChooseSlot prompt used to answer "¿qué turnos hay el jueves?"
   without consulting the agenda when the patient's existing cita was on a
   Thursday ("El jueves tiene ya su cita a las 10:00, ¿quiere cambiarla a otra
@@ -1198,37 +1230,66 @@ Two `evaluate()` calls per model, because DeepEval will not mix single-turn and
 conversational cases in one run — but both read the SAME conversations, so the
 second shape costs no agent turns.
 
-### What it measured (2026-08-31, ms-18 branch) — the clinic, 17 goldens
+### What it measured (2026-08-31, ms-18 branch, after `tk-18c659`) — the clinic, 17 goldens
 
 The five new-booking goldens ms-18 added are in the same array as the rest and
-were run by the same two commands:
+were run by the same two commands. This is the re-run that `tk-18c659` owed the
+board: the same `goldens.json`, not one line of it touched, scored by a
+ToolCorrectness that no longer counts the platform's clock against a golden
+about the business's tools (§9).
 
 | metric | claude-haiku-4-5 | gpt-5.4-mini |
 |---|---|---|
 | Grounded facts [ConversationalDAG] | 17/17 (100%) · 1.00 | 17/17 (100%) · 1.00 |
 | Keeps the register [ConversationalDAG] | 17/17 (100%) · 1.00 | 17/17 (100%) · 1.00 |
-| Reception line [GEval] | 17/17 (100%) · 0.90 | 15/17 (88%) · 0.82 |
-| Tool Correctness | 17/17 (100%) · 1.00 | 15/17 (88%) · 0.88 |
+| Reception line [GEval] | 17/17 (100%) · 0.87 | 16/17 (94%) · 0.87 |
+| Tool Correctness | 17/17 (100%) · 1.00 | 16/17 (94%) · 0.94 |
 
-Four divergences, all in the same direction, and none of them a golden to
-soften:
+Two divergences where the previous run had four, and the pair that went is the
+pair §9 predicted would go:
 
-- **Tool Correctness, «hola, ¿qué día es hoy?» and «pues quería una cita con el
-  dermatólogo»** — GPT reaches for `fecha_y_hora_actual` where Haiku does not,
-  and both goldens say `expected_tools: []`, which the metric reads as "nothing
-  at all" rather than "the agenda is not consulted". On the dermatologist golden
-  the GEval judge scored the reply **1.00** and wrote that the receptionist
-  "correctly did not invoke the tool". This is a metric artefact and it is
-  tracked in §9, not a behaviour difference.
+- **Tool Correctness, «hola, ¿qué día es hoy?» — gone.** GPT still calls
+  `fecha_y_hora_actual` on that turn (measured, not assumed) and Haiku still
+  does not; the clock is no longer in the list the metric compares, so both
+  models score 1.00 and the difference stops being a number. It never was a
+  behaviour difference.
+- **Tool Correctness, «pues quería una cita con el dermatólogo» — still failing
+  on GPT, and now for the right reason.** The clock is not in that turn's calls
+  at all: GPT calls `find_availability` with no day named by the patient, which
+  is exactly what the golden forbids («todavía no consulta la agenda, porque el
+  paciente no ha nombrado ningún día»). The artefact was hiding a real defect,
+  and the previous run's note that both goldens were "the same artefact" was
+  half wrong. A finding for a prompt card, not a golden to soften.
 - **Reception line, «para fisioterapia, ¿tiene algo el sábado por la mañana?»** —
   a real GPT defect and the reason this golden was written. The agenda returned
   09:00, 12:00 and 13:00 on the Saturday; GPT answered «el sábado por la mañana
   no tengo hueco» and pivoted to Wednesday. It misread its own tool output on the
   one metric that cannot see facts, which is why the divergence surfaced here and
   not in Grounded facts (it consulted Wednesday too, so the hours it read out
-  were real — just not an answer to the question).
-- **Reception line, «quiero cambiar mi cita al viernes por la tarde»** — the same
-  shape on an older golden: GPT offered a 10:00 slot as an afternoon one.
+  were real — just not an answer to the question). Unchanged.
+- **Reception line, «quiero cambiar mi cita al viernes por la tarde»** — did not
+  reproduce. GEval is a judge and this golden sits near the threshold; one run
+  is not a repair. It stays written down here so the next run knows to look.
+
+### What it measured (2026-08-31, ms-18 branch, after `tk-18c659`) — the shop, 11 goldens
+
+The same two commands against `tienda-sur/pedidos`, which had no ms-18 table of
+its own until this card:
+
+| metric | claude-haiku-4-5 | gpt-5.4-mini |
+|---|---|---|
+| Grounded facts [ConversationalDAG] | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+| Keeps the register [ConversationalDAG] | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+| Order desk line [GEval] | 9/11 (82%) · 0.86 | 10/11 (91%) · 0.92 |
+| Tool Correctness | 10/11 (91%) · 0.91 | 10/11 (91%) · 0.91 |
+
+Tool Correctness is now **identical on both models**, and the one golden it
+fails is the same one on each: «quiero cancelarlo, que me he equivocado de
+talla» expects `[]` and both models call `request_cancellation` — a BUSINESS
+tool, so the filter neither hides it nor should. That is the shape a metric
+artefact leaves behind when it is removed: what remains disagrees with the
+golden, not with the other model. The three remaining divergences are all on
+Order desk line, the judged metric, and none of them involves a tool.
 
 The consent ring is separate from that table and greener: the eight simulated
 calls (§5) score **1.0 on both models**, run as
