@@ -1,0 +1,4 @@
+{
+  "ring1": "tests/evals/test_pedidos_deepeval.py",
+  "grounding": "tests/evals/test_pedidos_dag.py"
+}

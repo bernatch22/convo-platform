@@ -1,0 +1,19 @@
+# The control plane on convo-box: serves the public console AND the read/pipeline API,
+# behind Caddy. It shares WorkingDirectory (and therefore tmp/convo.db) with the worker,
+# which is the whole point — a pipeline override saved in the public UI lands in the same
+# store the phone worker reads on its next call.
+[Unit]
+Description=convo-platform api (control plane + console)
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+User=berna
+WorkingDirectory=/home/berna/convo-app
+ExecStart=/home/berna/.local/bin/uv run uvicorn api:app --host 127.0.0.1 --port 8090
+EnvironmentFile=/home/berna/convo-app/.env
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -9,12 +9,22 @@
 
 import { asRecord, text, turnChips, type ConsentLink } from "../lib/sessions";
 import type { SessionEvent } from "../lib/api";
+import { voiceName } from "../lib/voices";
 
 /** The visual family a kind belongs to: it decides the row's rule colour, nothing else. */
-export type Family = "turn" | "tool" | "consent" | "stage" | "state" | "envelope" | "audio";
+export type Family =
+  | "turn"
+  | "tool"
+  | "consent"
+  | "stage"
+  | "state"
+  | "envelope"
+  | "audio"
+  | "supervisor";
 
 const FAMILIES: [string, Family][] = [
   ["turn.", "turn"],
+  ["supervisor.", "supervisor"],
   ["tool", "tool"],
   ["confirm.", "consent"],
   ["stage.", "stage"],
@@ -68,22 +78,44 @@ function Detail({ event, authorised }: EventRowProps) {
   if (kind.startsWith("confirm.")) return <Confirm kind={kind} payload={payload} />;
   if (kind === "tools.executed") return <Chip label="tools" value={String(payload["count"])} />;
   if (kind === "audio.start") return <Chip label="recording" value={String(payload["path"])} />;
+  if (kind.startsWith("supervisor.")) return <Supervision payload={payload} />;
   return <Raw payload={payload} />;
 }
+
+/** A second human on the line: who, with which powers, and whether the caller could see them. */
+function Supervision({ payload }: { payload: Record<string, unknown> }) {
+  return (
+    <span className="detail">
+      <Chip label="who" value={text(payload["identity"]) ?? "?"} />
+      <Chip label="as" value={text(payload["capability"]) ?? "?"} />
+      <Chip label="hidden" value={payload["hidden"] === false ? "no" : "yes"} />
+    </span>
+  );
+}
+
 
 /* ── the envelope ────────────────────────────────────────────────────────── */
 
 function Start({ payload }: { payload: Record<string, unknown> }) {
   const sip = asRecord(payload["sip"]);
   const caller = sip ? text(sip["sip.phoneNumber"]) : null;
+  const pipeline = asRecord(payload["pipeline"]);
+  const voice = pipeline ? text(pipeline["voice"]) : null;
   return (
     <span className="detail">
       <Chip label="project" value={`${payload["tenant"]}/${payload["project"]}`} />
       <Chip label="channel" value={String(payload["channel"])} />
       {payload["git_sha"] != null && <Chip label="build" value={String(payload["git_sha"])} />}
+      {voice && <Chip label="voice" value={spokenBy(voice)} accent />}
       {caller && <Chip label="from" value={caller} accent />}
     </span>
   );
+}
+
+/** The voice a session ran on, as a human reads it: the account name, the id as detail. */
+function spokenBy(id: string): string {
+  const named = voiceName(id);
+  return named ? `${named} · ${id}` : id;
 }
 
 function End({ payload }: { payload: Record<string, unknown> }) {

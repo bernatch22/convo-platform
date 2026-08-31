@@ -16,7 +16,7 @@ from core import confirm
 from core.context import Project, Tenant, TenantContext
 from core.tools.catalog import ToolCatalog, platform_specs
 from core.tools.contract import SideEffect, ToolSpec
-from core.tools.executor import LocalExecutor
+from core.tools.executor import SUMMARY_CHARS, LocalExecutor
 from core.tools.guard import ToolRefused, mask
 from core.tools.messages import DEFAULTS, FAILURE, TIMEOUT, UNKNOWN_TOOL
 
@@ -40,6 +40,7 @@ class FakeAdapter:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.result: Any = None  # set it to answer something other than the two default slots
 
     def capabilities(self) -> list[str]:
         return ["find_availability", "cancel_appointment", "slow_lookup", "broken_lookup"]
@@ -53,6 +54,8 @@ class FakeAdapter:
             await asyncio.sleep(1)
         if capability == "broken_lookup":
             raise RuntimeError("agenda-db: connection refused at 10.0.0.7:5432")
+        if self.result is not None:
+            return self.result
         return {"slots": ["10:00", "12:30"], "date": args.get("date")}
 
 
@@ -220,3 +223,93 @@ async def test_a_refusal_and_a_failure_are_logged_without_payloads() -> None:
     assert kinds == ["session.start", "tool.refused", "tool.call", "tool.error"]
     assert "10.0.0.7" not in str(logged(tc))
     assert logged(tc)[3][1]["key"] == FAILURE
+
+
+# ── result summaries: the one line of a payload the log may keep (ms-7) ──────
+
+
+def summarising(renderer) -> ToolCatalog:
+    """The same catalog with `find_availability` declaring `renderer` as its summary."""
+    spec = ToolSpec(
+        name="find_availability",
+        side_effect=SideEffect.READ,
+        timeout_s=5.0,
+        result_summary=renderer,
+    )
+    return CATALOG.merge(ToolCatalog.of(spec))
+
+
+def result_payload(tc) -> dict:
+    return next(payload for kind, payload in logged(tc) if kind == "tool.result")
+
+
+async def test_a_tool_that_declares_no_summary_logs_exactly_what_it_always_logged() -> None:
+    """The opt-in half of the contract: an untouched project's log does not change."""
+    tc = attached(context(FakeAdapter()))
+
+    await tc.tools.call("find_availability", {"date": "2026-09-01"})
+
+    assert result_payload(tc) == {
+        "tool": "find_availability",
+        "side_effect": "read",
+        "shape": "dict[2]",
+    }
+
+
+async def test_a_declared_summary_is_written_next_to_the_shape_never_instead_of_it() -> None:
+    tc = attached(context(FakeAdapter(), summarising(lambda r: f"free: {', '.join(r['slots'])}")))
+
+    await tc.tools.call("find_availability", {"date": "2026-09-01"})
+
+    assert result_payload(tc)["summary"] == "free: 10:00, 12:30"
+    assert result_payload(tc)["shape"] == "dict[2]", "the shape is what a reader counts by"
+
+
+async def test_a_renderer_that_explodes_costs_the_log_a_line_and_the_caller_nothing() -> None:
+    """A bug in a log line must never fail a tool call the adapter already answered."""
+
+    def broken(result: Any) -> str:
+        raise KeyError("doctor")
+
+    tc = attached(context(FakeAdapter(), summarising(broken)))
+
+    result = await tc.tools.call("find_availability", {"date": "2026-09-01"})
+
+    assert result == {"slots": ["10:00", "12:30"], "date": "2026-09-01"}
+    assert "summary" not in result_payload(tc)
+
+
+async def test_a_summary_longer_than_a_log_line_is_capped_and_says_so() -> None:
+    tc = attached(context(FakeAdapter(), summarising(lambda r: "hueco " * 200)))
+
+    await tc.tools.call("find_availability", {"date": "2026-09-01"})
+
+    summary = result_payload(tc)["summary"]
+    assert len(summary) == SUMMARY_CHARS and summary.endswith("…")
+
+
+async def test_an_empty_summary_leaves_no_key_rather_than_an_empty_one() -> None:
+    tc = attached(context(FakeAdapter(), summarising(lambda r: "")))
+
+    await tc.tools.call("find_availability", {"date": "2026-09-01"})
+
+    assert "summary" not in result_payload(tc)
+
+
+async def test_a_name_the_arguments_never_carried_is_masked_because_the_result_carried_it() -> None:
+    """`find_patient` is asked for a phone and answers with a person: the mask learns it here."""
+    adapter = FakeAdapter()
+    adapter.result = {"name": "Ana García Ruiz", "when": "2026-09-03T10:00"}
+    tc = attached(context(adapter, summarising(lambda r: f"found {r['name']} for {r['when']}")))
+
+    await tc.tools.call("find_availability", {"date": "2026-09-01"})
+
+    assert result_payload(tc)["summary"] == "found An************* for 2026-09-03T10:00"
+
+
+def attached(tc):
+    """The same context with an in-memory log, for the assertions that read one."""
+    from core.state.attach import attach_log
+    from core.state.store import MemoryStore
+
+    return attach_log(tc, MemoryStore())

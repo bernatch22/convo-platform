@@ -29,3 +29,13 @@ services:
     volumes:
       # v1.12 reads /sip/config.yaml, ignoring SIP_CONFIG_FILE
       - ./sip.yml:/sip/config.yaml:ro
+  caddy:
+    image: caddy:2-alpine
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - livekit
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy_data:/data
+      - ./caddy_config:/config

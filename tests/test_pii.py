@@ -14,6 +14,7 @@ import importlib
 
 import pytest
 
+from core import confirm
 from core.state.log import record
 from core.testing.harness import fake_context
 from core.tools import guard
@@ -28,6 +29,7 @@ MASKED_PATIENT = "An*************"
 PHONE = "600123456"
 MASKED_PHONE = "60*******"
 SLOT = {"id": "s-11", "when": "2026-09-03T11:00", "doctor": "Dra. Irene Campos"}
+BOOKABLE = "sl-20260903-0900-trau"  # a real slot id: `book_slot` reads the moment out of it
 
 project_tools = importlib.import_module("tenants.clinica-norte.projects.reagendamiento.tools")
 
@@ -106,6 +108,41 @@ async def test_a_refused_irreversible_call_names_nobody_in_the_line_it_leaves() 
     line = str(payload(tc, "tool.refused"))
     assert PATIENT not in line and PHONE not in line
     assert "book_slot" in line
+
+
+# ── the summaries: what a result is allowed to say about itself (ms-7) ───────
+
+
+async def test_the_summary_of_a_lookup_names_the_appointment_and_never_the_patient() -> None:
+    """`find_patient` is asked for a phone and answers with a name nothing had declared yet."""
+    tc = clinic_context(identified=False)
+
+    await tc.tools.call("find_patient", {"phone": PHONE})
+
+    summary = payload(tc, "tool.result")["summary"]
+    assert MASKED_PATIENT in summary, summary
+    assert PATIENT not in summary and PHONE not in summary
+    assert "2026-09-03T10:00" in summary and "Dra. Irene Campos" in summary
+
+
+async def test_no_summary_of_a_whole_rebooking_carries_a_name_or_a_number() -> None:
+    """The card's acceptance, asserted over every result line a real rebooking writes."""
+    tc = clinic_context(identified=False)
+    booking = {"slot_id": BOOKABLE, "patient": PATIENT, "phone": PHONE, "doctor": SLOT["doctor"]}
+
+    await tc.tools.call("find_patient", {"phone": PHONE})
+    await tc.tools.call("find_availability", {"date": "2026-09-03"})
+    await tc.tools.call("cancel_slot", {"appointment_id": APPOINTMENT})
+    confirm.mint(tc, "book_slot", booking)
+    await tc.tools.call("book_slot", booking)
+    await tc.tools.call("send_sms", {"phone": PHONE, "text": project_tools.sms_text(PATIENT, SLOT)})
+
+    summaries = [
+        event.payload["summary"] for event in tc.log.events() if "summary" in event.payload
+    ]
+    assert len(summaries) == 5, summaries
+    for summary in summaries:
+        assert PATIENT not in summary and PHONE not in summary, summary
 
 
 # ── the seams: free text no ToolSpec describes ───────────────────────────────

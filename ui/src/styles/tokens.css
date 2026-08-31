@@ -8,6 +8,8 @@
  */
 
 :root {
+  color-scheme: dark;
+
   /* Grounds — four layers, each a few percent lighter than the last. No gradients anywhere. */
   --bg: #0b0e12;
   --surface: #0f1319;
@@ -57,6 +59,37 @@
 
   --rail-w: 236px;
   --header-h: 52px;
+}
+
+/* ── Light theme: the same instrument in daylight ──────────────────────────
+ * Paper and ink, not a bright SaaS. ONLY the colour tokens are redefined; every
+ * size, step and font stays put, so nothing about the layout moves — it is the
+ * dark console re-inked. The four grounds now layer from paper downward (a
+ * raised surface reads a touch greyer, the inverse of the dark stack), the ink
+ * is three weights of near-black, and the one signal accent is the same lime
+ * deepened to an olive that clears WCAG AA on white (4.57:1 as text, and as the
+ * ground under near-white text on an open door) while staying recognisably it.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg: #fbfbf9;
+  --surface: #f2f2ec;
+  --surface-2: #ebebe4;
+  --surface-3: #e0e0d7;
+
+  --line: #dedcd2;
+  --line-strong: #c6c4b8;
+
+  --text: #191c20;
+  --text-dim: #545c68;
+  --text-faint: #7c8593;
+
+  --accent: #5f7d16;
+  --accent-soft: rgba(95, 125, 22, 0.14);
+
+  --warn: #8a6100;
+  --danger: #c62f28;
 }
 
 * {
