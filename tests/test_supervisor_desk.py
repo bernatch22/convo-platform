@@ -175,3 +175,66 @@ def test_an_sfu_that_cannot_be_asked_is_a_503_and_not_an_empty_room(client, monk
     reply = client.post("/supervise/entered", json={"room": ROOM, "identity": "sup:berna"})
 
     assert reply.status_code == 503
+
+
+async def test_a_verb_reaches_the_agent_alone_on_the_supervisor_topic(monkeypatch, sent) -> None:
+    """The order road is the join road: same topic, same destination, same trust anchor."""
+    in_room(monkeypatch, sent, agent(), supervisor("whisper"), Person("clinica-norte:u1"))
+
+    answered = await desk.command(ROOM, "sup:berna", "steer", {"text": "ve al grano"})
+
+    assert answered == {"verb": "steer", "identity": "sup:berna", "sent": True}
+    assert sent.request.destination_identities == ["agent-cc"]
+    assert b'"verb": "steer"' in sent.request.data and b"grano" in sent.request.data
+
+
+async def test_a_verb_from_a_ticket_that_was_never_used_never_leaves(monkeypatch, sent) -> None:
+    in_room(monkeypatch, sent, agent(), Person("clinica-norte:u1"))
+
+    with pytest.raises(desk.NotInRoom):
+        await desk.command(ROOM, "sup:ghost", "takeover", {})
+    assert sent.request is None
+
+
+async def test_a_caller_cannot_aim_a_verb_at_the_agent(monkeypatch, sent) -> None:
+    in_room(monkeypatch, sent, agent(), Person("clinica-norte:u1"))
+
+    with pytest.raises(desk.NotInRoom):
+        await desk.command(ROOM, "clinica-norte:u1", "takeover", {})
+    assert sent.request is None
+
+
+async def test_a_verb_this_door_does_not_forward_is_named(monkeypatch, sent) -> None:
+    in_room(monkeypatch, sent, agent(), supervisor())
+
+    with pytest.raises(ValueError, match="unknown supervisor verb"):
+        await desk.command(ROOM, "sup:berna", "join", {})
+
+
+async def test_a_room_with_no_agent_has_nothing_to_steer(monkeypatch, sent) -> None:
+    in_room(monkeypatch, sent, supervisor("whisper"))
+
+    with pytest.raises(desk.NotInRoom, match="no agent"):
+        await desk.command(ROOM, "sup:berna", "steer", {"text": "hola"})
+
+
+def test_the_verb_endpoint_forwards_the_body_and_refuses_a_verb_it_does_not_know(
+    client, monkeypatch, sent
+) -> None:
+    in_room(monkeypatch, sent, agent(), supervisor("whisper"))
+
+    body = {"room": ROOM, "identity": "sup:berna", "verb": "steer", "text": "ve al grano"}
+
+    assert client.post("/supervise/verb", json=body).json()["sent"] is True
+    assert client.post("/supervise/verb", json={**body, "verb": "hang_up"}).status_code == 422
+    assert client.post("/supervise/verb", json={**body, "shout": True}).status_code == 422
+
+
+def test_a_verb_aimed_at_a_room_the_supervisor_left_is_a_404(client, monkeypatch, sent) -> None:
+    in_room(monkeypatch, sent, agent())
+
+    reply = client.post(
+        "/supervise/verb", json={"room": ROOM, "identity": "sup:berna", "verb": "release"}
+    )
+
+    assert reply.status_code == 404

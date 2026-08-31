@@ -19,6 +19,14 @@ hidden participant fires no `participant_connected` anywhere, so the agent
 cannot see the arrival even if it wanted to. The control plane can — it holds
 the API key — and the packet is how the fact reaches the process that owns the
 caller's log, where the `seq` is allocated. One writer, one sequence, one story.
+
+`command` is the same packet carrying an ORDER rather than a fact: a steer, a
+takeover or a release aimed at the room's agent, server-side. A browser does
+not need it — it holds a `whisper` ticket and calls the agent's RPC directly —
+but a control plane does: an escalation rule, a compliance trigger or a
+`curl` from a terminal has no room connection to perform RPC over. Both roads
+end at `core.security.control.SupervisorControl.apply`, which asks the same
+`is_supervisor` question of the same identity.
 """
 
 import json
@@ -35,6 +43,9 @@ log = logging.getLogger("platform.supervisor")
 
 AGENT_KIND = rooms.AGENT_KIND
 DEFAULT_CAPABILITY = "listen"
+
+# The orders this door will forward. `join` is not one: it is a fact, and `entered` writes it.
+COMMANDS: tuple[str, ...] = ("steer", "takeover", "release")
 
 
 class NotInRoom(LookupError):
@@ -69,8 +80,40 @@ async def entered(room: str, identity: str) -> dict[str, Any]:
         }
         agent = next((person.identity for person in people if person.kind == AGENT_KIND), None)
         if agent is not None:
-            await _announce(api_client, room, agent, found)
+            await _send(api_client, room, agent, {"verb": JOIN_VERB, **found})
         return {**found, "announced": agent is not None}
+    finally:
+        await api_client.aclose()
+
+
+async def command(room: str, identity: str, verb: str, body: dict[str, Any]) -> dict[str, Any]:
+    """Aim one supervision verb at a room's agent, server-side, on a supervisor's behalf.
+
+    → `{"verb", "identity", "sent": True}` — the agent applies it and writes the
+    log line; this side never hears the outcome, because the log is the outcome.
+
+    The identity is checked against the SFU's own participant list first: a
+    verb from a `sup:` who is not actually in the call is a ticket somebody
+    kept, and the whole point of the short TTL is that it should not work.
+
+    Raises `NotInRoom` when the supervisor or the agent is not there,
+    `ValueError` for a verb this door does not forward, and `RoomsUnreachable`
+    when the SFU cannot be asked.
+    """
+    if not is_supervisor(identity):
+        raise NotInRoom(f"{identity!r} is not a supervisor identity")
+    if verb not in COMMANDS:
+        raise ValueError(f"unknown supervisor verb {verb!r}; known: {list(COMMANDS)}")
+    api_client = rooms.client()
+    try:
+        people = await _participants(api_client, room)
+        if not any(person.identity == identity for person in people):
+            raise NotInRoom(f"{identity!r} is not in room {room!r}")
+        agent = next((person.identity for person in people if person.kind == AGENT_KIND), None)
+        if agent is None:
+            raise NotInRoom(f"room {room!r} has no agent to aim {verb!r} at")
+        await _send(api_client, room, agent, {"verb": verb, "identity": identity, **body})
+        return {"verb": verb, "identity": identity, "sent": True}
     finally:
         await api_client.aclose()
 
@@ -84,13 +127,11 @@ async def _participants(api_client: api.LiveKitAPI, room: str) -> list[Any]:
         raise rooms.RoomsUnreachable(f"livekit: {error}") from error
 
 
-async def _announce(
-    api_client: api.LiveKitAPI, room: str, agent: str, found: dict[str, Any]
-) -> None:
-    """Send the join to the agent and nobody else — a broadcast would reach the caller."""
+async def _send(api_client: api.LiveKitAPI, room: str, agent: str, body: dict[str, Any]) -> None:
+    """Send one supervisor packet to the agent and nobody else — a broadcast reaches the caller."""
     request = api.SendDataRequest(
         room=room,
-        data=json.dumps({"verb": JOIN_VERB, **found}).encode("utf-8"),
+        data=json.dumps(body).encode("utf-8"),
         kind=rtc.DataPacketKind.KIND_RELIABLE,
         topic=TOPIC,
         destination_identities=[agent],
@@ -99,4 +140,4 @@ async def _announce(
         await api_client.room.send_data(request)
     except Exception as error:  # noqa: BLE001 — see above
         raise rooms.RoomsUnreachable(f"livekit: {error}") from error
-    log.info("announced %s to %s in %s", found["identity"], agent, room)
+    log.info("sent %s from %s to %s in %s", body["verb"], body.get("identity"), agent, room)
