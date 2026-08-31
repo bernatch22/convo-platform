@@ -55,7 +55,13 @@ export interface ObserverTicket {
 
 /* ── /sessions ────────────────────────────────────────────────────────────── */
 
-/** One line of the call log. `outcome` and `cost_eur` are null while the call runs. */
+/** One line of the call log. `outcome` and `cost_eur` are null while the call runs.
+ *
+ * `phone` is the caller's number off `session.start`, and null when the
+ * session never came in over the telephone: `channel` says "voice" for a
+ * browser call and a PSTN call alike, so this is the only field that tells
+ * the two apart in the log.
+ */
 export interface SessionLine {
   id: string;
   tenant: string;
@@ -67,6 +73,7 @@ export interface SessionLine {
   events: number;
   turns: number;
   cost_eur: number | null;
+  phone: string | null;
 }
 
 /** One fact in the append-only log. A turn's latencies live in `payload.metrics`. */
@@ -148,6 +155,8 @@ export interface TtsSnapshot {
   default_model: string;
   latency_model: string;
   forbidden_models: string[];
+  /** model id -> the sentence the control plane refuses it with, verbatim. */
+  forbidden_reasons: Record<string, string>;
   voice: string;
   sync_alignment: boolean;
 }
@@ -159,7 +168,7 @@ export interface PipelineOverrideRow {
   updated_at: number;
 }
 
-/** Medians in ms over stored voice sessions; a never-measured one is null, never 0. */
+/** Medians in SECONDS over stored voice sessions; a never-measured one is null, never 0. */
 export interface LatencyMedians {
   transcription_delay: number | null;
   end_of_turn_delay: number | null;

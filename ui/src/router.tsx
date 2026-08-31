@@ -10,9 +10,9 @@ import { createBrowserRouter } from "react-router";
 import { Crash } from "./routes/Crash";
 import { Evals } from "./routes/Evals";
 import { Home } from "./routes/Home";
-import { Pipeline } from "./routes/Pipeline";
-import { SessionDetail } from "./routes/SessionDetail";
-import { Sessions } from "./routes/Sessions";
+import { Pipeline, pipelineLoader } from "./routes/Pipeline";
+import { SessionDetail, sessionDetailLoader } from "./routes/SessionDetail";
+import { Sessions, sessionsLoader } from "./routes/Sessions";
 import { Shell, shellLoader } from "./routes/Shell";
 import { Supervisor } from "./routes/Supervisor";
 
@@ -25,9 +25,9 @@ export const router = createBrowserRouter([
     errorElement: <Crash />,
     children: [
       { index: true, element: <Home /> },
-      { path: "t/:tenant/sessions", element: <Sessions /> },
-      { path: "t/:tenant/sessions/:id", element: <SessionDetail /> },
-      { path: "t/:tenant/pipeline", element: <Pipeline /> },
+      { path: "t/:tenant/sessions", element: <Sessions />, loader: sessionsLoader },
+      { path: "t/:tenant/sessions/:id", element: <SessionDetail />, loader: sessionDetailLoader },
+      { path: "t/:tenant/pipeline", element: <Pipeline />, loader: pipelineLoader },
       {
         // The only screen that needs the SFU client, so it is the only one that downloads
         // it: livekit-client is half the bundle and no other screen touches a room.

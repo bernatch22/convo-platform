@@ -127,9 +127,16 @@ async def sessions(
 
     → `[{"id": str, "tenant": str, "project": str, "channel": "voice"|"chat",
          "started_at": float, "ended_at": float|null, "outcome": str|null,
-         "events": int, "turns": int, "cost_eur": float|null}]`
+         "events": int, "turns": int, "cost_eur": float|null,
+         "phone": str|null}]`
 
     `cost_eur` and `outcome` are null while the call is still running.
+
+    `phone` is the caller's `sip.phoneNumber` (or the trunk's, when the caller
+    withheld it) read off `session.start`, and null when the session never came
+    in over the telephone. `channel` cannot say this: a phone call and a browser
+    call are both `"voice"`, so this is the only field that separates them in
+    the call log.
     """
     return control_plane.sessions(store, tenant=tenant, project=project, limit=limit)
 
@@ -138,7 +145,7 @@ async def sessions(
 async def session(session_id: str, store: Reader) -> dict[str, Any]:
     """One session: the list line, the end-of-call report, and every event in seq order.
 
-    → `{...the /sessions line..., "report": object|null,
+    → `{...the /sessions line (`phone` included), "report": object|null,
          "events": [{"seq": int, "t_ms": int, "kind": str, "payload": object}]}`
 
     `kind` is the log's own vocabulary (`session.start`, `stt.final`,
@@ -222,7 +229,7 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
         "llm": {"provider", "model", "caching", "max_tokens",
                 "cache_minimum_tokens", "cache_note"},
         "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
-                "forbidden_models", "voice", "sync_alignment"},
+                "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
         "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
         "latency": {"sessions": int, "turns": int,
                     "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",

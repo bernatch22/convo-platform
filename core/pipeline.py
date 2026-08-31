@@ -87,7 +87,12 @@ def llm_view() -> dict[str, Any]:
 
 
 def tts_view(project: Project) -> dict[str, Any]:
-    """ElevenLabs: the model the platform will really run, the voice, and what it refuses."""
+    """ElevenLabs: the model the platform will really run, the voice, and what it refuses.
+
+    `forbidden_reasons` carries the very sentence `overridable` would answer a
+    PUT with, so the console can grey a model out and say why in the server's
+    words instead of keeping its own copy of the rule.
+    """
     return {
         "provider": "elevenlabs",
         "model": tts.tts_model(project),
@@ -95,6 +100,9 @@ def tts_view(project: Project) -> dict[str, Any]:
         "default_model": tts.DEFAULT_MODEL,
         "latency_model": tts.LATENCY_MODEL,
         "forbidden_models": sorted(tts.FORBIDDEN_MODELS),
+        "forbidden_reasons": {
+            model: overridable("tts_model", model) for model in sorted(tts.FORBIDDEN_MODELS)
+        },
         "voice": project.voice,
         "sync_alignment": True,
     }
