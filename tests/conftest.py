@@ -20,7 +20,7 @@ OFFLINE_KEY = "offline-unit-ring-no-provider-calls"
 # OPENAI too: deepeval's ToolCorrectnessMetric (deterministic!) still constructs
 # a default OpenAI judge and demands a key it will never use.
 LLM_KEYS = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY")
-VOICE_KEYS = ("SONIOX_API_KEY", "ELEVENLABS_API_KEY", "ELEVEN_API_KEY")
+VOICE_KEYS = ("SONIOX_API_KEY", "DEEPGRAM_API_KEY", "ELEVENLABS_API_KEY", "ELEVEN_API_KEY")
 
 
 # Marks a test as LLM-backed: skipped without a key, exempt from the unit-ring strip.
