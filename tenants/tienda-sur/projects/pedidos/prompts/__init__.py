@@ -6,7 +6,10 @@ success described instead of prohibitions, a few examples in <example> tags,
 prose over bullets (the prompt's format leaks into spoken output).
 
 Every stage assembles its prompt through `stage_prompt`, which puts the same
-`<shop_knowledge>` block first, byte for byte. Two reasons, and the second is
+`<shop_knowledge>` block first, byte for byte. That is also what made a fourth
+stage affordable in ms-20: `TicketDesk` writes its own role, its own
+instructions and its own examples, and pays nothing for the 4550 tokens the
+other three already share. Two reasons, and the second is
 the expensive one:
 
 - what the shop is does not change between stages. A customer who asks about
@@ -35,6 +38,11 @@ from .order_desk import (
     ORDER_DESK_INSTRUCTIONS,
     ORDER_DESK_ROLE,
 )
+from .ticket_desk import (
+    TICKET_DESK_EXAMPLES,
+    TICKET_DESK_INSTRUCTIONS,
+    TICKET_DESK_ROLE,
+)
 
 __all__ = [
     "confirm_instructions",
@@ -42,6 +50,7 @@ __all__ = [
     "identify_prompt",
     "order_desk_prompt",
     "stage_prompt",
+    "ticket_desk_prompt",
 ]
 
 
@@ -53,6 +62,11 @@ def identify_prompt(tc: TenantContext) -> str:
 def order_desk_prompt(tc: TenantContext) -> str:
     """The stage that reads the order back and cancels it while the warehouse still can."""
     return stage_prompt(tc, ORDER_DESK_ROLE, ORDER_DESK_INSTRUCTIONS, ORDER_DESK_EXAMPLES)
+
+
+def ticket_desk_prompt(tc: TenantContext) -> str:
+    """The stage that writes an incident down and reads back the one the customer asks for."""
+    return stage_prompt(tc, TICKET_DESK_ROLE, TICKET_DESK_INSTRUCTIONS, TICKET_DESK_EXAMPLES)
 
 
 def confirm_instructions() -> str:

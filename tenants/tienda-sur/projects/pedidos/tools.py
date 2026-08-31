@@ -4,13 +4,15 @@ The tools themselves are methods of the stage that owns them (`stages/`), so a
 reader opens one file and sees the model's whole surface for that step of the
 call. This module holds the pieces those tools share: turning an order row into
 a line the model can read aloud, the sentence the customer has to say yes to,
-the SMS a cancellation ends with, and the four things that can be told to the
-model when a tool cannot do what was asked.
+the SMS a cancellation ends with, the incident lines the helpdesk answers with,
+and the things that can be told to the model when a tool cannot do what was
+asked.
 
 Pure functions, no context and no I/O, which is why every rule below is a
 one-line unit test.
 """
 
+from ...adapters import ticketbook
 from . import dates
 
 RETURN_POLICY = (
@@ -51,6 +53,58 @@ STATUS_NOTES = {
     "entregado": "ya está entregado, así que lo que cabe es una devolución",
     "cancelado": "el pedido ya está cancelado y el importe está de vuelta",
 }
+
+NO_TICKET = (
+    "No consta ninguna incidencia con esos datos. Pídele que te repita el número —empieza por "
+    "TS-T y son cuatro cifras— o el móvil con el que llamó, por si se ha oído mal. Si sigue sin "
+    "aparecer, ofrécele abrirle una nueva ahora mismo."
+)
+NO_SUBJECT = (
+    "Todavía no te ha contado qué le pasa, así que no hay nada que escribir en la incidencia. "
+    "Pregúntaselo con una sola pregunta y ábrela cuando te lo haya dicho."
+)
+
+
+def ticket_subject(text: str | None) -> str:
+    """The customer's own words as the helpdesk will store them — trimmed, never rewritten.
+
+    One line of indirection on purpose: the stage asks the project what a
+    subject is, and the project asks the system that has to hold it. A shop
+    that swaps `FakeTickets` for a real helpdesk with a 120-character field
+    changes one constant and the prompt above it stops promising more.
+    """
+    return ticketbook.subject_of(text)
+
+
+def ticket_line(ticket: dict[str, str]) -> str:
+    """The incident as the model reads it back: number, state, what it is about, who has it."""
+    return "\n".join(
+        [
+            f"Incidencia {ticket['ticket_id']}, a nombre de {ticket['name'] or 'quien llamó'}.",
+            f"Estado: {ticket['status']} ({ticketbook.STATUS_NOTES.get(ticket['status'], '')}).",
+            f"Abierta el {dates.spanish_date(ticket.get('opened', '')) or 'sin fecha'}, "
+            f"la lleva {ticket.get('team') or 'atención al cliente'}.",
+            f"Asunto tal y como se anotó: {ticket['subject']}.",
+            _about_order(ticket),
+        ]
+    )
+
+
+def opened_line(ticket: dict[str, str]) -> str:
+    """What the model is told the moment an incident exists: the number, and to read it out.
+
+    The number is the whole point of the turn — it is what the customer writes
+    on the back of an envelope and quotes on the next call — so the instruction
+    to say it out loud, digit by digit, is here and not left to the prompt: a
+    tool that returns an identifier nobody repeats has helped no one.
+    """
+    return (
+        f"Incidencia abierta con el número {ticket['ticket_id']}, en estado "
+        f"{ticket['status']}. Dile el número despacio, dile que un compañero la mira y que "
+        "le escribimos al correo o al móvil de la compra. Se anotó esto y solo esto: "
+        f"{ticket['subject']}. No prometas plazos ni compensaciones que no estén en la "
+        "información de la tienda."
+    )
 
 
 def order_line(order: dict[str, str]) -> str:
@@ -122,3 +176,10 @@ def _tracking(order: dict[str, str]) -> str:
     if order.get("tracking"):
         return f"Seguimiento: {order['tracking']}, en la web de {order['carrier']}."
     return "Seguimiento: todavía no tiene número; sale en cuanto el paquete deje el almacén."
+
+
+def _about_order(ticket: dict[str, str]) -> str:
+    """The order the incident is about, when the helpdesk recorded one; never invented."""
+    if ticket.get("order_id"):
+        return f"Va sobre el pedido {ticket['order_id']}."
+    return "No está asociada a ningún pedido concreto."

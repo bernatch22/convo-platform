@@ -90,11 +90,16 @@ def tool_correctness() -> ToolCorrectnessMetric:
     worth running.
 
     There is no ArgumentCorrectness in this project, and that is not an
-    oversight: the two tools of the order desk take no arguments at all (the
-    order is already identified), and the one tool that does take them —
-    `identify_order` — is pinned by `tests/test_tienda_stages.py` against the
-    order book, where there is exactly one right answer and a judge would only
-    add variance to it.
+    oversight. The two tools of the order desk take no arguments at all (the
+    order is already identified); `identify_order` does, and is pinned by
+    `tests/test_tienda_stages.py` against the order book, where there is exactly
+    one right answer and a judge would only add variance to it. `open_ticket`
+    is the third case and the reason the rule is worth writing down: its
+    argument is free text a customer dictated, so there is no right answer to
+    compare against — only a rule about what must NOT be in it, which the
+    goldens judge as words and `tests/test_tienda_tickets.py` pins as storage
+    (what the helpdesk keeps is the caller's own sentence, trimmed and never
+    rewritten).
     """
     return ToolCorrectnessMetric(threshold=0.9)
 

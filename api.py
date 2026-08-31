@@ -306,7 +306,16 @@ async def reservations(
                    "handled_by": str|null, "state": str,
                    "tone": "new"|"changed"|"gone"|"plain",
                    "detail": str|null, "at": float|null, "session": str|null,
-                   "verb": str|null, "confirmed": bool, "channel": str|null}]}`
+                   "verb": str|null, "confirmed": bool, "channel": str|null}],
+         "views": [{"shape": …, "labels": …, "systems": …, "rows": […]}]}`
+
+    `views` is one entry per system of this tenant that offers a record view,
+    in the order the tenant's own factory builds them, and the flat `shape`,
+    `labels`, `systems` and `rows` are the first of them. A shop that keeps its
+    orders in one system and its incidents in another answers with two, each
+    with its own shape and its own words for a state — they are two tables and
+    not a longer one, and deciding which of a business's vocabularies wins is
+    not the platform's to do.
 
     `/outcomes` counts what the platform DID, off the append-only log whose
     summaries are PII-filtered by design. This is the other reading and the one

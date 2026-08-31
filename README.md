@@ -43,6 +43,22 @@ agenda, reads the hour back to you and waits for a yes before writing anything.
 Either way `uv run python -m convo sessions show <id>` prints the log: the yes
 before the write, and one line for the cita the booking system created.
 
+The shop takes three. Ask where an order is («mi pedido es el TS-10432, ¿por
+dónde va?»), ask to cancel it and it reads the order and the amount back and
+waits for a yes — and if what you have is a problem it cannot fix, say so
+(«quiero poner una reclamación por escrito») and it opens an incident with your
+own words and reads you its number:
+
+> «quiero poner una reclamación por escrito» · «llevo tres correos sin
+> respuesta» → «Te la dejo apuntada con el número TS-T0003.»
+
+Hang up, run the console again and ask for that number («¿cómo va la incidencia
+TS-T0003?»): it is still there, because a helpdesk that forgot its tickets
+between calls would not be one — the rows live in `tmp/business.json`
+(`CONVO_LEDGER`), which is what a customer's real helpdesk would be. Both the orders and the incidents show up on the project's **Board**
+in the console, each as its own table with its own columns and its own words for
+a state.
+
 ### Talking to it out loud
 
 Drop `--text` and the console runs in **audio mode**: it opens the laptop

@@ -518,16 +518,26 @@ export interface RecordLabels {
   detail?: string | null;
 }
 
-/** Everything the Board's table reads. `shape` null = this project's systems offer no such view. */
-export interface BusinessView {
-  tenant: string;
-  project: string;
-  days: number;
+/** One system's table: its own shape, its own column headings, its own words for a state. */
+export interface RecordTable {
   shape: string | null;
   labels: RecordLabels;
   /** Which of the tenant's systems answered, by the name its factory gave it. */
   systems: string[];
   rows: BusinessRecord[];
+}
+
+/** Everything the Board reads. `shape` null = this project's systems offer no such view.
+ *
+ * `views` is one table per system that offers a record view — a shop keeps its orders in
+ * one and its incidents in another — and the flat `shape`/`labels`/`systems`/`rows` are
+ * the first of them, which is what this endpoint has always meant by "the records".
+ */
+export interface BusinessView extends RecordTable {
+  tenant: string;
+  project: string;
+  days: number;
+  views: RecordTable[];
 }
 
 /** The reservations themselves, read off the customer's own system — not off our log. */

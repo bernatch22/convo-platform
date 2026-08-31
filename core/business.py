@@ -17,10 +17,12 @@ always lived: in the BUSINESS system. So this module goes and asks it.
 registry is the one door core is allowed to open onto `tenants/` (it imports
 each in try/except, and `tests/test_core_isolation.py` keeps every other file
 in core honest). From there it is one capability, `LIST_RECORDS`, declared by
-whichever adapter has a view to offer. Nothing here knows what a clinic books
-or a shop ships: the adapter answers with its own shape, its own labels and
-its own state words, and a tenant whose systems have none answers `shape:
-null`, which the console shows as an honest empty rather than a fake agenda.
+EVERY adapter that has a view to offer — a shop keeps its orders in one system
+and its incidents in another, and those are two tables and not a longer one.
+Nothing here knows what a clinic books or a shop ships: each adapter answers
+with its own shape, its own labels and its own state words, and a tenant whose
+systems have none answers `shape: null`, which the console shows as an honest
+empty rather than a fake agenda.
 
 **The join, and what it is for.** Each row's STATE comes from the business
 system, because the business system is the authority on its own records — a
@@ -59,6 +61,11 @@ MAX_ROWS = 1000
 
 ROW_KEYS = ("id", "who", "contact", "when", "handled_by", "state", "tone", "detail", "at")
 
+# What a project whose systems offer no record view answers with. The console reads
+# `shape: null` as "there is no such view here" and says so in words, which is the one
+# honest thing to draw instead of an empty agenda nobody ever had.
+EMPTY: dict[str, Any] = {"shape": None, "labels": {}, "rows": [], "systems": []}
+
 
 async def records(
     tenant: Tenant,
@@ -68,44 +75,65 @@ async def records(
     limit: int = DEFAULT_ROWS,
     now: float | None = None,
 ) -> dict[str, Any]:
-    """One project's business records, each carrying the call that last touched it."""
+    """One project's business records, per system, each carrying the call that last touched it."""
     days = max(1, min(days, MAX_DAYS))
     limit = max(1, min(limit, MAX_ROWS))
-    view = await _ask(tenant)
-    rows = _joined(view["rows"], _by_id(store, tenant.id, project_id, days, now))
+    transactions = _by_id(store, tenant.id, project_id, days, now)
+    views = [
+        {**view, "rows": _ordered(_joined(view["rows"], transactions))[:limit]}
+        for view in await _ask(tenant)
+    ]
+    first = views[0] if views else EMPTY
 
     return {
         "tenant": tenant.id,
         "project": project_id,
         "days": days,
-        "shape": view["shape"],
-        "labels": view["labels"],
-        "systems": view["systems"],
-        "rows": _ordered(rows)[:limit],
+        "shape": first["shape"],
+        "labels": first["labels"],
+        "systems": first["systems"],
+        "rows": first["rows"],
+        "views": views,
     }
 
 
-async def _ask(tenant: Tenant) -> dict[str, Any]:
-    """The first system of this tenant that has a view to offer, or an honest nothing.
+async def _ask(tenant: Tenant) -> list[dict[str, Any]]:
+    """Every system of this tenant that has a view to offer, in the tenant's own order.
+
+    One system used to answer and the rest were never asked, which was right
+    while a business had one kind of record. It stopped being right the moment
+    a shop kept orders in one system and incidents in another: the second view
+    is not a longer table, it is a DIFFERENT table — its own shape, its own
+    column headings, its own words for a state — and merging the two would have
+    meant core deciding which of the business's vocabularies wins. So the read
+    returns them all and the console draws one table each.
+
+    The flat `shape`/`labels`/`rows` of the answer stay the first view. Not
+    politeness towards an old client: it is what the endpoint has always meant
+    by "this project's records", the reason the tenant's factory order is
+    documented as meaning something, and it keeps a one-system tenant's answer
+    byte-for-byte what it was.
 
     Adapters are built the way a session builds them — the tenant's own factory
     — and thrown away when this read is over: a console read must not be able
     to leave anything behind in a customer's system.
     """
-    empty: dict[str, Any] = {"shape": None, "labels": {}, "rows": [], "systems": []}
+    views = []
     for name, adapter in tenant.build_adapters().items():
         if not adapter.supports(LIST_RECORDS):
             continue
         answer = await adapter.execute(LIST_RECORDS, {})
         if not isinstance(answer, dict):
             continue
-        return {
-            "shape": answer.get("shape"),
-            "labels": dict(answer.get("labels") or {}),
-            "rows": [_clean(row) for row in answer.get("rows") or []],
-            "systems": [name],
-        }
-    return empty
+        views.append(
+            {
+                "shape": answer.get("shape"),
+                "labels": dict(answer.get("labels") or {}),
+                "rows": [_clean(row) for row in answer.get("rows") or []],
+                "systems": [name],
+            }
+        )
+    return views
 
 
 def _clean(row: Any) -> dict[str, Any]:
