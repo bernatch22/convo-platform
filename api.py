@@ -26,7 +26,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
 from core import control_plane, pipeline, rooms
-from core.auth import mint_observer, mint_session
+from core.auth import mint_caller, mint_observer, mint_session
 from core.context import Project, Tenant
 from core.contracts import Channel, SessionMeta
 from core.registry import load_registry
@@ -218,6 +218,45 @@ def observe(req: ObserveRequest) -> dict[str, str]:
     appears in the room — the caller is not told anybody joined.
     """
     return mint_observer(req.room)
+
+
+class EvalRoomRequest(BaseModel):
+    """What a ring-2 harness must name to get a room the fleet already answers in."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tenant: str
+    project: str
+    persona: str | None = None
+    identity: str = "deepeval-caller"
+
+
+@app.post("/evals/rooms")
+async def eval_room(req: EvalRoomRequest, store: Reader) -> dict[str, str]:
+    """Mint a room for a synthetic caller: the agent is dispatched before anybody joins.
+
+    → `{"url": str, "room": "eval-<tenant>-<project>-<hex>", "identity": str,
+        "token": "<jwt>"}`
+
+    The eval twin of `POST /token`, and it exists because of one verified
+    limitation: DeepEval's `LiveKitConnector` signs its own join token and can
+    dispatch only by `agent_name`, never with metadata — so a room it opens by
+    itself reaches a worker that cannot tell which tenant is calling. Here the
+    dispatch is made server-side with the same `SessionMeta` JSON `/token`
+    puts inside the JWT, and the ticket returned carries no dispatch of its
+    own: the room already has one, and two would seat two agents.
+
+    Refused with 404 for a tenant or project this deployment cannot route, and
+    with 503 when the LiveKit server cannot be reached — a harness must not
+    read "the SFU is down" as "the agent never answered".
+    """
+    _effective(req.tenant, req.project, store)  # 404s unless the fleet can route it
+    meta = SessionMeta(tenant=req.tenant, project=req.project, channel="voice")
+    try:
+        room = await rooms.create_eval_room(meta, persona=req.persona)
+    except RoomsUnreachable as error:
+        raise HTTPException(503, str(error)) from error
+    return mint_caller(room, tenant=req.tenant, identity=req.identity)
 
 
 @app.get("/pipeline/{tenant}/{project}")

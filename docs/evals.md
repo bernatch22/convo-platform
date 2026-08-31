@@ -26,7 +26,7 @@ consent, grounded facts, register — and share not one sentence of criteria.
 | Ring | What is evaluated | When | Status |
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
-| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: against a real LiveKit room, with personas | offline on demand; live nightly (ms-13) | offline live since ms-6 — §3.9; live planned |
+| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live nightly (ms-13) | offline live since ms-6 — §3.9; live since ms-13 — §3.10 |
 | **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; grounding is blind to tool results — §3.6 |
 
 The metrics are the same in every ring. A ring changes where the conversation
@@ -434,6 +434,56 @@ human's.
   itself) with a different fix. Ring 2's live half against a real room is where
   that gets measured.
 
+### 3.11 Ring 2 live — a synthetic caller who really speaks
+
+- **What it is:** `core/testing/ring2.py:converse(persona, tenant, project,
+  turns)` — the door and the result — over `core/testing/caller.py:Call`, the
+  room mechanics. It asks `POST /evals/rooms` for a room, joins it as an
+  ordinary participant with a published microphone
+  (`core/testing/speaker.py:VirtualMicrophone`), speaks each line with
+  ElevenLabs, reads both sides off `lk.transcription` and hangs up, returning a
+  `Transcript` of DeepEval `Turn`s with audio and latency on each.
+- **Why the room comes from `api.py`.** DeepEval's `LiveKitConnector` signs its
+  own join token and dispatches with `RoomAgentDispatch(agent_name=…)` and **no
+  metadata** (`voice/connectors/providers/livekit.py:179`). A room it opens by
+  itself therefore reaches a worker that cannot tell which tenant is calling.
+  `POST /evals/rooms` makes the dispatch server-side, with the same
+  `SessionMeta` JSON `/token` puts inside the JWT, and hands back a ticket that
+  carries **no** `RoomConfiguration` — a second dispatch would seat two agents
+  in one room, both greeting. This is the reason the endpoint exists.
+- **Both speakers come off one topic.** In a voice session the framework
+  publishes the CALLER's STT transcript under the caller's identity
+  (`room_io.py:145`, `is_delta_stream=False`) and the agent's under its own
+  (`:153`, `is_delta_stream=True`). So the caller's turn carries what the agent
+  **heard**, not what we meant to say — which is the failure this ring exists
+  to catch. The user's interims re-open a stream bearing the same
+  `lk.segment_id`, so a segment's text is the text of the LAST stream with that
+  id; one real turn arrived as 18 streams and one entry.
+- **Latency here is not `e2e_latency`.** The agent publishes `lk.agent.state`,
+  and the moment it turns `speaking` is the moment sound leaves for us.
+  `Turn.latency_ms` is that moment minus the moment the caller stopped talking,
+  so it includes the SFU and the agent's own endpointing. It is measured from
+  the outside and is larger than the framework's `e2e_latency`; the two are
+  never compared. First measured run against the dev compose stack:
+  greeting 6.5 s (cold job: process spawn, prewarm and Anthropic's first call),
+  then 1.67 s / 1.32 s / 1.62 s.
+- **Every turn carries `Audio` with a `start_time`.** The agent's is cut from a
+  live `core.testing.audio.Timeline` — frames written at the wall clock they
+  arrived on, so the silence between two answers is silence nobody sent rather
+  than a splice. The caller's is the samples the microphone actually put on the
+  wire, because no track carries our own voice back to us.
+  `TurnTakingNaturalnessMetric` rebuilds the call from those offsets and scores
+  nothing without them (`metrics/voice/turn_taking.py:18-23`).
+- **Two traps paid for once each.** A livekit-agents plugin asks the job
+  context for its HTTP session and a harness is not a job, so the caller's TTS
+  must be handed its own `aiohttp.ClientSession` or the first `say` dies with
+  "Attempted to use an http session outside of a job context". And two workers
+  registered under the same `FLEET` share every dispatch: run a harness against
+  a private `FLEET` or the job lands in somebody else's process.
+- **How to see it:** three terminals —
+  `docker compose -f infra/compose/dev.yml up`, `uv run uvicorn api:app --port
+  8090`, `python worker.py dev` — then `converse(...)` from a fourth.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
@@ -573,7 +623,7 @@ about four minutes.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6
-  (§3.9), its live half against a LiveKit room with ms-13.
+  (§3.9), its live half against a LiveKit room with ms-13 (§3.10).
 - **`AudioIntegrityMetric` is uncalibrated for conversational turns.** Its
   dropout detector reads normal inter-word pauses as defects, so the score is
   0.0 for any well-formed sentence longer than a phrase (§3.9). We assert the
@@ -584,8 +634,10 @@ about four minutes.
   down a leg with echo. Measuring that needs ring 2's live room.
 - **A `--record` run with a microphone has never been scored.** Everything in
   §3.9 is measured on a recording whose caller channel is silent, so nothing
-  yet exercises overlap, barge-in or the caller's own audio. That needs a human
-  with a microphone (`python worker.py console --record`) or ms-13's room.
+  yet exercises overlap, barge-in or the caller's own audio. §3.10 closes half
+  of it — the caller now really speaks — but `converse` is still half duplex: it
+  waits out its own line and never talks over the agent, so barge-in and
+  overlap remain unmeasured until a persona is allowed to interrupt.
 - **Ring 3 cannot ground facts against tool results.** The log stores the shape
   of a result, never its contents, so `grounded_facts_dag` on a replayed
   session escalates every datum that came off the agenda and scores it 0.0 on
