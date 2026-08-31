@@ -56,9 +56,13 @@
           <p><strong>El gate de calidad es la evaluación</strong>: la batería conversacional en
           integración continua, y la nocturna vigilando lo desplegado. Sin GPU en todo el
           sistema.</p>
-          <p><strong>Escalar tiene disparadores, no adjetivos</strong>: concurrencia al límite →
-          segundo nodo de workers (sin estado, el dispatch ya reparte) · segundo escritor →
-          Postgres · otra región → servidor de medios federado.</p>
+          <p><strong>Concurrencia probada contra este nodo</strong> (llamadas reales simultáneas):
+          con 1 y con 4 a la vez — el tamaño del pool precalentado — completa el 100%, con la
+          respuesta en 3,8 s de mediana bajo carga (2,25 s en solitario); con 8, dos de ocho
+          esperan proceso. El techo está medido, no estimado.</p>
+          <p><strong>Escalar tiene disparadores, no adjetivos</strong>: concurrencia sobre el
+          techo medido → segundo nodo de workers (sin estado, el dispatch ya reparte) ·
+          segundo escritor → Postgres · otra región → servidor de medios federado.</p>
         </div>
       </div>
 
