@@ -30,7 +30,9 @@
           <p><strong>Desplegar es un comando</strong>, idéntico e idempotente; la configuración de
           los negocios no se toca al desplegar — es estado vivo, no artefacto.</p>
           <p><strong>El gate de calidad es la evaluación</strong>: la batería de conversaciones
-          corre en integración continua y la nocturna vigila lo desplegado.</p>
+          corre en integración continua y la nocturna vigila lo desplegado. El rollback es
+          redeclarar la versión anterior — el despliegue es idempotente y la configuración
+          de negocio no viaja con él.</p>
         </div>
         <p class="f15-sec f15-gap">Escalado — el disparador es un hecho, no un adjetivo</p>
         <table class="f15-tbl">
@@ -59,6 +61,8 @@
           <tr><td><strong>Generación anticipada apagada</strong> — se midió: con fin-de-turno semántico en ~0,4 s, especular no ocultaba latencia y solo gastaba llamadas al modelo</td></tr>
           <tr><td><strong>Base embebida antes que Postgres</strong> — un solo escritor hoy; migrar antes de necesitarlo sería ceremonia, y el disparador está escrito</td></tr>
           <tr><td><strong>Grabación en el propio worker</strong> — cero latencia añadida y simplicidad, a cambio de no captar la voz del supervisor en toma de línea; documentado, con la alternativa nombrada</td></tr>
+          <tr><td><strong>LiveKit antes que stack propio de medios</strong> — SIP, WebRTC, aislamiento por llamada y tokens firmados resueltos desde el día uno; se asume la dependencia del servidor de medios, y la migración futura es un coste conocido</td></tr>
+          <tr><td><strong>Motor conversacional propio</strong> — un motor SaaS dejaría la autorización y la auditoría fuera del bucle; el control transaccional exige poseerlo</td></tr>
           <tr><td><strong>Modelo económico por defecto</strong> — Haiku con caché de prompt; el premium se decide por la matriz de evaluación, no por marketing</td></tr>
         </table>
       </div>
