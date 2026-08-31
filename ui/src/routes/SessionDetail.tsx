@@ -14,6 +14,7 @@ import { EventRow } from "../components/EventRow";
 import { LatencyStrip } from "../components/LatencyStrip";
 import { ScoreBreakdown } from "../components/ScoreBreakdown";
 import { getSession, recordingUrl, type SessionView } from "../lib/api";
+import { sectionPath } from "../lib/nav";
 import {
   authorisedBy,
   consentLinks,
@@ -30,6 +31,7 @@ import {
 
 interface DetailData {
   tenant: string;
+  project: string;
   id: string;
   view: SessionView | null;
   error: string | null;
@@ -38,21 +40,23 @@ interface DetailData {
 /** Load one session in full — the row, the report and every event in seq order. */
 export async function sessionDetailLoader({ params }: LoaderFunctionArgs): Promise<DetailData> {
   const tenant = params["tenant"] ?? "";
+  const project = params["project"] ?? "";
   const id = params["id"] ?? "";
   try {
-    return { tenant, id, view: await getSession(id), error: null };
+    return { tenant, project, id, view: await getSession(id), error: null };
   } catch (cause) {
-    return { tenant, id, view: null, error: cause instanceof Error ? cause.message : String(cause) };
+    const error = cause instanceof Error ? cause.message : String(cause);
+    return { tenant, project, id, view: null, error };
   }
 }
 
 export function SessionDetail() {
-  const { tenant, id, view, error } = useLoaderData() as DetailData;
+  const { tenant, project, id, view, error } = useLoaderData() as DetailData;
 
   if (!view) {
     return (
       <div className="page">
-        <Head tenant={tenant} id={id} />
+        <Head tenant={tenant} project={project} id={id} />
         <section className="section">
           <EmptyState title="That session did not load" command={`curl -s localhost:8090/sessions/${id}`}>
             <p>
@@ -71,7 +75,7 @@ export function SessionDetail() {
 
   return (
     <div className="page page--wide">
-      <Head tenant={tenant} id={id} />
+      <Head tenant={tenant} project={project} id={id} />
 
       <section className="section">
         <div className="facts">
@@ -210,11 +214,13 @@ export function SessionDetail() {
 }
 
 /** The page's title strip: where you are, and which session you are reading. */
-function Head({ tenant, id }: { tenant: string; id: string }) {
+function Head({ tenant, project, id }: { tenant: string; project: string; id: string }) {
   return (
     <header className="page__head">
       <div className="page__eyebrow">
-        <Link to={`/t/${tenant}/sessions`}>{tenant} / sessions</Link>
+        <Link to={sectionPath(tenant, project, "sessions")}>
+          {tenant} / {project} / sessions
+        </Link>
       </div>
       <h1 className="page__title page__title--mono">{id}</h1>
     </header>

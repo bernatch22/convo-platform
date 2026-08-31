@@ -39,6 +39,7 @@ from core.auth import (
 )
 from core.context import Project, Tenant
 from core.contracts import Channel, SessionMeta
+from core.evals import goldens as eval_goldens_view
 from core.evals import runner as runner_module
 from core.evals import runs as eval_runs_view
 from core.evals import suites as eval_suites
@@ -681,6 +682,34 @@ def eval_suites_declared() -> list[dict[str, Any]]:
         for tenant in load_registry().values()
         for project in tenant.projects.values()
     ]
+
+
+@app.get("/evals/goldens/{tenant}/{project}")
+def eval_goldens(tenant: str, project: str) -> dict[str, Any]:
+    """What each of a project's suites actually asks of the agent, so it is readable on screen.
+
+    → `{"tenant", "project", "suites": [{"suite", "target", "dataset",
+         "kind": "turn"|"call"|"code", "count": int|null, "goldens": [...]}]}`
+
+    A `turn` golden is `{"input", "turn", "expected_behaviour", "expected_tools"}`
+    — one line of a caller and what must come back. A `call` golden is
+    `{"name", "persona", "objective", "turns", "policies", "max_turns"}` — a
+    whole conversation and the hard policies that must survive it. A `code`
+    suite writes its cases in python instead of JSON: `count` is null and
+    `target` says where to read them.
+
+    `suite` is the same id a run carries, so the console can put a suite's
+    goldens next to its runs. Read-only on purpose: goldens are edited in git,
+    where a reviewer sees the change.
+
+    → 404 when nothing on disk answers to that tenant and project. The files are
+    READ, never imported: no tenant module enters this process because somebody
+    asked what a project evaluates.
+    """
+    try:
+        return eval_goldens_view.datasets(tenant, project)
+    except eval_goldens_view.UnknownProject as error:
+        raise HTTPException(404, str(error)) from error
 
 
 @app.get("/evals/runs")

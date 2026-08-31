@@ -24,6 +24,7 @@ import { LiveCalls } from "../components/LiveCalls";
 import { Timeline } from "../components/Timeline";
 import { Transcript } from "../components/Transcript";
 import type { LiveCall } from "../lib/api";
+import { sectionPath } from "../lib/nav";
 import { useRoom, type Live, type Mode } from "../lib/useRoom";
 import { useTimeline } from "../lib/useTimeline";
 
@@ -46,15 +47,14 @@ export function Talk() {
   return (
     <div className="page page--wide">
       <header className="page__head">
-        <div className="page__eyebrow">{tenant}</div>
+        <div className="page__eyebrow">
+          {tenant} / {project}
+        </div>
         <h1 className="page__title">{known?.name ?? project}</h1>
         <p className="page__lede">
           One runtime, three ways in — the microphone in this tab, a text session with no audio at
           all, or the SIP trunk, if this project has a number of its own (
-          <Link
-            className="accent"
-            to={`/t/${tenant}/pipeline?project=${encodeURIComponent(project)}`}
-          >
+          <Link className="accent" to={sectionPath(tenant, project, "pipeline")}>
             Pipeline
           </Link>{" "}
           names it, or says there is none). The transcript and the log below do not know which one
@@ -71,7 +71,7 @@ export function Talk() {
             {live.mode === "chat" && <Composer live={live} />}
             {live.error && <p className="note note--warn">{live.error}</p>}
           </div>
-          <Timeline log={log} tenant={tenant} />
+          <Timeline log={log} tenant={tenant} project={project} />
         </div>
       </section>
 

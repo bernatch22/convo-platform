@@ -357,6 +357,45 @@ export interface ProjectSuites {
   suites: string[];
 }
 
+/** One ring-1 case: the caller's line, the behaviour expected back, the tools that must run. */
+export interface TurnGolden {
+  input: string;
+  turn: string | null;
+  expected_behaviour: string;
+  expected_tools: string[];
+}
+
+/** One ring-2 case: who calls, what they want, and the hard policies the call must survive. */
+export interface CallGolden {
+  name: string;
+  persona: string;
+  objective: string;
+  turns: string[];
+  policies: string[];
+  max_turns: number | null;
+}
+
+/** Where a suite's cases come from: JSON on disk (`turn`, `call`) or python (`code`). */
+export type GoldenKind = "turn" | "call" | "code";
+
+/** One suite and everything it asks: the dataset it reads and every case in it. */
+export interface SuiteGoldens {
+  suite: string;
+  target: string;
+  dataset: string | null;
+  kind: GoldenKind;
+  /** How many cases a run of this suite scores; null when they are written in code. */
+  count: number | null;
+  goldens: Array<TurnGolden | CallGolden>;
+}
+
+/** Every suite of one project, with the goldens it runs — the Datasets view's only source. */
+export interface ProjectGoldens {
+  tenant: string;
+  project: string;
+  suites: SuiteGoldens[];
+}
+
 /** What the console must name before the box spends minutes of paid LLM traffic. */
 export interface EvalRunRequest {
   tenant: string;
@@ -513,6 +552,16 @@ export async function probe(signal?: AbortSignal): Promise<{ up: boolean; ms: nu
 /** Every routable project and the eval suites it declares — the Run buttons' only source. */
 export async function listEvalSuites(signal?: AbortSignal): Promise<ProjectSuites[]> {
   return request<ProjectSuites[]>("/evals/suites", signal ? { signal } : {});
+}
+
+/** What one project's suites actually ask of the agent, read off disk. Throws ApiError(404). */
+export async function getProjectGoldens(
+  tenant: string,
+  project: string,
+  signal?: AbortSignal,
+): Promise<ProjectGoldens> {
+  const path = `/evals/goldens/${encodeURIComponent(tenant)}/${encodeURIComponent(project)}`;
+  return request<ProjectGoldens>(path, signal ? { signal } : {});
 }
 
 /** Stored eval runs, newest first, each already diffed against the previous run of its suite. */

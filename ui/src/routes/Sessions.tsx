@@ -1,4 +1,4 @@
-/* Sessions — every conversation one tenant has had, newest first, in one dense table.
+/* Sessions — every conversation one project has had, newest first, in one dense table.
  *
  * The table is the whole screen on purpose: eight columns an operator scans
  * down, no cards, no charts. A row is a link into the log that produced it.
@@ -9,37 +9,43 @@ import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
 import { EmptyState } from "../components/EmptyState";
 import { ScoreChip } from "../components/ScoreChip";
 import { listSessions, type SessionLine } from "../lib/api";
+import { sectionPath } from "../lib/nav";
 import { euros, mediumOf, startedAt } from "../lib/sessions";
 
 const LIMIT = 200;
 
 interface SessionsData {
   tenant: string;
+  project: string;
   rows: SessionLine[];
   error: string | null;
 }
 
-/** Load one tenant's call log; a dead control plane leaves the screen empty, not broken. */
+/** Load one project's call log; a dead control plane leaves the screen empty, not broken. */
 export async function sessionsLoader({ params }: LoaderFunctionArgs): Promise<SessionsData> {
   const tenant = params["tenant"] ?? "";
+  const project = params["project"] ?? "";
   try {
-    return { tenant, rows: await listSessions({ tenant, limit: LIMIT }), error: null };
+    const rows = await listSessions({ tenant, project, limit: LIMIT });
+    return { tenant, project, rows, error: null };
   } catch (cause) {
     const error = cause instanceof Error ? cause.message : String(cause);
-    return { tenant, rows: [], error };
+    return { tenant, project, rows: [], error };
   }
 }
 
 export function Sessions() {
-  const { tenant, rows, error } = useLoaderData() as SessionsData;
+  const { tenant, project, rows, error } = useLoaderData() as SessionsData;
 
   return (
     <div className="page page--wide">
       <header className="page__head">
-        <div className="page__eyebrow">{tenant}</div>
+        <div className="page__eyebrow">
+          {tenant} / {project}
+        </div>
         <h1 className="page__title">Sessions</h1>
         <p className="page__lede">
-          Every conversation this tenant has had, newest first — phone calls included. A row opens
+          Every conversation this project has had, newest first — phone calls included. A row opens
           the session&apos;s append-only log: one line per fact, numbered by{" "}
           <code className="mono">seq</code>, with the per-turn STT / LLM / TTS breakdown and the
           consent proof beside it. The <strong>score</strong> column is the call judging itself:
@@ -67,7 +73,7 @@ export function Sessions() {
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <Row key={row.id} tenant={tenant} row={row} />
+                  <Row key={row.id} tenant={tenant} project={project} row={row} />
                 ))}
               </tbody>
             </table>
@@ -84,7 +90,7 @@ export function Sessions() {
           <EmptyState
             title={error ? "The control plane did not answer" : "No sessions recorded yet"}
             milestone="ms-9"
-            command={`curl -s 'localhost:8090/sessions?tenant=${tenant}&limit=20'`}
+            command={`curl -s 'localhost:8090/sessions?tenant=${tenant}&project=${project}&limit=20'`}
           >
             <p>
               {error ? (
@@ -109,14 +115,14 @@ export function Sessions() {
 }
 
 /** One call: identity, medium, envelope, and the two numbers that price it. */
-function Row({ tenant, row }: { tenant: string; row: SessionLine }) {
+function Row({ tenant, project, row }: { tenant: string; project: string; row: SessionLine }) {
   const medium = mediumOf(row);
   const live = row.ended_at === null;
 
   return (
     <tr>
       <td className="id">
-        <Link to={`/t/${tenant}/sessions/${row.id}`} className="link">
+        <Link to={`${sectionPath(tenant, project, "sessions")}/${row.id}`} className="link">
           {row.id}
         </Link>
       </td>
