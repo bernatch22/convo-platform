@@ -167,3 +167,125 @@
 .ev__scores td {
   vertical-align: middle;
 }
+
+/* ── the datasets: what every suite actually asks ────────────────────────── */
+/* The project tabs sit under the view tabs, so they carry no second hairline. */
+
+.ev__scope {
+  margin-top: 0;
+  border-bottom: none;
+}
+
+.ds {
+  display: grid;
+  gap: var(--s6);
+}
+
+.ds__projectName {
+  margin: 0 0 var(--s4);
+  font-family: var(--font-mono);
+  font-size: var(--text-md);
+  font-weight: 400;
+}
+
+.ds__suite {
+  margin-bottom: var(--s5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.ds__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+
+.ds__suiteName {
+  color: var(--accent);
+  font-size: var(--text-md);
+}
+
+.ds__count {
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+}
+
+.ds__target {
+  margin-left: auto;
+  font-size: var(--text-xs);
+}
+
+.ds__suite .note {
+  padding: var(--s3) var(--s4);
+}
+
+/* One case per row, numbered: the list IS the dataset, in file order. */
+
+.ds__cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: golden;
+}
+
+.ds__card {
+  padding: var(--s4);
+  counter-increment: golden;
+}
+
+.ds__card + .ds__card {
+  border-top: 1px solid var(--line);
+}
+
+.ds__card::before {
+  content: counter(golden);
+  float: right;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* What the caller says is quoted; what must come back is plain ink. */
+
+.ds__said {
+  margin: 0;
+  padding-left: var(--s3);
+  border-left: 2px solid var(--line-strong);
+  color: var(--text);
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+
+.ds__expect {
+  margin: var(--s2) 0 0;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+}
+
+.ds__name {
+  margin: 0 0 var(--s2);
+  color: var(--text);
+  font-size: var(--text-sm);
+}
+
+.ds__turns {
+  margin: var(--s3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s2);
+  list-style: none;
+}
+
+/* A policy is the one thing on a card that can fail the whole call. */
+
+.ds__policy {
+  border-color: var(--line-strong);
+}
+
+.ds__policy .chip__val {
+  color: var(--accent);
+}
