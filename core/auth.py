@@ -159,7 +159,7 @@ def mint_supervisor(
         .to_jwt()
     )
     return {
-        "url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
+        "url": public_url(),
         "room": room,
         "identity": identity,
         "capability": capability,
