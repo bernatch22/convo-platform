@@ -37,6 +37,7 @@ select = ["E", "F", "I", "UP", "B"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
+    "voice: needs the real STT/TTS keys (never run in the unit ring)",
     "unit: fast tests with no external services",
     "evals: tests that call an LLM judge (need provider keys)",
     "voice: tests that build STT/TTS sessions (keys kept in the unit ring)",

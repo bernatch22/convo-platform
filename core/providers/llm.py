@@ -13,6 +13,16 @@ measured; a PUT naming anything else is a 422 that lists these two, and a
 project whose git names something else falls back to the default rather than
 opening a connection nobody costed.
 
+Being on the list is half of it: the box also has to carry the vendor's key.
+`KEY_ENV` names where each family's key lives, `runnable` asks whether this
+host has it, and `llm_model` treats a missing one as unusable config — the
+same fall-back-to-the-default rule the allow-list already had. It is written
+down because the absence cost us a morning: on 2026-08-31 the console stored
+`llm_model=gpt-5.4-mini` on a box with no `OPENAI_API_KEY` and every job died
+with a `KeyError` here until somebody read a worker log. The control plane now
+refuses that override at the door (`core.pipeline.overridable`) AND the worker
+survives one already stored. Only the variable NAME is ever printed.
+
 The two families do not cache the same way and the difference is not cosmetic:
 
 - Anthropic caching is EXPLICIT (`caching="ephemeral"`) and Haiku 4.5 only
@@ -33,6 +43,7 @@ family needs a `sanitize_tool_pairing` call of our own, and adding one on the
 openai path would duplicate work the framework already did.
 """
 
+import logging
 import os
 
 import anthropic as anthropic_sdk
@@ -40,12 +51,18 @@ from livekit.plugins import anthropic, openai
 
 from core.context import Project, Tenant
 
+log = logging.getLogger("platform.llm")
+
 HAIKU = "claude-haiku-4-5"
 GPT_MINI = "gpt-5.4-mini"
 DEFAULT_MODEL = HAIKU
 
 # Exactly what the platform will run: each of these is priced and measured.
 ALLOWED_MODELS = (HAIKU, GPT_MINI)
+
+# Where each family's key lives on the box. The NAME travels — into a refusal,
+# into a warning, into the console; the VALUE never leaves this module.
+KEY_ENV = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY"}
 
 MAX_TOKENS = 300
 
@@ -56,20 +73,45 @@ CACHE_FLOOR = {"anthropic": 4096, "openai": 1024}
 def llm_for(tenant: Tenant, project: Project):
     """The project's model, built by its family: Claude with caching, or GPT-5.4-mini."""
     model = llm_model(project)
+    _warn_if_swapped(project, model)
+    if not runnable(model):
+        raise RuntimeError(f"{model} needs {key_env(model)} and this host carries none")
     if family(model) == "openai":
         return _openai(tenant, project, model)
     return _anthropic(model)
 
 
 def llm_model(project: Project) -> str:
-    """The project's model, unless it names one the platform will not run."""
+    """The model the next session on THIS host will really build.
+
+    Two things stand between the project's choice and the connection. The
+    allow-list is the first: a model nobody priced is never opened, however git
+    names it. The host is the second, and it is the one that used to end calls
+    rather than start them — an override stored from a console can name a
+    vendor whose key this box does not carry, and taking it as gospel meant a
+    `KeyError` in the middle of every job. Unusable config falls back to the
+    default here exactly as it always has; a key the box lacks is unusable
+    config, not an emergency.
+    """
     wanted = project.llm_model or DEFAULT_MODEL
-    return wanted if wanted in ALLOWED_MODELS else DEFAULT_MODEL
+    if wanted not in ALLOWED_MODELS:
+        return DEFAULT_MODEL
+    return wanted if runnable(wanted) else DEFAULT_MODEL
 
 
 def family(model: str) -> str:
     """Which vendor a model id belongs to — the name says it, no lookup table needed."""
     return "openai" if model.startswith("gpt-") else "anthropic"
+
+
+def key_env(model: str) -> str:
+    """The environment variable this model's vendor key must live in on the box."""
+    return KEY_ENV[family(model)]
+
+
+def runnable(model: str) -> bool:
+    """Whether this host carries the key this model needs — the name, never the value."""
+    return bool(os.getenv(key_env(model)))
 
 
 def _anthropic(model: str):
@@ -78,7 +120,7 @@ def _anthropic(model: str):
         model=model,
         caching="ephemeral",
         max_tokens=MAX_TOKENS,
-        api_key=os.environ["ANTHROPIC_API_KEY"],
+        api_key=os.environ[KEY_ENV["anthropic"]],
         client=_anthropic_client(),
     )
 
@@ -93,9 +135,27 @@ def _openai(tenant: Tenant, project: Project, model: str):
     """
     return openai.LLM(
         model=model,
-        api_key=os.environ["OPENAI_API_KEY"],
+        api_key=os.environ[KEY_ENV["openai"]],
         max_completion_tokens=MAX_TOKENS,
         prompt_cache_key=f"{tenant.id}/{project.id}",
+    )
+
+
+def _warn_if_swapped(project: Project, model: str) -> None:
+    """One line per built session when a priced model was swapped for want of a key.
+
+    Only the keyless case earns a line: a model outside the allow-list is a
+    deploy-time mistake the console already shows, while a key absent from THIS
+    box is an operational fact nobody can see from there.
+    """
+    wanted = project.llm_model or DEFAULT_MODEL
+    if wanted == model or wanted not in ALLOWED_MODELS:
+        return
+    log.warning(
+        "llm: %s needs %s and this host carries none; running %s instead",
+        wanted,
+        key_env(wanted),
+        model,
     )
 
 
@@ -105,6 +165,6 @@ def _anthropic_client() -> anthropic_sdk.AsyncClient | None:
     if not workspace:
         return None
     return anthropic_sdk.AsyncClient(
-        api_key=os.environ["ANTHROPIC_API_KEY"],
+        api_key=os.environ[KEY_ENV["anthropic"]],
         default_headers={"anthropic-workspace-id": workspace},
     )

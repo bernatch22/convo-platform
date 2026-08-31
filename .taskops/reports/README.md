@@ -19,8 +19,10 @@ sheets) live under `tmp/reports/` and are not versioned.
 | ms-4 event log — append-only with seq, session report, `convo sessions` CLI | landed | [ms-4.md](ms-4.md) |
 | ms-5 tenants — one worker, two businesses | landed | [ms-5.md](ms-5.md) |
 | ms-6 local voice — talk to the agent with your microphone | landed | [ms-6.md](ms-6.md) |
-| ms-7 evals ring 1 complete — DeepEval suites per project in CI | deferred to the end | — |
+| ms-7 evals ring 1 complete — judgment became cheap, then it caught things | landed | [ms-7.md](ms-7.md) |
 | ms-8 LiveKit server locally — rooms, tokens, dispatch by metadata | landed | [ms-8.md](ms-8.md) |
+| ms-10 box core on GCP — the platform answers from the cloud | landed | [ms-10.md](ms-10.md) |
 | ms-11 telephone — a real number answered by the platform | landed | [ms-11.md](ms-11.md) |
+| ms-14 the console — audited, the voice bug named, evals on screen | landed | [ms-14.md](ms-14.md) |
 | ms-9 the console — three channels on screen, the pipeline governable | landed | [ms-9.md](ms-9.md) |
 | ms-15 the supervisor — authority is a signature, the model is the last skeptic | landed | [ms-15.md](ms-15.md) |

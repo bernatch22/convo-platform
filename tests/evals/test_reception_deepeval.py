@@ -1,6 +1,6 @@
 """DeepEval ring 1 for the reception prompt: does every reply keep the line, and hold up?
 
-Two metrics over every golden of the project, from one conversation, because a
+Three metrics over every golden of the project, from one conversation, because a
 headless turn against real Haiku is the expensive part:
 
 - `grounded_facts_dag`, first, because it is deterministic and free in the
@@ -8,6 +8,11 @@ headless turn against real Haiku is the expensive part:
   what the agent said and matches it against the clinic's sheet, what the
   caller said and what the tools returned. A judge is paid only for what is
   left over, and only ever sees that claim next to the evidence.
+- `keeps_the_register`, on the same whole-call case and also free: a word scan
+  for tú-forms, because the clinic addresses patients as usted and the one
+  slip ms-3 found («¿cuál te viene mejor?») appeared in a golden run, not in a
+  simulation. Scored here it is a regression test on every golden of the
+  project rather than on the five simulated calls alone.
 - `reception_line`, the GEval, on tone, register, length and remit. It used to
   own the invention rule as well and flipped the price golden between 0.0 and
   0.9 across runs; the rule moved to the DAG and the criterion lost the clause.
@@ -57,6 +62,6 @@ async def test_reception_keeps_its_line(golden: dict) -> None:
     grounded = bridge.conversational_test_case_for(
         conversation, descriptions, scenario=golden["expected_behaviour"], name=golden["input"]
     )
-    assert_test(grounded, [metrics.grounded_facts_dag()])
+    assert_test(grounded, [metrics.grounded_facts_dag(), metrics.keeps_the_register()])
     line = bridge.test_case_for(golden, conversation, descriptions)
     assert_test(line, [metrics.reception_line()])

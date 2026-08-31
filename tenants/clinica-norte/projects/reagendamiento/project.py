@@ -9,6 +9,13 @@ The catalog below is the whole of what this project may call. It is data the
 platform reads before every call, not documentation: a tool missing from here
 cannot run, however convincingly the model asks for it, and the side effect
 declared on each spec is what decides whether a caller has to say yes first.
+
+Every spec here also declares a `result_summary` (ms-7): the one line of a
+result the session log is allowed to keep, rendered by the adapter that
+produced it and masked by the platform before it is written. Reading a
+rescheduling call back months later — or scoring it with the grounding metric —
+is the difference between "the agent said nine o'clock" and "the agenda offered
+nine o'clock and the agent said it".
 """
 
 from dataclasses import dataclass
@@ -18,13 +25,26 @@ from core.tools.catalog import ToolCatalog, platform_specs
 from core.tools.contract import SideEffect, ToolSpec
 from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
+from ...adapters.agenda import summarise_availability, summarise_change, summarise_patient
+from ...adapters.sms import summarise_message
 from . import knowledge
 
+# The platform's own `find_availability` spec, re-declared with the one clause only a
+# clinic can write: what a free slot may say in the log. The renderer lives next to the
+# adapter that produces the rows, so a customer swapping FakeAgenda for their real agenda
+# changes the shape and its summary in the same file.
+FIND_AVAILABILITY = ToolSpec(
+    name="find_availability",
+    side_effect=SideEffect.READ,
+    timeout_s=5.0,
+    result_summary=summarise_availability,
+)
 FIND_PATIENT = ToolSpec(
     name="find_patient",
     side_effect=SideEffect.READ,
     pii_scope=frozenset({"phone", "name"}),
     timeout_s=5.0,
+    result_summary=summarise_patient,
 )
 CANCEL_SLOT = ToolSpec(
     name="cancel_slot",
@@ -32,6 +52,7 @@ CANCEL_SLOT = ToolSpec(
     idempotency_key="appointment_id",
     compensation="rebook_slot",
     timeout_s=5.0,
+    result_summary=summarise_change,
 )
 BOOK_SLOT = ToolSpec(
     name="book_slot",
@@ -40,6 +61,7 @@ BOOK_SLOT = ToolSpec(
     pii_scope=frozenset({"phone", "patient"}),
     compensation="cancel_slot",
     timeout_s=8.0,
+    result_summary=summarise_change,
 )
 # The undo of a cancel is a write, never an irreversible: the platform is putting
 # things back the way the patient left them, and asking for a second yes to do
@@ -49,12 +71,14 @@ REBOOK_SLOT = ToolSpec(
     side_effect=SideEffect.WRITE,
     idempotency_key="appointment_id",
     timeout_s=5.0,
+    result_summary=summarise_change,
 )
 SEND_SMS = ToolSpec(
     name="send_sms",
     side_effect=SideEffect.WRITE,
     pii_scope=frozenset({"phone"}),
     timeout_s=5.0,
+    result_summary=summarise_message,
 )
 
 # When a tool call cannot produce a result the model still has to say something,
@@ -94,7 +118,9 @@ PROJECT = ReagendamientoProject(
     voice="UOIqAnmS11Reiei1Ytkc",  # ElevenLabs "Carolina - Spanish woman - es_ES" (used from ms-6)
     tts_model="eleven_flash_v2_5",  # latency profile: ~100ms ttfb vs ~700ms measured on v3 (PSTN)
     tools=platform_specs().merge(
-        ToolCatalog.of(FIND_PATIENT, CANCEL_SLOT, BOOK_SLOT, REBOOK_SLOT, SEND_SMS)
+        ToolCatalog.of(
+            FIND_AVAILABILITY, FIND_PATIENT, CANCEL_SLOT, BOOK_SLOT, REBOOK_SLOT, SEND_SMS
+        )
     ),
     messages=MESSAGES,
     knowledge_seed=knowledge.CLINIC,

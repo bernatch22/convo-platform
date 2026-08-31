@@ -249,6 +249,62 @@ export interface PipelineUpdate {
   llm_model?: string;
 }
 
+/* ── /evals ───────────────────────────────────────────────────────────────── */
+
+/** One metric's verdict over a whole run, and what it gained or lost since the last one. */
+export interface MetricScore {
+  metric: string;
+  /** Mean over the run's cases, 0..1. */
+  score: number;
+  passed: number;
+  failed: number;
+  /** This score minus the previous run's of the same suite; null when there was no previous. */
+  delta: number | null;
+}
+
+export type EvalStatus = "running" | "done" | "failed";
+
+/** One `deepeval` run of one project's suite: what it scored and where its evidence is. */
+export interface EvalRun {
+  id: string;
+  tenant: string;
+  project: string;
+  suite: string;
+  status: EvalStatus;
+  started_at: number;
+  finished_at: number | null;
+  git_sha: string | null;
+  milestone: string | null;
+  report_html: string | null;
+  log_path: string | null;
+  detail: string | null;
+  metrics: MetricScore[];
+  /** The run this one is diffed against, or null when it is the first of its suite. */
+  previous: string | null;
+}
+
+/** A run being polled: the same line, plus the tail of what the subprocess is writing. */
+export interface EvalRunStatus extends EvalRun {
+  log: string[];
+  /** Is the box still holding its single eval slot? */
+  busy: boolean;
+}
+
+/** What one project can be asked to run. The suite ids are the project's own data. */
+export interface ProjectSuites {
+  tenant: string;
+  project: string;
+  name: string;
+  suites: string[];
+}
+
+/** What the console must name before the box spends minutes of paid LLM traffic. */
+export interface EvalRunRequest {
+  tenant: string;
+  project: string;
+  suite: string;
+}
+
 /* ── errors ───────────────────────────────────────────────────────────────── */
 
 /** A control-plane refusal with the status and the sentence the API gave, for the UI to show. */
@@ -383,6 +439,29 @@ export async function probe(signal?: AbortSignal): Promise<{ up: boolean; ms: nu
   } catch {
     return { up: false, ms: Math.round(performance.now() - started) };
   }
+}
+
+/** Every routable project and the eval suites it declares — the Run buttons' only source. */
+export async function listEvalSuites(signal?: AbortSignal): Promise<ProjectSuites[]> {
+  return request<ProjectSuites[]>("/evals/suites", signal ? { signal } : {});
+}
+
+/** Stored eval runs, newest first, each already diffed against the previous run of its suite. */
+export async function listEvalRuns(
+  params: { tenant?: string; project?: string; suite?: string; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<EvalRun[]> {
+  return request<EvalRun[]>(`/evals/runs${query(params)}`, signal ? { signal } : {});
+}
+
+/** Spend money: run one project's suite on the box. Throws ApiError(409) while one is going. */
+export async function launchEvalRun(req: EvalRunRequest): Promise<EvalRun> {
+  return request<EvalRun>("/evals/run", json("POST", req));
+}
+
+/** One run's standing while it happens, with the tail of its log. */
+export async function getEvalRun(id: string, signal?: AbortSignal): Promise<EvalRunStatus> {
+  return request<EvalRunStatus>(`/evals/run/${encodeURIComponent(id)}`, signal ? { signal } : {});
 }
 
 function pipelinePath(tenant: string, project: string): string {

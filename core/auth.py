@@ -64,6 +64,17 @@ _SUPERVISOR_GRANTS: dict[str, dict[str, bool]] = {
 }
 
 
+def public_url() -> str:
+    """The LiveKit URL a BROWSER connects to — public and TLS behind Caddy.
+
+    The worker joins over `LIVEKIT_URL` (loopback on the box, `ws://127.0.0.1:7880`);
+    a browser cannot use that, so a session token carries `LIVEKIT_PUBLIC_URL`
+    (`wss://lk.bernardocastro.dev`) when set, and falls back to `LIVEKIT_URL`
+    for the laptop stack where the two are the same.
+    """
+    return os.getenv("LIVEKIT_PUBLIC_URL") or os.getenv("LIVEKIT_URL", "ws://localhost:7880")
+
+
 def mint_session(meta: SessionMeta, user_id: str = "anonymous") -> dict[str, str]:
     """Mint {url, room, token} for one session: a fresh room, joinable by exactly this caller."""
     room = f"{meta.tenant}-{meta.project}-{uuid.uuid4().hex[:8]}"
@@ -77,7 +88,7 @@ def mint_session(meta: SessionMeta, user_id: str = "anonymous") -> dict[str, str
         .with_room_config(api.RoomConfiguration(agents=[dispatch]))
         .to_jwt()
     )
-    return {"url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"), "room": room, "token": token}
+    return {"url": public_url(), "room": room, "token": token}
 
 
 def mint_observer(room: str) -> dict[str, str]:
@@ -108,7 +119,7 @@ def mint_observer(room: str) -> dict[str, str]:
         .to_jwt()
     )
     return {
-        "url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
+        "url": public_url(),
         "room": room,
         "identity": identity,
         "token": token,

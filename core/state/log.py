@@ -10,7 +10,10 @@ live ≡ stored, append-only, never edited).
 Kinds are plain dotted strings so a reader needs no enum to grep a log:
   session.start · session.end            the envelope (outcome, cost)
   stage.enter · stage.handoff             the process moving on
-  tool.call · tool.result · tool.error · tool.refused   masked args, never payloads
+  tool.call · tool.result · tool.error · tool.refused   masked args, never payloads —
+                                        `tool.result` may carry the one-line `summary` its
+                                        ToolSpec's `result_summary` rendered, masked like
+                                        everything else that passes through `record`
   confirm.request · confirm.granted · confirm.declined  the caller's yes or no
   saga.fail · saga.compensated            what was undone, last first
   turn.user · turn.agent                  text + metrics (ttft, e2e) from the framework
