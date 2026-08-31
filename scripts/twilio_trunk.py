@@ -14,6 +14,12 @@ what is missing, so a second run prints the same ids and changes nothing.
                                          `hide_inbound_port: true` drops the rest
              SIPDispatchRule             individual room `call-…`, agent `cc`
 
+It also REPORTS the trunk's `transfer_mode` / `transfer_caller_id` — the two
+properties that decide whether a cold transfer's SIP REFER is carried — and
+prints the exact command to change them. It never changes them itself: that is
+a human's call, with a billing consequence, and this repo does not mutate a
+trunk's call settings after the fraud incident that wrote that rule.
+
 The rule names **no tenant**: which business answers is `store.route(fleet,
 number)`, wired with `python -m convo routes add` — a phone number is a route,
 never a project. Two tenants on one trunk differ by one row in a table.
@@ -98,6 +104,7 @@ def twilio_trunk(twilio: "Twilio", args: argparse.Namespace) -> str | None:
         trunk = twilio.post(f"{TRUNKING_API}/Trunks", {"FriendlyName": args.trunk_name})
     sid = trunk["sid"]
     print(f"trunk    {sid}  {trunk['friendly_name']}")
+    report_transfer(trunk)
 
     urls = twilio.get(f"{TRUNKING_API}/Trunks/{sid}/OriginationUrls")["origination_urls"]
     origination = find(urls, "sip_url", ORIGINATION_URI)
@@ -171,6 +178,30 @@ def dispatch_rule_request(trunk_id: str) -> api.CreateSIPDispatchRuleRequest:
         ),
         room_config=api.RoomConfiguration(agents=[api.RoomAgentDispatch(agent_name=FLEET)]),
     )
+
+
+def report_transfer(trunk: dict) -> None:
+    """Say whether this trunk will carry a SIP REFER — and print the fix, never run it.
+
+    Cold transfer is the trunk's decision, not ours: `livekit-sip` sends the
+    REFER and Twilio either carries it or does not. The two properties that
+    decide it are read here and reported; **this script never writes them.**
+    Switching a trunk on is a deliberate human act with a billing consequence
+    (the transferred leg is charged as Termination on top of the Origination
+    that is still running), and after a fraud incident nothing in this repo
+    mutates a trunk's call settings on its own.
+    """
+    mode = trunk.get("transfer_mode", "?")
+    caller_id = trunk.get("transfer_caller_id", "?")
+    verdict = "REFER to PSTN allowed" if mode == "enable-all" else "cold transfer will FAIL"
+    print(f"transfer {mode} / caller-id {caller_id}  →  {verdict}")
+    if mode == "enable-all":
+        return
+    print("         enable it yourself — the exact call, never run from here:")
+    print(f"           twilio api trunking v1 trunks update --sid {trunk['sid']} \\")
+    print("             --transfer-mode enable-all --transfer-caller-id from-transferee")
+    print("         or: Console → Elastic SIP Trunking → Manage → Trunks → <trunk> →")
+    print("             Features → Call Transfer (SIP REFER) = Enabled, + Enable PSTN Transfer")
 
 
 def number_row(twilio: "Twilio", number: str) -> dict | None:

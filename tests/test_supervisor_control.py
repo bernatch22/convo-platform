@@ -37,7 +37,7 @@ from core.security.control import (
     SupervisorControl,
     UnknownVerb,
 )
-from core.security.supervisor import RELEASE, STEER, TAKEOVER
+from core.security.supervisor import RELEASE, STEER, TAKEOVER, TRANSFER
 from core.testing import fake_context
 
 pytestmark = pytest.mark.unit
@@ -179,8 +179,9 @@ async def test_an_empty_or_unknown_steer_comes_back_as_an_error_the_desk_can_rea
 
 
 async def test_a_verb_this_build_does_not_implement_is_named_not_swallowed(control) -> None:
-    with pytest.raises(UnknownVerb):
-        await control.apply("supervisor.transfer", SUP, {})
+    """A newer desk talking to an older worker gets a refusal that names the verb."""
+    with pytest.raises(UnknownVerb, match="supervisor.conference"):
+        await control.apply("supervisor.conference", SUP, {})
 
 
 async def test_a_steer_mid_sentence_waits_for_the_turn_boundary(tc, agent) -> None:
@@ -409,8 +410,13 @@ def test_the_rpc_methods_are_registered_under_their_audit_names(control) -> None
 
     taken = monitor.register_verbs(room, control)
 
-    assert taken == (STEER, TAKEOVER, RELEASE)
-    assert sorted(room.methods) == ["supervisor.release", "supervisor.steer", "supervisor.takeover"]
+    assert taken == (STEER, TAKEOVER, RELEASE, TRANSFER)
+    assert sorted(room.methods) == [
+        "supervisor.release",
+        "supervisor.steer",
+        "supervisor.takeover",
+        "supervisor.transfer",
+    ]
 
 
 def test_watching_a_room_with_a_control_wires_both_roads(tc, control) -> None:
@@ -419,7 +425,7 @@ def test_watching_a_room_with_a_control_wires_both_roads(tc, control) -> None:
     watch = monitor.watch_supervisors(room, tc, control)
 
     assert room.handlers["data_received"] == watch.on_packet
-    assert len(room.methods) == 3
+    assert len(room.methods) == 4
 
 
 class _Stage(TenantAgent):

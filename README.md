@@ -167,6 +167,25 @@ arrival is written into the caller's own log as `supervisor.join`:
 uv run python -m convo sessions show <id> | grep supervisor
 ```
 
+From that desk a supervisor can also **whisper** to the agent, **take the
+line**, and **transfer the call to a phone** — cold (a SIP REFER: the caller
+leaves for that number and this job ends) or warm (the colleague is dialled
+into the room, briefed where the caller provably cannot hear it, then bridged).
+Every verb is one line in the caller's own log, and a transfer carries its mode
+and its outcome, so a transfer that did NOT happen is as readable as one that
+did. Warm needs an outbound trunk (`SIP_OUTBOUND_TRUNK_ID`) this box does not
+have yet and says so instead of failing mid-call; cold needs only
+`transfer_mode=enable-all` on the Twilio trunk — `infra/box/README.md` has the
+exact toggles, and `scripts/twilio_trunk.py` reports whether they are set.
+
+The same three verbs without a browser, for an escalation rule or a terminal:
+
+```bash
+curl -XPOST localhost:8090/supervise/verb -H 'content-type: application/json' \
+  -d '{"room":"call-…","identity":"sup:berna","verb":"transfer",
+       "mode":"cold","to":"+34600111222"}'
+```
+
 Two ways to run it. In development the vite server serves the app and proxies
 `/tenants`, `/token`, `/sessions` and `/pipeline` to the control plane:
 

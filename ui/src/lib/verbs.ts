@@ -24,6 +24,9 @@ export const TAKEOVER = "supervisor.takeover";
 /** Give the line back, with the human's interval summarised into the agent's context. */
 export const RELEASE = "supervisor.release";
 
+/** Move the call to a phone: `cold` REFERs the caller away, `warm` bridges a briefed colleague. */
+export const TRANSFER = "supervisor.transfer";
+
 /** True when this participant is the agent — `kind`, never a guess at the identity string. */
 export function isAgent(participant: Participant): boolean {
   return participant.kind === ParticipantKind.AGENT;
