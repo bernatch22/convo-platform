@@ -57,6 +57,28 @@ CONTACT_UPDATE_FAILED = (
     "ofrécele que lo intentemos de nuevo o que pase por recepción."
 )
 
+NO_CITA_ON_THE_BOOK = (
+    "No consta ninguna cita a su nombre, así que no hay nada que anular ni que confirmar. "
+    "Díselo tal cual y no toques nada. Si te dice que está seguro de que la tiene, pídele "
+    "que te repita el nombre por si se ha oído mal y vuelve a consultarla; si sigue sin "
+    "aparecer, ofrécele que se pase por recepción con su DNI."
+)
+CANCEL_NOT_CONFIRMED = (
+    "El paciente no ha confirmado, así que no se ha anulado nada y su cita sigue en pie, tal "
+    "cual estaba. Díselo así, sin insistir, y pregúntale si necesita algo más."
+)
+CANCEL_FAILED = (
+    "El sistema de citas ha rechazado la anulación y no se ha tocado nada: la cita del "
+    "paciente sigue en pie, el mismo día y a la misma hora. Díselo con esas dos ideas —no ha "
+    "podido anularse y su cita sigue como estaba— y ofrécele intentarlo otra vez o pasarse "
+    "por recepción."
+)
+CONFIRM_FAILED = (
+    "El sistema de citas no ha podido apuntar la confirmación. La cita del paciente sigue en "
+    "pie exactamente igual, así que díselo tal cual —no se ha podido dejar constancia, pero "
+    "su cita sigue— y que puede venir igualmente el día que tiene."
+)
+
 
 def resolve_day(text: str, today: datetime.date) -> datetime.date:
     """The day the caller means, or ValueError; the stage turns that into a spoken sentence."""
@@ -139,6 +161,42 @@ def contact_confirmation_question(phone: str) -> str:
     they cannot hear.
     """
     return f"Su nuevo teléfono de contacto sería el {spoken_phone(phone)}. ¿Se lo cambio?"
+
+
+def appointment_line(appointment: dict[str, str]) -> str:
+    """The cita as the stage that is about to cancel or confirm it reads it back.
+
+    Rendered from the row the booking system just returned, and rendered HERE
+    rather than in the summary the previous stage leaves, for a reason the evals
+    ring can see: an hour a model recites off a note is an hour with no source in
+    the call, and `grounded_facts_dag` is right to escalate it. Coming back as a
+    tool output, the day, the hour and the professional are evidence — the same
+    property that lets a replayed call prove the receptionist read the agenda
+    instead of guessing.
+
+    The hour is written as the clock writes it (`spanish_moment`), not as a
+    person says it, exactly like `_offer`: the shared paragraph in `reception.py`
+    is what turns 10:00 into "las diez de la mañana" out loud, and a tool that
+    did it too would be deciding the wording twice.
+    """
+    return (
+        f"Cita del paciente: {dates.spanish_moment(appointment['when'])} con "
+        f"{appointment['doctor']}"
+        + (f" ({appointment['specialty']})" if appointment.get("specialty") else "")
+        + ". Léesela —día, hora y profesional— y pregúntale si es esa."
+    )
+
+
+def cancellation_question(appointment: dict[str, str]) -> str:
+    """The sentence a caller has to say yes to before the clinic gives their hour away.
+
+    The same rule as the two booking questions and the contact one: rendered by
+    the platform from the row the write is about to receive, never by the model.
+    «¿se la anulo?» names what is about to happen to the cita the caller has just
+    heard read back, and there is no softer verb for it — the hour is on offer to
+    somebody else a second later.
+    """
+    return f"{dates.spoken_moment(appointment['when'])} con {appointment['doctor']}, ¿se la anulo?"
 
 
 def confirmation_question(slot: dict[str, str]) -> str:

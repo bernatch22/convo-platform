@@ -22,6 +22,17 @@ lesson, failing on the one day the model thinks it already knows the answer. The
 sentence that fixes it went into `A_NAMED_DAY_IS_ALWAYS_A_LOOKUP`, and both
 booking stages learned it in the same commit. Had the paragraph been copied, one
 of them would still be wrong and nothing would say so.
+
+Ms-20's cancel/confirm stage split one block in two, and the split is the same
+argument read the other way. `SAYS_HOURS_THE_WAY_PEOPLE_DO` had a second half
+welded onto it — "only book an hour the agenda gave you" — and a stage that
+reads a cita back but books nothing needed the first half and must not carry the
+second: a rule about a tool it does not have is the surest way to have a model
+reach for one (`tests/test_prompts.py` pins exactly that). So the booking rule
+became `ONLY_THE_HOURS_THE_AGENDA_GAVE`, composed straight after it in both
+booking stages — the same two paragraphs in the same order, one blank line where
+there used to be a line break — and the spoken-hour rule is now genuinely shared
+by three stages instead of two.
 """
 
 OPEN, CLOSE = "<instructions>", "</instructions>"
@@ -82,7 +93,9 @@ SAYS_HOURS_THE_WAY_PEOPLE_DO = """\
 Las horas las dices como las dice la gente, no como las escribe el reloj: las 13:00 son «la
 una», las 15:00 «las tres», las 20:30 «las ocho y media». Si hace falta, añades «de la
 mañana» o «de la tarde» para que no haya duda. Leer «las trece cero cero» en voz alta suena
-a megafonía de estación, y confundir las 13:00 con las dos es una cita perdida.
+a megafonía de estación, y confundir las 13:00 con las dos es una cita perdida."""
+
+ONLY_THE_HOURS_THE_AGENDA_GAVE = """\
 Solo puedes reservar una de las horas que la agenda te ha devuelto en esta llamada; si
 pide una hora que no está entre ellas, vuelves a consultar ese día y le ofreces lo que
 haya."""

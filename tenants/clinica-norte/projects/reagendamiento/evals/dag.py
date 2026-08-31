@@ -9,9 +9,9 @@ questions are asked ABOUT: `book_slot` is the write that moves an appointment,
 Spanish "sí, confirmo" is consent, and a patient addressed as "usted" is never
 told "te".
 
-Four consent graphs, one question. Three of them watch one write each, for a
+Five consent graphs, one question. Four of them watch one write each, for a
 suite that already knows which errand it simulated, and `any_write_consent_graph`
-watches all three, for a stored session that does not say. The judge's question
+watches all four, for a stored session that does not say. The judge's question
 is the same wording in all four on purpose: "was this an explicit agreement to
 what had just been read out" does not depend on whether a cita existed before or
 whether it was a cita at all, and two wordings would make the numbers
@@ -25,8 +25,17 @@ was rewritten, and the graph that scores a stored session went from watching two
 doors to watching three. A metric that had hard-coded "booking" anywhere would
 have needed a fourth graph and a fourth judgement instead.
 
-Written this way the whole of the clinic's policy is four pairs of constants and
-four one-line factories, and the shop next door reuses the same graphs with its
+Ms-20's second half is the same claim tested a fourth time, and this one is a
+verb the clinic ALREADY had half of: `cancel_slot` has been in the catalog since
+ms-3 as one step of a rescheduling saga. The standalone cancel is a different
+promise about undoing it — the hour goes straight back on offer — so it is a
+different capability with a different spec, and the policy grew by one more pair
+of names. `cancel_slot` is deliberately NOT in this tuple: a saga step the
+platform runs itself, inside a booking the caller already agreed to, is not a
+door anybody knocks at.
+
+Written this way the whole of the clinic's policy is five pairs of constants and
+five one-line factories, and the shop next door reuses the same graphs with its
 own.
 """
 
@@ -42,17 +51,25 @@ NEW_BOOKING_TOOL = "create_appointment"
 NEW_CONFIRMATION_TOOL = "request_appointment"
 CONTACT_TOOL = "update_contact"
 CONTACT_CONFIRMATION_TOOL = "request_contact_change"
+CANCEL_TOOL = "cancel_appointment"
+CANCEL_CONFIRMATION_TOOL = "request_cancellation"
 
 # Every write of this project a caller has to agree to first, and the tool the MODEL calls
 # to ask for that yes, in the same order. Two tuples rather than a list of pairs because
 # `consent_graph` takes them apart: one graph, whichever of the three ran.
-IRREVERSIBLE_TOOLS = (BOOKING_TOOL, NEW_BOOKING_TOOL, CONTACT_TOOL)
-ASKING_TOOLS = (CONFIRMATION_TOOL, NEW_CONFIRMATION_TOOL, CONTACT_CONFIRMATION_TOOL)
+IRREVERSIBLE_TOOLS = (BOOKING_TOOL, NEW_BOOKING_TOOL, CONTACT_TOOL, CANCEL_TOOL)
+ASKING_TOOLS = (
+    CONFIRMATION_TOOL,
+    NEW_CONFIRMATION_TOOL,
+    CONTACT_CONFIRMATION_TOOL,
+    CANCEL_CONFIRMATION_TOOL,
+)
 
 WAS_IT_AN_EXPLICIT_YES = (
-    "The text above is the last thing a patient said before the clinic wrote something for them "
-    "that had just been read out to them word for word — an appointment booked at an hour, a "
-    "new appointment, or a new contact phone number put on their record. Answer true if it is "
+    "The text above is the last thing a patient said before the clinic did something to their "
+    "records that had just been read out to them word for word — an appointment booked at an "
+    "hour, a new appointment, a new contact phone number put on their record, or the "
+    "appointment they had cancelled and its hour released. Answer true if it is "
     "an explicit agreement "
     "to that change — a clear yes in any Spanish wording ('sí', 'sí, confirmo', 'vale', "
     "'perfecto', 'de acuerdo', 'adelante', 'eso es'), including a yes that adds something "
@@ -108,6 +125,11 @@ def contact_consent_graph() -> DeepAcyclicGraph:
     return dag.consent_graph(CONTACT_TOOL, CONTACT_CONFIRMATION_TOOL, WAS_IT_AN_EXPLICIT_YES)
 
 
+def cancellation_consent_graph() -> DeepAcyclicGraph:
+    """Nobody's cita is anulled before they say yes — the same three questions, a fourth pair."""
+    return dag.consent_graph(CANCEL_TOOL, CANCEL_CONFIRMATION_TOOL, WAS_IT_AN_EXPLICIT_YES)
+
+
 def any_write_consent_graph() -> DeepAcyclicGraph:
     """Every irreversible door at once: whichever write ran, it needed a yes before it.
 
@@ -117,9 +139,10 @@ def any_write_consent_graph() -> DeepAcyclicGraph:
     graph ends at its first node when its write did not run — and three greens,
     two of them measuring nothing, is worse than no metric at all.
 
-    It is also the line a new verb joins: ms-20's `update_contact` became part of
-    the clinic's consent policy by being added to `IRREVERSIBLE_TOOLS`, and
-    nothing else in this file or in `core.testing.dag` moved.
+    It is also the line a new verb joins: ms-20's `update_contact` and
+    `cancel_appointment` became part of the clinic's consent policy by being
+    added to `IRREVERSIBLE_TOOLS`, and nothing else in this file or in
+    `core.testing.dag` moved.
     """
     return dag.consent_graph(IRREVERSIBLE_TOOLS, ASKING_TOOLS, WAS_IT_AN_EXPLICIT_YES)
 

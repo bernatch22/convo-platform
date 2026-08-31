@@ -28,6 +28,12 @@ the expensive one:
 from core.context import TenantContext
 from core.security.protocol import SUPERVISOR_PROTOCOL
 
+from .cancel_or_confirm import (
+    CANCEL_OR_CONFIRM_EXAMPLES,
+    CANCEL_OR_CONFIRM_INSTRUCTIONS,
+    CANCEL_OR_CONFIRM_ROLE,
+    CONFIRM_CANCELLATION_INSTRUCTIONS,
+)
 from .choose_slot import (
     CHOOSE_SLOT_EXAMPLES,
     CHOOSE_SLOT_INSTRUCTIONS,
@@ -50,7 +56,9 @@ from .update_contact import (
 )
 
 __all__ = [
+    "cancel_or_confirm_prompt",
     "choose_slot_prompt",
+    "confirm_cancellation_instructions",
     "confirm_contact_instructions",
     "confirm_instructions",
     "confirm_new_booking_instructions",
@@ -70,6 +78,13 @@ def identify_prompt(tc: TenantContext) -> str:
 def choose_slot_prompt(tc: TenantContext) -> str:
     """The stage that reads the agenda, offers real hours and books the one chosen."""
     return stage_prompt(tc, CHOOSE_SLOT_ROLE, CHOOSE_SLOT_INSTRUCTIONS, CHOOSE_SLOT_EXAMPLES)
+
+
+def cancel_or_confirm_prompt(tc: TenantContext) -> str:
+    """The stage for the cita a caller already has: read it back, then cancel or confirm it."""
+    return stage_prompt(
+        tc, CANCEL_OR_CONFIRM_ROLE, CANCEL_OR_CONFIRM_INSTRUCTIONS, CANCEL_OR_CONFIRM_EXAMPLES
+    )
 
 
 def new_booking_prompt(tc: TenantContext) -> str:
@@ -92,6 +107,11 @@ def confirm_instructions() -> str:
 def confirm_new_booking_instructions() -> str:
     """The same, for a cita being CREATED: there is no earlier hour to promise back."""
     return CONFIRM_NEW_BOOKING_INSTRUCTIONS
+
+
+def confirm_cancellation_instructions() -> str:
+    """The same, for a cita being CANCELLED: what is read back is the cita it is about to lose."""
+    return CONFIRM_CANCELLATION_INSTRUCTIONS
 
 
 def confirm_contact_instructions() -> str:

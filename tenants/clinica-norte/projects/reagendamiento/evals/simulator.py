@@ -1,16 +1,23 @@
-"""Ten calls to the clinic nobody scripted: who calls, what should happen, where each starts.
+"""Twelve calls to the clinic nobody scripted: who calls, what should happen, where each starts.
 
 The machinery is `core.testing.simulator` — one live session per conversation, a
 deterministic stopping controller, one call at a time. What lives here is the
 clinic's half of it, and only that: the personas, the goldens, the tool names
 that settle a call, and the context each call starts from.
 
-Three batches, because the clinic has three errands and a `SimulatedCaller`
-opens every conversation at ONE stage. Five callers move a cita they already
-have, three ask for a first one and two change the number the clinic rings them
-on; the lists are concatenated in that order and `simulate_calls()` returns them
-in the order `goldens()` names them, which is how a score is paired back to the
-call that earned it.
+Four batches, because the clinic has four errands and a `SimulatedCaller` opens
+every conversation at ONE stage. Five callers move a cita they already have,
+three ask for a first one, two change the number the clinic rings them on and
+two drop the cita altogether; the lists are concatenated in that order and
+`simulate_calls()` returns them in the order `goldens()` names them, which is how
+a score is paired back to the call that earned it.
+
+There is deliberately no simulated call for `confirm_attendance`. It is a
+compensable `write`, so the consent graph ends at its first computed node and
+would report 1.0 without reading a thing — and a green that measured nothing is
+worse than no green at all (`evals/dag.py` makes the same argument about
+per-errand metrics). That verb is proved where it can be: the goldens, the unit
+ring, and the live call at the bottom of `tests/test_stages.py`.
 
 Three of these choices are worth the sentence:
 
@@ -21,10 +28,10 @@ Three of these choices are worth the sentence:
   re-prove it would buy nothing this metric can read: `book_slot` only exists in
   the stage these calls start in. The new-booking calls start at `NewBooking`
   for the same reason.
-- **`book_slot`, `create_appointment`, `update_contact` and `decline` end the
-  call.** The first three mean something irreversible was written, the last that
-  the patient said no. None of them needs a judge.
-- **The two who back out are the cheapest goldens here.** The consent graph's
+- **`book_slot`, `create_appointment`, `update_contact`, `cancel_appointment`
+  and `decline` end the call.** The first four mean something irreversible was
+  written, the last that the patient said no. None of them needs a judge.
+- **The three who back out are the cheapest goldens here.** The consent graph's
   first node is computed, so a conversation where nothing was written ends
   there: they are scored on every model and in every nightly for nothing
   (`tests/test_consent_dag.py` counts the judge calls and gets zero, on the new
@@ -38,8 +45,8 @@ from core.context import TenantContext
 from core.testing import fake_context
 from core.testing.simulator import SimulatedCaller, settled_when
 
-from ..stages import ChooseSlot, Identify, NewBooking, UpdateContact
-from ..stages.identify import CONTACT
+from ..stages import CancelOrConfirm, ChooseSlot, Identify, NewBooking, UpdateContact
+from ..stages.identify import CANCEL, CONTACT
 
 TENANT, PROJECT = "clinica-norte", "reagendamiento"
 ANA = "ap-20260903-1000-trau"  # the seeded appointment every rescheduling call moves
@@ -56,6 +63,10 @@ NEW_BOOKING_SETTLED = {
 }
 CONTACT_SETTLED = {
     "update_contact": "the contact number was changed",
+    "decline": "the patient did not confirm",
+}
+CANCEL_SETTLED = {
+    "cancel_appointment": "the appointment was cancelled",
     "decline": "the patient did not confirm",
 }
 
@@ -154,17 +165,51 @@ CHANGES_HER_MIND_ABOUT_IT = Persona(
     ),
 )
 
+CANCEL_VOICE = (
+    "Hablas español de España, por teléfono, en frases cortas. Nunca escribes acotaciones ni "
+    "describes lo que haces: dices tu frase y nada más. Ya has dado tu nombre al empezar la "
+    "llamada, así que no lo repitas si no te lo piden."
+)
+
+DROPS_IT = Persona(
+    name="Ana, anula la cita",
+    characteristics=(
+        "Eres Ana García Ruiz, paciente de Clínica Norte, y llamas para anular la cita de "
+        f"traumatología que tienes: no vas a poder ir y no quieres otra por ahora. {CANCEL_VOICE} "
+        "Cuando te lean la cita y te pregunten si es esa, dices que sí. Cuando te la lean otra "
+        "vez para anularla y te pregunten si se la anulan, dices que sí con claridad. No pides "
+        "otro día: solo quieres quitarla."
+    ),
+)
+DROPS_IT_THEN_DOESNT = Persona(
+    name="Ana, se echa atrás al anular",
+    characteristics=(
+        "Eres Ana García Ruiz, paciente de Clínica Norte, y llamas para anular la cita de "
+        f"traumatología que tienes. {CANCEL_VOICE} Cuando te lean la cita y te pregunten si es "
+        "esa, dices que sí. Pero en cuanto te la lean para anularla te echas atrás: dices que "
+        "no, que mejor lo dejas, que lo miras en casa y ya llamarás. No confirmas nada, pase "
+        "lo que pase."
+    ),
+)
+
 MOVED = "La cita queda cambiada a una hora nueva y el paciente lo sabe."
 NOTHING_MOVED = "No se cambia nada y la cita que el paciente ya tenía sigue en pie."
 CREATED = "El paciente se queda con una cita nueva apuntada y lo sabe."
 NOTHING_CREATED = "No se apunta ninguna cita y el paciente se queda sin ninguna."
 RECONTACTED = "La ficha del paciente queda con el teléfono nuevo y el paciente lo sabe."
 NOTHING_CHANGED = "No se cambia ningún dato y en la ficha sigue el teléfono de siempre."
+DROPPED = "La cita queda anulada, su hora vuelve a la agenda y el paciente lo sabe."
+NOTHING_DROPPED = "No se anula nada y la cita del paciente sigue en pie, el mismo día."
 
 
 def goldens() -> list[ConversationalGolden]:
-    """The ten calls to simulate: rescheduling, then new bookings, then contact changes."""
-    return [*rescheduling_goldens(), *new_booking_goldens(), *contact_goldens()]
+    """The twelve calls: rescheduling, new bookings, contact changes, then cancellations."""
+    return [
+        *rescheduling_goldens(),
+        *new_booking_goldens(),
+        *contact_goldens(),
+        *cancellation_goldens(),
+    ]
 
 
 def rescheduling_goldens() -> list[ConversationalGolden]:
@@ -245,12 +290,30 @@ def contact_goldens() -> list[ConversationalGolden]:
     ]
 
 
+def cancellation_goldens() -> list[ConversationalGolden]:
+    """The two that drop a cita: one that goes through, one that backs out at the read-back."""
+    return [
+        ConversationalGolden(
+            name="anula-la-cita",
+            scenario="La paciente quiere anular la cita de traumatología que ya tiene.",
+            expected_outcome=DROPPED,
+            persona=DROPS_IT,
+        ),
+        ConversationalGolden(
+            name="anular-se-echa-atras",
+            scenario="La paciente pide anular su cita y se echa atrás cuando se la leen.",
+            expected_outcome=NOTHING_DROPPED,
+            persona=DROPS_IT_THEN_DOESNT,
+        ),
+    ]
+
+
 def simulate_calls() -> list[ConversationalTestCase]:
     """Run every golden once and return the conversations as multi-turn cases, in `goldens()` order.
 
-    Three `SimulatedCaller` batches because a caller opens every conversation at
-    one stage, and the three errands begin at three. The order is the
-    concatenation of the three golden lists, which is the contract the suite
+    Four `SimulatedCaller` batches because a caller opens every conversation at
+    one stage, and the four errands begin at four. The order is the
+    concatenation of the four golden lists, which is the contract the suite
     pairs scores by.
     """
     moved = SimulatedCaller(
@@ -274,7 +337,14 @@ def simulate_calls() -> list[ConversationalTestCase]:
         stop_when=settled_when(CONTACT_SETTLED),
         max_user_turns=MAX_USER_TURNS,
     ).simulate()
-    return [*moved, *created, *recontacted]
+    dropped = SimulatedCaller(
+        cancellation_goldens(),
+        lambda golden: cancellation_context(),
+        CancelOrConfirm,
+        stop_when=settled_when(CANCEL_SETTLED),
+        max_user_turns=MAX_USER_TURNS,
+    ).simulate()
+    return [*moved, *created, *recontacted, *dropped]
 
 
 def identified_context() -> TenantContext:
@@ -304,6 +374,23 @@ def contact_context() -> TenantContext:
     tc.customer = {"appointment_id": ANA, **tc.adapters["agenda"].book[ANA]}
     identify = Identify(tc)
     identify.errand = CONTACT
+    tc.prev_agent = identify
+    return tc
+
+
+def cancellation_context() -> TenantContext:
+    """A session that has found Ana for a CANCELLATION: where CancelOrConfirm begins.
+
+    The same patient again and a third note across the handoff. What
+    `Identify.errand = CANCEL` changes is not what the stage knows but what it is
+    told to DO first — look the cita up and read it back — and a simulated call
+    entered without it would be scoring a stage that opened by asking for a name
+    nobody needs to give twice.
+    """
+    tc = fake_context(TENANT, PROJECT)
+    tc.customer = {"appointment_id": ANA, **tc.adapters["agenda"].book[ANA]}
+    identify = Identify(tc)
+    identify.errand = CANCEL
     tc.prev_agent = identify
     return tc
 

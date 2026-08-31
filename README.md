@@ -31,7 +31,7 @@ TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --te
 TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
 ```
 
-The clinic takes three errands. Say you want to change the cita you already have
+The clinic takes five errands. Say you want to change the cita you already have
 and reception finds it by name or phone; say you have none —
 
 > «hola, quería pedir cita, no tengo ninguna» · «Pedro Ramos Gil, teléfono
@@ -57,6 +57,37 @@ Ask it for the old number whole and it will not say it. The log of that call has
 a `confirm.granted` for `update_contact` before the write, and the line the write
 left behind names the record and three digits — «now reachable on a number ending
 111» — which is what an auditor needs and all a leak would get.
+
+The last two are what a caller does with the cita they already have and are not
+moving: drop it, or say they will be there. Both start the same way — reception
+looks the cita up in the booking system and reads it back, never off a note —
+and only the ending differs:
+
+> «buenos días, quería anular la cita que tengo» · «Ana García Ruiz» → «Me
+> consta su cita el jueves 3 a las diez de la mañana con la doctora Campos. ¿Es
+> esa la que quiere anular?» · «sí, esa» → «Jueves 3 de septiembre a las diez de
+> la mañana con Dra. Irene Campos, ¿se la anulo?» · «sí, anúlemela»
+
+The hour goes straight back on the agenda: from the moment that write lands,
+`find_availability` offers the ten o'clock you just gave up to whoever asks for
+that Thursday next, so cancelling does not lose the clinic the half hour — which
+is also why the verb declares no undo. (In the demo that is true for the rest of
+the session: the fake book lives in the process, and only the rows cross to the
+console. A real agenda is one system both processes reach, and has no such
+seam.) You can watch it happen without a phone:
+
+```bash
+uv run pytest -m unit -k "cancelled_hour_goes_back_on_offer or yes_drops_the_cita" -v
+```
+
+On the Board the cita is struck through (`tone: gone`); the confirming call
+
+> «hola, llamo para confirmar que voy a mi cita, soy Ana García Ruiz» · «sí, esa
+> misma, que voy a ir»
+
+leaves the same cita where it was and marks it `confirmed` instead. Cancelling
+is the fourth thing the platform will not do without a yes; confirming is not —
+nothing is taken from a patient who rang to say they are coming.
 
 The shop takes three. Ask where an order is («mi pedido es el TS-10432, ¿por
 dónde va?»), ask to cancel it and it reads the order and the amount back and

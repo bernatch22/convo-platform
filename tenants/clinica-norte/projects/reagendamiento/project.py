@@ -5,6 +5,17 @@ and gives it the right to write: `book_slot` is irreversible and unreachable
 without a confirmation token, and the three writes that make up a rebooking run
 as a saga so a failure halfway leaves the patient's old appointment standing.
 
+ms-20 also closes the two verbs a reception has and this project did not: a cita
+could be moved and created, and only ever cancelled as the first half of a move.
+`cancel_appointment` is the standalone cancel — the fourth irreversible door,
+and the one that gives an hour back instead of taking one, which is why the
+freed slot reappears in `find_availability` and why the spec declares no
+compensation. `confirm_attendance` is its opposite in every way: the patient
+rang to say they ARE coming, nothing is taken from them, and it is a plain
+`write` with `rebook_slot` as its undo. Both live in one stage, because the
+conversation is one conversation — the cita you already have, and what you want
+done with it that is not moving it.
+
 ms-20 adds the third, and it is the first one that is not an appointment:
 `update_contact` changes the number the clinic rings the patient on. The verb is
 only reachable once the caller has been found on the book — an unidentified
@@ -108,6 +119,31 @@ UPDATE_CONTACT = ToolSpec(
     timeout_s=5.0,
     result_summary=summarise_contact,
 )
+# The fourth irreversible door, and the one that gives something back instead of taking
+# an hour: the patient is not coming. It declares no compensation for a reason the
+# adapter spells out — from the moment it runs, `find_availability` offers that half hour
+# to the next caller, so "undo" would be a promise about a booking somebody else may
+# already hold. `cancel_slot` above is the same field with a different promise: a step
+# inside a saga that puts it back in milliseconds. Two promises, two specs, two names.
+CANCEL_APPOINTMENT = ToolSpec(
+    name="cancel_appointment",
+    side_effect=SideEffect.IRREVERSIBLE,
+    idempotency_key="appointment_id",
+    timeout_s=5.0,
+    result_summary=summarise_change,
+)
+# The one write of this project a caller does not have to agree to twice. Marking a cita
+# confirmed takes nothing away from the patient who rang to say they are coming, and
+# `rebook_slot` puts the row back to `booked` if it was ever wrong — which is what a
+# `write` with a compensation is: reversible, and therefore not a door.
+CONFIRM_ATTENDANCE = ToolSpec(
+    name="confirm_attendance",
+    side_effect=SideEffect.WRITE,
+    idempotency_key="appointment_id",
+    compensation="rebook_slot",
+    timeout_s=5.0,
+    result_summary=summarise_change,
+)
 # The undo of a cancel is a write, never an irreversible: the platform is putting
 # things back the way the patient left them, and asking for a second yes to do
 # that is not a conversation anybody wants.
@@ -150,9 +186,23 @@ class ReagendamientoProject(Project):
 
     def stages(self, tc: TenantContext) -> list:
         """Every stage of the call, in order — the project's whole tool surface for evals."""
-        from .stages import ChooseSlot, Farewell, Identify, NewBooking, UpdateContact
+        from .stages import (
+            CancelOrConfirm,
+            ChooseSlot,
+            Farewell,
+            Identify,
+            NewBooking,
+            UpdateContact,
+        )
 
-        return [Identify(tc), ChooseSlot(tc), NewBooking(tc), UpdateContact(tc), Farewell(tc)]
+        return [
+            Identify(tc),
+            ChooseSlot(tc),
+            NewBooking(tc),
+            CancelOrConfirm(tc),
+            UpdateContact(tc),
+            Farewell(tc),
+        ]
 
 
 PROJECT = ReagendamientoProject(
@@ -170,6 +220,8 @@ PROJECT = ReagendamientoProject(
             BOOK_SLOT,
             CREATE_APPOINTMENT,
             UPDATE_CONTACT,
+            CANCEL_APPOINTMENT,
+            CONFIRM_ATTENDANCE,
             REBOOK_SLOT,
             SEND_SMS,
         )

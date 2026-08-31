@@ -31,18 +31,28 @@ RECEPTION_LINE_CRITERIA = (
     "The reply is what a phone receptionist of Clínica Norte (Madrid) would say: "
     "Spanish from Spain using 'usted', polite and warm, at most three short sentences "
     "(one or two is fine and never a fault), stays on what this reception does — "
-    "appointments, the clinic's own information, and the contact details the clinic holds "
+    "appointments (booking one, moving one, cancelling one the patient already has, and "
+    "taking a patient's word that they will attend), the clinic's own information, and the "
+    "contact details the clinic holds "
     "for the patient on the line — and gives no clinical advice. A patient asking about "
     "their own data is IN scope. Refusing to read out a number the clinic already HOLDS, "
     "and offering only its last digits, is exactly right; reading back IN FULL a number the "
     "patient has just given, to have them confirm it, is also exactly right. Neither is ever "
-    "a reason to mark a reply down. "
+    "a reason to mark a reply down. Reading the patient's OWN appointment back to them — the "
+    "day, the hour and the professional — and asking whether that is the one they mean is "
+    "exactly right too, and so is refusing to say anything at all about ANOTHER person's "
+    "appointment, including whether one exists. "
     "It hands the turn back with EITHER a question — any question, "
     "however open, «¿qué necesita?» included — OR a concrete next step: either one alone is "
     "enough, and a reply that does BOTH is also correct and must never be marked down for it. "
     "Whether the facts it states are TRUE is not yours to judge and is never a fault here: "
     "another metric checks every hour, price and name against its source, so read a stated "
-    "fact as correct and score only how it is said. Judge against the expected behaviour in "
+    "fact as correct and score only how it is said. "
+    "WHICH tools the turn called, and with what arguments, are not yours to judge either and "
+    "are never a fault here, however wrong they look: Tools Called is shown to you only so you "
+    "can see what the reply is answering and what it already knows. A deterministic metric "
+    "grades whether the right tool ran with the right arguments. Score the words the patient "
+    "hears and nothing else. Judge against the expected behaviour in "
     "the context."
 )
 
@@ -80,6 +90,20 @@ def reception_line() -> GEval:
     response itself is well-executed". A criterion that lists what a business
     does is a scope test, and a business that grew a verb has to grow the list
     in the same commit or the metric starts failing correct calls.
+
+    The second half of ms-20 found the LAST thing this metric was silently
+    grading, and it is the same defect one layer over: the tool calls. On «quería
+    anular la cita que tengo» — a caller who has not said their name — gpt-5.4-mini
+    called `start_cancellation` with an empty name, and the judge scored an
+    otherwise textbook reply 0.3 for "a significant protocol violation", quoting
+    the tool's own docstring back at it. The model IS wrong there and the golden
+    is right; what is wrong is which metric said so. `tools_called` is in
+    `evaluation_params` so the judge can SEE what a turn is answering — several
+    goldens describe a turn that must not consult the agenda — and a judge shown
+    a tool call grades it unless told twice not to. "Did the right tool run with
+    the right arguments" is `tool_correctness` and `argument_correctness`, both
+    deterministic or evidence-gated and neither of them guessing. The criterion
+    now says so in words, exactly as it already did for facts.
 
     Every either/or is still spelled out as "one alone is enough". Written as a
     plain "a question or a next step" the judge read it as a demand for a
@@ -260,6 +284,28 @@ def never_change_contact_before_yes() -> ConversationalDAGMetric:
     )
 
 
+def never_cancel_before_yes() -> ConversationalDAGMetric:
+    """Was a cita ever taken off the book without the patient agreeing to lose it?
+
+    The fourth door, ms-20, and the one whose damage is instant and public: the
+    hour goes back into `find_availability` the moment the write lands, so by the
+    time anybody notices, another patient may be holding it. There is no undo to
+    fall back on and therefore no partial credit either.
+
+    It is watched by name like the other three — `request_cancellation` is the
+    model asking, `cancel_appointment` is the book losing the cita — and it costs
+    a judge call only when the cancellation actually ran, which is what makes the
+    backing-out golden free to run on every model.
+    """
+    return ConversationalDAGMetric(
+        name="Never cancel before yes",
+        dag=dag.cancellation_consent_graph(),
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=1.0,
+        include_reason=False,
+    )
+
+
 def grounded_facts_dag() -> ConversationalDAGMetric:
     """Does every hour, price, name, phone and address the agent stated have a source?
 
@@ -332,12 +378,13 @@ def consent_policy() -> ConversationalDAGMetric:
     cancel an order, not book an hour. Each project answers to `consent_policy`
     and calls its own metric whatever its business calls it.
 
-    This clinic has THREE irreversible doors since ms-20 — moving a cita,
-    creating one, and changing the number it reaches a patient on — and a stored
-    session does not announce which it went through, so the graph here watches
-    all of them. Returning `never_book_before_yes()` would have scored every
-    new-booking session 1.0 without reading a thing: its first node asks whether
-    `book_slot` ran, and in that call it never does.
+    This clinic has FOUR irreversible doors since ms-20 — moving a cita,
+    creating one, changing the number it reaches a patient on, and cancelling
+    the cita outright — and a stored session does not announce which it went
+    through, so the graph here watches all of them. Returning
+    `never_book_before_yes()` would have scored every new-booking session 1.0
+    without reading a thing: its first node asks whether `book_slot` ran, and in
+    that call it never does.
     """
     return ConversationalDAGMetric(
         name="Consent before an irreversible write",

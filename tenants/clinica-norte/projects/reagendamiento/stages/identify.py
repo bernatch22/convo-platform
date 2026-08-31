@@ -1,13 +1,21 @@
 """Identify: open the call, find out who is on the line, and hand it to the right stage.
 
-Two exits, and which one a call takes is a tool call in the run rather than a
+Five exits, and which one a call takes is a tool call in the run rather than a
 flag. `identify_patient` finds an existing cita and hands over to ChooseSlot;
-`start_new_booking` hands over to NewBooking for a caller who has none. The
-second is deliberately NOT what a failed lookup does on its own: a misheard
-surname is the commonest error on a phone line, and routing the first miss
-straight into a new booking is how a patient ends up with two citas. The miss
-asks for the name again; the caller saying they want a new one is what moves the
-call.
+`start_new_booking` hands over to NewBooking for a caller who has none;
+`start_contact_update` hands over to UpdateContact; and `start_cancellation` and
+`start_attendance_confirmation` both hand over to CancelOrConfirm — two tools
+into one stage, because the model routes on a docstring and «quiero anularla»
+and «llamo para confirmar que voy» are opposite intents that one description
+would blur.
+
+The new-booking exit is deliberately NOT what a failed lookup does on its own: a
+misheard surname is the commonest error on a phone line, and routing the first
+miss straight into a new booking is how a patient ends up with two citas. The
+miss asks for the name again; the caller saying they want a new one is what
+moves the call. The same rule, harder, on the other three: a caller nobody found
+gets a refusal and no handoff — there is no record to change, no cita to cancel
+and none to confirm.
 """
 
 from core.agents import RunContext, TenantAgent, function_tool
@@ -20,6 +28,22 @@ from .. import dates, prompts, tools
 # somebody changing a phone number and somebody moving a cita are the same record, and
 # the next stage is owed a different amount of it.
 APPOINTMENT, CONTACT = "appointment", "contact"
+CANCEL, CONFIRM = "cancel", "confirm"
+
+NO_CITA_TO_CANCEL = (
+    "No consta ninguna cita con esos datos, así que no hay nada que anular: no se anula la "
+    "cita de nadie a quien no se ha localizado. Pídele que te repita el nombre o el teléfono "
+    "por si se ha oído mal y vuelve a llamar a esta herramienta con lo que te diga. Si sigue "
+    "sin aparecer, explícale que no le consta ninguna cita a su nombre y que por tanto no hay "
+    "nada que anular. No le ofrezcas pedir una cita nueva: quien llama para anular no ha "
+    "pedido ninguna."
+)
+NO_CITA_TO_CONFIRM = (
+    "No consta ninguna cita con esos datos, así que no hay nada que confirmar. Pídele que te "
+    "repita el nombre o el teléfono por si se ha oído mal y vuelve a llamar a esta herramienta "
+    "con lo que te diga. Si sigue sin aparecer, explícale que no le consta ninguna cita a su "
+    "nombre y ofrécele pedir una."
+)
 
 NO_RECORD_TO_CHANGE = (
     "No consta ninguna ficha con esos datos, así que no hay nada que puedas cambiar: sin "
@@ -53,6 +77,8 @@ class Identify(TenantAgent):
             return "Todavía no se ha identificado al paciente."
         if self.errand == CONTACT:
             return self._contact_summary(patient)
+        if self.errand in (CANCEL, CONFIRM):
+            return self._settle_summary(patient)
         if not patient.get("appointment_id"):
             return (
                 f"Paciente identificado: {patient['patient']}, teléfono {patient['phone']}. "
@@ -166,6 +192,105 @@ class Identify(TenantAgent):
         from .update_contact import UpdateContact
 
         return self.hand_off(UpdateContact(tc))
+
+    @function_tool
+    async def start_cancellation(
+        self,
+        ctx: RunContext[TenantContext],
+        name: str,
+        phone: str | None = None,
+    ) -> str | tuple:
+        """Localiza al paciente y da paso a anular la cita que tiene.
+
+        Llámala en cuanto el paciente te haya dicho su NOMBRE y sepas que lo que quiere es
+        anular, cancelar o quitar su cita. El nombre es la condición: mientras no lo hayas
+        oído no la llames, pídeselo y llámala en el turno siguiente. No la llames para
+        cambiar una cita de día —para eso está la de buscar al paciente— ni para confirmar
+        que va a venir, que es justo lo contrario y tiene su propia herramienta.
+
+        Args:
+            name: el nombre del paciente tal y como LO HA DICHO ÉL. Si todavía no ha dicho su
+                nombre, no llames a esta herramienta: pídeselo primero y llámala en el turno
+                siguiente. Nunca la llames con este campo vacío, ni con un trozo de su frase
+                («la del jueves»), ni con un nombre inventado: una búsqueda así no encuentra
+                a nadie, y si por casualidad encontrara a alguien sería otra persona.
+            phone: el teléfono de contacto, solo los dígitos y solo si el paciente ya lo ha
+                dicho. Omítelo mientras no lo sepas: con el nombre suele bastar.
+
+        Devuelve el paso a esa parte de la llamada, o la indicación de que no consta ninguna
+        cita con esos datos —y entonces no hay nada que anular.
+        """
+        return await self._settle(ctx, name, phone, CANCEL, NO_CITA_TO_CANCEL)
+
+    @function_tool
+    async def start_attendance_confirmation(
+        self,
+        ctx: RunContext[TenantContext],
+        name: str,
+        phone: str | None = None,
+    ) -> str | tuple:
+        """Localiza al paciente y da paso a dejar constancia de que va a acudir a su cita.
+
+        Llámala en cuanto el paciente te haya dicho su NOMBRE y sepas que llama para
+        confirmar que va a venir, que va a acudir o que ahí estará. El nombre es la
+        condición: mientras no lo hayas oído no la llames. No la llames para anular la cita
+        —eso es lo contrario y tiene su propia herramienta— ni para cambiarla de día.
+
+        Args:
+            name: el nombre del paciente tal y como LO HA DICHO ÉL, sin completarlo ni
+                corregirlo. Si todavía no lo ha dicho, no llames a esta herramienta: pídeselo
+                primero. Nunca la llames con este campo vacío ni con un trozo de su frase.
+            phone: el teléfono de contacto, solo los dígitos y solo si ya lo ha dicho.
+
+        Devuelve el paso a esa parte de la llamada, o la indicación de que no consta ninguna
+        cita con esos datos —y entonces no hay nada que confirmar.
+        """
+        return await self._settle(ctx, name, phone, CONFIRM, NO_CITA_TO_CONFIRM)
+
+    async def _settle(
+        self,
+        ctx: RunContext[TenantContext],
+        name: str,
+        phone: str | None,
+        errand: str,
+        refusal: str,
+    ) -> str | tuple:
+        """The two exits that lead to CancelOrConfirm: same lookup, same refusal, one word apart.
+
+        Written once because the difference between them is genuinely one word.
+        They are still two TOOLS, and that is not a contradiction: the model
+        routes on a docstring, and «quiero anularla» and «llamo para confirmar
+        que voy» are opposite intents that one description would blur. What
+        happens after the routing is identical, so it lives here.
+        """
+        tc = ctx.userdata
+        patient = await tc.tools.call("find_patient", {"name": name, "phone": phone})
+        if not patient:
+            return refusal
+        tc.customer = patient
+        self.errand = errand
+        from .cancel_or_confirm import CancelOrConfirm
+
+        return self.hand_off(CancelOrConfirm(tc))
+
+    def _settle_summary(self, patient: dict) -> str:
+        """The note that tells the next stage its FIRST sentence, not just its facts.
+
+        Ms-20's prompt findings, applied: a stage handed a paragraph of context
+        and no opening decides its own, and both models opened by asking for a
+        name the previous stage had already taken. So the note ends with the
+        move — look the cita up, then read it back — and it deliberately does NOT
+        carry the day, the hour or the professional. That is the same discipline
+        as `_contact_summary` for a different reason: the next stage is required
+        to read those off the booking system in this call, and a stage that was
+        handed them would recite them instead.
+        """
+        errand = "anularla" if self.errand == CANCEL else "confirmar que va a acudir"
+        return (
+            f"Paciente identificado: {patient['patient']}, teléfono {patient['phone']}. "
+            f"Tiene una cita y lo que quiere es {errand}. Lo primero que haces es consultar "
+            "su cita con tu herramienta y leérsela: no la tienes escrita aquí."
+        )
 
     def _contact_summary(self, patient: dict) -> str:
         """The one summary in this project that hands the next stage LESS than it holds.
