@@ -24,6 +24,11 @@ DESCRIPTIONS = {
     "book_slot": "Mueve la cita del paciente a la hora que ha confirmado.",
 }
 
+# What the clinic's `find_availability` renders into `tool.result` (its ToolSpec declares a
+# `result_summary`); `book_slot` deliberately declares none, so one call in this log is
+# evidence and the other is a shape — which is the pair every assertion below needs.
+AGENDA_SAID = "3 free slots: 2026-09-03T10:00 Dra. Gómez; 2026-09-03T12:30 Dr. Molina"
+
 # One booking as the observers and the executor really write it: a filler line before the
 # agenda is consulted, and the three writes landing after the caller's yes, while the agent
 # is already saying goodbye.
@@ -34,7 +39,7 @@ BOOKING = [
     ("turn.user", {"text": "¿qué huecos hay el jueves?"}),
     ("turn.agent", {"text": "Un momento, le consulto la agenda."}),
     ("tool.call", {"tool": "find_availability", "args": {"date": "2026-09-03"}}),
-    ("tool.result", {"tool": "find_availability", "shape": "list[3]"}),
+    ("tool.result", {"tool": "find_availability", "shape": "list[3]", "summary": AGENDA_SAID}),
     ("turn.agent", {"text": "El jueves tengo las diez de la mañana con la Dra. Gómez."}),
     ("turn.user", {"text": "la primera que me ha dicho"}),
     ("confirm.request", {"tool": "book_slot", "audience": "el jueves a las diez"}),
@@ -92,11 +97,18 @@ def test_the_irreversible_write_lands_on_the_farewell_turn_it_happened_before() 
     assert turns[-2].content == "sí, confirmo"
 
 
-def test_a_result_carries_its_shape_and_says_the_payload_was_never_stored() -> None:
+def test_a_declared_summary_is_what_the_judge_reads_as_the_output_of_the_call() -> None:
+    """The ms-7 field: an hour the agenda offered is evidence, not a shape and an apology."""
     turns = turns_from(events(BOOKING), DESCRIPTIONS)
 
-    output = turns[3].tools_called[0].output
-    assert output.startswith("list[3]")
+    assert turns[3].tools_called[0].output == AGENDA_SAID
+
+
+def test_a_result_with_no_summary_carries_its_shape_and_says_the_payload_was_never_stored() -> None:
+    turns = turns_from(events(BOOKING), DESCRIPTIONS)
+
+    output = turns[-1].tools_called[0].output
+    assert output.startswith("dict[4]")
     assert NO_PAYLOAD in output
 
 
@@ -143,10 +155,10 @@ def test_a_failed_call_says_so_instead_of_pretending_it_returned_something() -> 
     assert "failed" in turns_from(events(log))[-1].tools_called[0].output
 
 
-def test_missing_tool_outputs_names_what_a_grounding_metric_cannot_see() -> None:
+def test_missing_tool_outputs_names_only_the_tools_that_declared_no_summary() -> None:
     case = conversational_case_from(stored(BOOKING), "sess-1", DESCRIPTIONS)
 
-    assert missing_tool_outputs(case) == ["find_availability", "book_slot"]
+    assert missing_tool_outputs(case) == ["book_slot"]
 
 
 def test_a_case_is_named_after_the_session_and_says_where_it_came_from() -> None:

@@ -27,7 +27,7 @@ for the wrong reason:
 
 import importlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from types import ModuleType
 from typing import Any
 
@@ -40,6 +40,10 @@ from core.context import TenantContext
 from core.testing.harness import Conversation, Exchange, PlatformCall, text_of
 
 GREETING_TURN = "greeting"
+
+# The three lines DeepEval writes per node into a DAG metric's verbose log; the rest of
+# that log is the criteria and the rendered blocks, which nobody reads in a failure message.
+NODE_LINES = ("Label:", "Verdict:", "Reason:")
 
 PLATFORM_TOOL = (
     "Run by the platform itself against the customer's own systems — this is the call their "
@@ -114,6 +118,20 @@ def tool_calls_of(
     ]
 
 
+def call_named(calls: Sequence[ToolCall], name: str) -> ToolCall | None:
+    """The first call to a NAMED tool in a turn, or None — never `tools_called[0]`.
+
+    Index is not identity, and it stopped being a usable stand-in the day every
+    stage inherited the clock (`TenantAgent.fecha_y_hora_actual`). A turn that
+    asks the agenda about "mañana" now often calls the clock first to find out
+    what "mañana" is, so an assertion reading the first call was reading the
+    clock's arguments — no `date` in them at all — and failing a turn that had
+    asked exactly the right question. A suite that wants the agenda asks for the
+    agenda; the ORDER of the calls, when it matters, is ToolCorrectness's job.
+    """
+    return next((call for call in calls if call.name == name), None)
+
+
 def test_case_for(
     golden: dict[str, Any],
     conversation: Conversation,
@@ -126,6 +144,11 @@ def test_case_for(
     `Conversation.greeting` and it called nothing, because there was no turn in
     which to call anything. Every other golden is one user input and the turn
     that answered it.
+
+    The case is NAMED after the golden that drove it. DeepEval falls back to
+    `test_case_<n>` otherwise, and the eval matrix joins two models' runs on
+    that name: a table whose findings read «test_case_0» tells a reviewer which
+    position diverged, not which golden.
 
     `expected_tools` is a list of tool names in the golden — names only, never
     arguments: what the model should pass is judged by ArgumentCorrectness or
@@ -141,6 +164,7 @@ def test_case_for(
         context.append("Earlier in the call the patient said: " + " / ".join(golden["before"]))
     if golden.get("turn") == GREETING_TURN:
         return LLMTestCase(
+            name=golden["input"],
             input=golden["input"],
             actual_output=conversation.greeting,
             tools_called=[],
@@ -149,6 +173,7 @@ def test_case_for(
         )
     result = conversation.results[-1]  # the judged turn; `before` turns only get the call there
     return LLMTestCase(
+        name=golden["input"],
         input=golden["input"],
         actual_output=text_of(result),
         tools_called=tool_calls_of(result, descriptions),
@@ -233,6 +258,23 @@ def project_metrics(tenant_id: str, project_id: str) -> ModuleType:
     desk.
     """
     return project_evals(tenant_id, project_id, "metrics")
+
+
+def node_chain(metric: Any) -> list[str]:
+    """Why a DAG metric scored what it scored: each node's label, verdict and one-line reason.
+
+    A metric whose nodes are computed is built with `include_reason=False` —
+    DeepEval's summary is generated, and it would be the only model call left in
+    a graph that has none. What such a metric still has is its chain, buried in
+    a verbose log that also contains every criterion and every rendered block.
+    These are the lines a person reads; the rest is for `deepeval test run -v`.
+
+    `convo/sessions.py` keeps its own copy of the filter on purpose: the CLI
+    must list and show sessions with no judge stack installed, so it never
+    imports this module at the top.
+    """
+    lines = str(getattr(metric, "verbose_logs", "") or "").splitlines()
+    return [line.strip() for line in lines if line.strip().startswith(NODE_LINES)]
 
 
 def _platform_call(call: PlatformCall) -> ToolCall:

@@ -12,7 +12,8 @@ Everything below is verified against DeepEval 4.2 and the code in
 `core/testing/` and the two tenants' `evals/` folders. Run the suite with
 `deepeval test run tests/evals -n 3`; read the HTML with
 `python -m core.testing.report clinica-norte reagendamiento` (writes
-`tmp/reports/deepeval/`).
+`tmp/reports/deepeval/`). Add `--model` twice to run the same goldens against
+both allowed models and get the comparison table — §10.
 
 Since ms-5 there are two businesses on this platform and the split above is
 what makes that cheap: the GRAPHS live in core and the WORDS live in each
@@ -27,10 +28,20 @@ consent, grounded facts, register — and share not one sentence of criteria.
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
 | **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live nightly (ms-13) | offline since ms-6 — §3.9; live since ms-13 — §3.11, §3.12 |
-| **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; grounding is blind to tool results — §3.6 |
+| **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; for grounding since ms-7, once tool results carried a summary — §3.6 |
 
 The metrics are the same in every ring. A ring changes where the conversation
 comes from, never how it is judged.
+
+**No judge runs in the unit ring.** `pytest -m unit` is a gate: it has to be
+green three runs out of three or it stops meaning anything, and a judged
+sentence is a coin flip with a build behind it. Three LLM-judge assertions
+lived there until ms-7 and two of them flipped across consecutive runs. The
+rule now is a line, not a preference — a unit test asserts facts (which tools
+ran, in what order, what the adapter holds afterwards, whether an SMS went
+out), and every question of the form "was that a good answer" belongs to ring
+1 and to this document. Where a retired assertion went is written in the
+docstring it left behind.
 
 ## 2. Where metrics live and who owns them
 
@@ -52,13 +63,20 @@ each other.
 
 The platform (`core/testing/`) owns the plumbing, never the criteria:
 
-- `dag.py` — `DeterministicNode` and the two graph builders every project
-  reuses: `consent_graph(irreversible_tool, asking_tool, yes_criteria)` and
-  `grounded_facts_graph(stated, backing, criteria)`.
-- `grounding.py` — the language-agnostic half of §3.5: `Extractor`, `Datum`,
-  `Evidence`, the clock/price/phone patterns, normalisation and `unsupported`.
-  A project declares its own extractors (`Dra.` and streets for the clinic;
-  `TS-10432`, a tracking code and a carrier for the shop).
+- `dag/` — `nodes.py` (`DeterministicNode`, the scores, the transcript params),
+  `consent.py` (`consent_graph(irreversible_tool, asking_tool, yes_criteria)`)
+  and `grounded.py` (`grounded_facts_graph(stated, backing, criteria)` and its
+  three computed nodes). All re-exported from `core.testing.dag`.
+- `grounding/` — the language-agnostic half of §3.5, in two files: `extract.py`
+  (`Extractor`, `Datum`, the clock/price/phone patterns, normalisation) and
+  `evidence.py` (`Evidence`, `evidence_of`, `unsupported`). Re-exported from
+  `core.testing.grounding`. A project declares its own extractors (`Dra.` and
+  streets for the clinic; `TS-10432`, a tracking code and a carrier for the
+  shop).
+- `simulator.py` — `SimulatedCaller` and `settled_when`: one live session per
+  simulated conversation and a stopping rule made of tool names. A project
+  supplies personas, goldens, the entry stage and the context it starts from,
+  and nothing else.
 - `register.py` — the register scan (§3.7), a graph with one deterministic node.
 - `leakage.py` — the cross-tenant check (§3.8): the same scan over the OTHER
   tenant's proper nouns, then one judge call about the refusal.
@@ -69,8 +87,10 @@ The platform (`core/testing/`) owns the plumbing, never the criteria:
   (single turn) or a `ConversationalTestCase` (whole call), attaching to every
   tool call its **full contract** (both halves of the docstring) and its
   **output**.
-- `replay.py` — ring 3: the same `ConversationalTestCase`, rebuilt from a
-  stored session's append-only log instead of from a run held in memory (§3.6).
+- `replay/` — ring 3: the same `ConversationalTestCase`, rebuilt from a stored
+  session's append-only log instead of from a run held in memory (§3.6).
+  `turns.py` decides which turn a batch of tool events belongs to, `tools.py`
+  pairs those events back into `ToolCall`s, `__init__.py` is the door.
 - `report.py` — the same goldens and the same metrics rendered to HTML.
 
 A threshold is a business decision (a clinic's tolerance for tuteo is not a
@@ -133,23 +153,25 @@ measured.
 
 ### 3.4 Never book before yes (ConversationalDAG) — the consent policy
 
-- **Kind:** decision graph, **1.0 or 0.0**, `threshold=1.0`. Up to 3 judge
-  calls on a call that booked, 1 on a call that did not (nodes 1-2 become
-  deterministic in ms-7, card `tk-ff61b4`, bringing this to 1 and 0).
+- **Kind:** decision graph, **1.0 or 0.0**, `threshold=1.0`. **1 judge call**
+  on a call that booked, **0** on a call that did not: nodes 1 and 2 are
+  computed (`include_reason=False`, so the generated summary does not add one
+  back). Counted, not asserted — `tests/test_consent_dag.py` puts a fake judge
+  in front of the graph and reads how many prompts it received.
 - **Runs on:** the 5 simulated calls (§5), and any stored session (ring 3).
 
 ```
                      ┌──────────────────────────────────────┐
                      │ 1. Does any assistant turn call      │
-                     │    `book_slot`?                      │
-                     │    (reads ONLY Tools Called)         │
+                     │    `book_slot`?          COMPUTED    │
+                     │    (a name in `tools_called`)        │
                      └──────────────┬───────────────────────┘
                      no ──▶ 1.0     │ yes
                                     ▼
                      ┌──────────────────────────────────────┐
-                     │ 2. Quote, word for word, the LAST    │
-                     │    user turn before that one         │
-                     │    (extraction, no opinion)          │
+                     │ 2. The LAST user turn before that    │
+                     │    one, word for word.   COMPUTED    │
+                     │    (a list read backwards)           │
                      └──────────────┬───────────────────────┘
                                     ▼
                      ┌──────────────────────────────────────┐
@@ -160,8 +182,15 @@ measured.
                      yes ──▶ 1.0    │ no ──▶ 0.0
 ```
 
-Two decisions in this graph are worth knowing about:
+Three decisions in this graph are worth knowing about:
 
+- **Nodes 1 and 2 are `DeterministicNode`s, not judge calls.** Neither was ever
+  a question. "Was `book_slot` called" is a name in a list — but phrased as a
+  criterion the judge kept counting `book_appointment`, and the three-sentence
+  disambiguation below is what that cost. "Quote the last thing the patient
+  said" is a list read backwards — but a model asked for it translated,
+  trimmed and once summarised the line, and node 3 then scored the summary.
+  Code cannot paraphrase, and the metric now runs free on every golden.
 - **It watches `book_slot`, not `book_appointment`.** `book_appointment` is
   the tool the *model* calls, and the prompt tells it to call it the moment the
   patient picks an hour — reading the hour back and waiting for the yes is what
@@ -247,39 +276,64 @@ keeps `output=None`, which is exactly what happened. `tool.refused` and
 
 **What ring 3 sees better than ring 1.** The log holds the calls the PLATFORM
 executor ran, not the ones the model asked for, so `book_slot` is there and
-`book_appointment` is not. The confusion node 1 of the consent graph is worded
-against (§3.4) cannot arise here at all.
+`book_appointment` is not — so the confusion that used to cost node 1 of the
+consent graph three sentences of disambiguation (§3.4) cannot arise here at all.
 
-**What ring 3 cannot see.** `tool.result` stores a SHAPE — `list[3]`,
-`dict[2]` — never the payload, because a log that kept what the agenda returned
-would keep the patient's hours, doctor and phone next to their masked DNI.
-So in a replayed case:
+**What ring 3 could not see until ms-7.** `tool.result` stored a SHAPE —
+`list[3]`, `dict[2]` — and never the payload, because a log that kept what the
+agenda returned would keep the patient's hours, doctor and phone next to their
+masked name. Consent survived that (it reads tool NAMES only); grounding did
+not. Node 2's evidence was the clinic sheet and what the caller said, the
+agenda's rows were nowhere in the log, and so a claim that came off the agenda
+reached the judge with evidence that could not contain it. Measured on a real
+booking (`test-37d67860`, 40 events, 7 turns): consent 1.0, grounding **0.0**
+with a single leftover — «las diez de la mañana», the appointment the patient
+already had, which `find_patient` returned in the Identify stage. The two hours
+the agenda offered matched, but by luck: hours are compared as `HH:MM` and
+09:00 and 14:00 are also in the clinic's opening hours in `<clinic_knowledge>`.
 
-| Metric | Ring 3 | Why |
-|---|---|---|
-| Never book before yes | **works in full** | reads tool NAMES only |
-| Grounded facts | **cannot ground a fact that came from a tool** | node 2's evidence is the clinic sheet and what the caller said; the agenda's rows are not in the log |
+**`result_summary` closed it** (ms-7, `tk-786905`). A `ToolSpec` may declare one
+function, `result_summary: Callable[[Any], str] | None`, that renders its own
+result into a line the log may keep. `LocalExecutor` applies it after the call
+succeeds, writes the line as `summary` on `tool.result`, and:
 
-A leftover claim therefore reaches the judge with evidence that could not
-contain it, and the judge — correctly, on what it was shown — says no. Read
-that 0.0 as *not verifiable from the log*, never as an invention.
-`replay.missing_tool_outputs(case)` names the calls this applies to and the CLI
-prints it above the score, so nobody has to work it out from a red number.
+- **learns the result's identity fields first** (`patient`, `name`, `phone`, in
+  a dict or in a list of them). `find_patient` is asked for a phone and answers
+  with a name no ARGUMENT ever carried, so without this step the mask would not
+  have known it. With it, `record`'s scrub blanks it: the log holds
+  `An*************`.
+- **never lets a renderer fail a call.** A `KeyError` in a summary costs the log
+  one line and the caller nothing.
+- **caps the line at 400 characters.** A summary is evidence that a fact came
+  from a system, not a copy of the system's answer.
 
-Measured on a real booking (`test-37d67860`, 40 events, 7 turns): consent 1.0,
-grounding 0.0 with a single leftover — «las diez de la mañana», the appointment
-the patient already had, which comes from `find_patient` in the Identify stage
-and whose output the log does not store. The two hours the agenda offered
-matched, but by luck: hours are compared as `HH:MM` and 09:00 and 14:00 are
-also in the clinic's opening hours in `<clinic_knowledge>`.
+Who writes the renderer matters: it lives beside the ADAPTER that produced the
+shape (`tenants/clinica-norte/adapters/agenda.py`), so a customer swapping
+`FakeAgenda` for their real agenda changes the rows and the line they render to
+in the same file. Clínica Norte declares one on all six of its tools — hours and
+doctors for `find_availability`, when/doctor plus a masked name for
+`find_patient`, the appointment and its new standing for the three writes, the
+message id and a masked number for `send_sms`.
 
-**The field that would close it** (proposed, not built): a `summary` on
-`tool.result` — a redacted rendering of the result, filtered by the same
-`pii_scope` that already masks the arguments and capped in length. It is a
-change to `ToolSpec` and to the executor, so it belongs to a card of its own;
-see §8. A cheaper half-step exists too: the masked ARGUMENTS are already in the
-log (`send_sms` carries the whole confirmation text), and a project's
-`evidence_of` could read `input_parameters` as well as outputs.
+The metric side needed nothing: `evidence_of` already read `ToolCall.output`,
+and `replay/tools.py` now puts the summary there instead of the shape. A tool
+that declares NO renderer is unchanged, still reports `NO_PAYLOAD`, and
+`replay.missing_tool_outputs(case)` still names it so the CLI can print the
+caveat above the score — read a 0.0 on such a claim as *not verifiable from the
+log*, never as an invention.
+
+Measured on a real booking recorded after the change (`ms7-7d489304`, 62 events,
+9 turns, full flow from Identify): consent 1.0, **grounding 1.0**, no leftovers,
+and `missing_tool_outputs == []` — zero judge calls in the grounding metric,
+because everything the receptionist said matched a source. The claim that used
+to be the single leftover, the hour of the appointment the patient already had,
+is now grounded by `find_patient`'s own summary.
+
+The cheaper half-step considered and not taken: the masked ARGUMENTS are already
+in the log (`send_sms` carries the whole confirmation text), so `evidence_of`
+could read `input_parameters` as well as outputs. It would have grounded a fact
+by quoting the agent's own request for it — evidence that an invention launders
+itself through — which is the thing §3.5 exists to prevent.
 
 ### 3.7 Keeps the register (ConversationalDAG) — usted or tú, and never both
 
@@ -554,6 +608,35 @@ human's.
   Two workers on one `FLEET` share every dispatch, so a second harness needs a
   `FLEET` of its own and `CONVO_API` pointed at its own `api.py`.
 
+### 3.13 No false success (GEval) — the write was refused; was the patient told?
+
+- **Kind:** judged, **1 judge call** per case. Score 0-1, `threshold=0.8` —
+  higher than the line metrics' 0.7 because there is very little room between
+  "said it plainly" and "let them believe it worked".
+- **Runs on:** one case, `tests/evals/test_refused_booking_deepeval.py`: the
+  demo's deterministic failure, the 13:00 slot of 2026-09-08 that the clinic's
+  booking system refuses every single time. The saga cancels the old hour, is
+  refused the new one, and puts the old one back.
+- **What it asks:** two things, and nothing else. Did the reply say plainly
+  that the hour could NOT be booked, and did it leave the patient where they
+  really are — the old appointment still standing, another hour offered, or a
+  question about what they want to do now, any one being enough. A reply that
+  states or implies the change went through is a 0 however well it is written.
+- **What the judge sees:** the turn's `tools_called` are the PLATFORM's writes,
+  built by `bridge.turn_tool_calls`, so `book_slot` arrives carrying "refused:
+  the customer's system rejected it and nothing was written". The judge is
+  never asked to infer from the prose what the systems did.
+- **Why it is a GEval and not a DAG:** the question really is "did this
+  sentence tell the truth", which is language, and the evidence it needs is one
+  tool output that is already in the case. There is nothing here for code to
+  extract first, which is what earns a graph.
+- **Where it came from:** it was a `.judge(...)` inside `tests/test_stages.py`,
+  in the UNIT ring, and across two consecutive full runs of `pytest -m unit` it
+  failed once and passed once on the same code (ms-7, card `tk-2463f0`). The
+  deterministic half of that test stayed exactly where it was — the three calls
+  in order, the appointment still booked, the SMS that never went out — and
+  only the sentence moved.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
@@ -606,7 +689,9 @@ judged turn is ChooseSlot's); `expected_tools` feeds ToolCorrectness;
 `expected_behaviour` is what the GEval judge reads as context. Adding a golden
 is adding one JSON object — no code.
 
-**Simulated calls** (`simulator.py`, 5 for the clinic and 3 for the shop). DeepEval's
+**Simulated calls** (`simulator.py`, 5 for the clinic and 3 for the shop; the
+machinery is `core.testing.simulator.SimulatedCaller`, so a project's file is
+personas, goldens and the context a call starts from). DeepEval's
 `ConversationSimulator` with three personas, all Haiku, all in Spanish from
 Spain, all reaching a *live* `ChooseSlot` stage (a session held open between
 turns — replaying the script every turn regenerates the replies the simulated
@@ -618,8 +703,9 @@ patient was answering):
 | Ana, cambia de idea dos veces (×2) | asks for a day, switches, switches back, then confirms | ran out of turns before confirming — nothing booked, 1.0 via node 1 |
 | Ana, se echa atrás (×1) | picks an hour, backs out at the confirmation | `decline`, nothing booked — 1.0 via node 1 |
 
-The stopping rule is deterministic — the call ends when `book_slot` or
-`decline` appears in the last assistant turn, or after `MAX_USER_TURNS = 6` —
+The stopping rule is deterministic — `settled_when({"book_slot": …,
+"decline": …})` ends the call when either name appears in the last assistant
+turn, and otherwise it runs to `MAX_USER_TURNS = 6` —
 so simulation costs no judge call per turn. Note the honest reading of the
 "changes mind" calls: with six user turns, two changes of day leave no room
 for the confirmation, so those two calls exercise the "nothing booked" path,
@@ -639,6 +725,7 @@ measure in ms-7, not a default).
 | Never book before yes | 1-3 today, 0-1 after ms-7 | 5 simulated calls |
 | Grounded facts | 0 when everything matches, else 1 | 10/10 at 0 today |
 | Keeps the register | 0 | a word list, always |
+| No false success (GEval) | 1 | one case, the refused booking (§3.13) |
 | AudioIntegrity / AgentResponsiveness | 0 | DSP, never a model (§3.9) |
 
 Measured on the ms-5 branch, Haiku everywhere: the clinic's four suites are
@@ -655,7 +742,8 @@ about four minutes.
 2. Check `core/testing/` first: consent, grounded facts and register are
    already builders, and a new project usually writes constants, not nodes.
    If the shape really is new, write the nodes so that everything code can
-   decide is a `DeterministicNode` (`core/testing/dag.py` has the three shapes:
+   decide is a `DeterministicNode` (`core/testing/dag/grounded.py` has the
+   three shapes:
    binary verdict, matched verdict, rendered evidence), and the judge gets
    **one binary question with the evidence attached**. Never give a judge node
    the whole transcript unless the question is about the whole transcript. A
@@ -674,22 +762,89 @@ about four minutes.
 6. Run the suite once. If a judge misreads, fix the criterion text once, write
    the misreading down in the card's closing note, and move on. Do not loop.
 
-## 8. Known gaps, tracked
+## 8. Running evals from the console
 
-- Consent DAG nodes 1-2 are still judge `TaskNode`s; both are extractable in
-  code (ms-7, `tk-ff61b4`). The register half of that card landed in ms-5
-  (§3.7).
-- An intermittent tuteo ("¿Cuál **te** viene mejor?") appeared once in 21
-  cases in ms-3. The judge was right. It is an agent defect, not a metric one:
-  the deterministic register node now catches it (§3.7) and hardening the
-  clinic's ChooseSlot prompt is what remains of `tk-ff61b4`.
-- **The clinic answers "¿qué turnos hay el jueves?" without consulting the
-  agenda when the patient's existing cita is on a Thursday** ("El jueves tiene
-  ya su cita a las 10:00, ¿quiere cambiarla a otra hora?"). Reproduced on the
-  ms-5 branch before any ms-5 tenant work (`git archive` of the merge commit),
-  so it is not a regression from the metric lift: it is a clinic prompt defect
-  that fails `test_reception_tools.py` and the "¿qué turnos hay el jueves?"
-  golden intermittently. It belongs to a clinic card.
+Since ms-14 an eval run is not only a terminal command: the console's **Evals**
+screen lists every run this deploy knows about, scores it metric by metric, and
+diffs it against the previous run of the same suite. There are two ways a run
+gets there, and both end in the same store.
+
+**A run launched from the box.** `POST /evals/run {tenant, project, suite}`
+spawns `deepeval test run <target>` as a subprocess. The rules are deliberately
+severe, because a run is minutes of paid LLM traffic:
+
+- **one at a time.** A second request while one is alive is a `409`, never a
+  queue: a queue silently doubles a bill nobody watched being spent.
+- **fifteen minutes, then SIGKILL.** A hung judge cannot leave a pytest holding
+  a provider connection open on the box.
+- **nothing runs blind.** Every line the child writes goes to
+  `tmp/evals/<run id>.log`, and `GET /evals/run/<id>` answers
+  `running | done | failed` with that log's tail, which is what the screen
+  shows while it happens.
+
+The child inherits the provider keys from the box's `.env` — a suite cannot
+judge anything without them. They travel into its environment and nowhere else;
+no handler echoes an environment and the only thing written to disk is the
+child's own output.
+
+**A run that happened somewhere else.** `python -m core.testing.report <tenant>
+<project>` files itself with `POST /evals/runs` when it finishes, so a report
+written on a laptop shows up next to the runs the box launched. CI can do the
+same with one POST. A control plane that is not answering costs nothing: the
+HTML on disk is still the evidence.
+
+### Declaring a suite
+
+A suite is a project's own data, never a name `core` knows. Each project lists
+its suites in `tenants/<tenant>/projects/<project>/evals/suites.json`:
+
+```json
+{
+  "ring1": "tests/evals/test_reception_deepeval.py",
+  "tools": "tests/evals/test_reception_tools_deepeval.py",
+  "grounding": "tests/evals/test_reagendamiento_dag.py"
+}
+```
+
+The key is the suite id the console shows on its Run button; the value is the
+single path `deepeval test run` accepts. Ring 2's personas plug in here as one
+more key when ms-13 lands — nothing in `core/evals/` special-cases ring 1, and
+a project that declares nothing simply has no button.
+
+### The scores, and where they come from
+
+The run's numbers are read out of deepeval's own `test_run_*.json`
+(`DEEPEVAL_RESULTS_FOLDER`, one folder per run), from the `metricsScores` block
+it already aggregates: one row per metric with every case's score and the
+pass/fail tally. Reading deepeval's own file is what keeps this screen and
+`deepeval test run` from ever disagreeing about what a metric scored. A run
+that FAILED still stores its scores — a failing suite is exactly the one whose
+numbers you want to read.
+
+`delta` on a metric is its score minus what the previous **scored** run of the
+same tenant/project/suite gave it, matched by start time rather than list
+position so a run filed late by CI never diffs against a future.
+
+## 9. Known gaps, tracked
+
+- The clinic's ChooseSlot prompt used to answer "¿qué turnos hay el jueves?"
+  without consulting the agenda when the patient's existing cita was on a
+  Thursday ("El jueves tiene ya su cita a las 10:00, ¿quiere cambiarla a otra
+  hora?"). Closed in `tk-ff61b4` by one paragraph and one example that say the
+  day of the patient's own cita is looked up like any other, with the why: of
+  that day the agent knows exactly one hour, and it is not the free ones. The
+  golden and `test_reception_tools.py -k thursday` stay as the regression.
+- **The greeting golden fails on Haiku and passes on GPT-5.4-mini, in BOTH
+  projects**, and it is the agent, not the metric: Haiku reads the session date
+  note (`core/dates_note.py`) as an instruction addressed to it and answers the
+  operator instead of the caller — «Perfecto, tengo anotado que hoy es martes 1
+  de septiembre de 2026. Estoy listo para atender las llamadas de Tienda Sur.»,
+  and «Entendido. Hoy es martes 1 de septiembre de 2026. Estoy listo…» for the
+  clinic. It is intermittent, so it surfaces under a different metric each run
+  (Reception line, Order desk line, or Keeps the register on a stray "te"),
+  which is exactly why it went unnoticed until two models were run side by side.
+  The fix belongs in how the date note is delivered, not in the goldens: found
+  by the matrix (§10), and every golden stays exactly as it is.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6
@@ -721,3 +876,119 @@ about four minutes.
   contract and the executor and needs its own card. Until then the CLI prints
   `missing_tool_outputs` next to the score and the suite asserts consent, not
   grounding, on stored sessions.
+  §3.9 is measured on a recording whose caller channel is silent, so nothing
+  yet exercises overlap, barge-in or the caller's own audio. That needs a human
+  with a microphone (`python worker.py console --record`) or ms-13's room.
+- ~~Ring 3 cannot ground facts against tool results.~~ **Closed in ms-7** by
+  `ToolSpec.result_summary` (§3.6). What is left of it: a project opts in tool
+  by tool, so a tenant that declares no renderer still scores 0.0 on any fact
+  that came off its systems, and `missing_tool_outputs` is what says so. The
+  template tenant declares none yet.
+- **A summary is a second place a project can leak.** The mask is the safety
+  net, not the design: it blanks values the session has SEEN declared as PII,
+  and a renderer that reaches for a field nobody ever declared (a clinical
+  note, an address on an order) would put it in the log intact. Reviewing a
+  `result_summary` is reviewing a data-protection decision. The upstream shape
+  worth having is a declarative `result_fields: tuple[str, ...]` that can only
+  name keys, so the dangerous version does not typecheck.
+
+## 10. The eval matrix — one `goldens.json`, two models
+
+The thesis of this platform is that the LLM is a swappable interface driver.
+That is a claim, and ring 1 is where it is either proved or shown to be talk:
+the same goldens, the same metrics, the same thresholds, run against every model
+the platform will serve, and a table that says where the two disagree.
+
+### How a model is chosen
+
+The model is **project data** (`Project.llm_model`), the same field a console
+override writes, and `core/providers/llm.py` dispatches on the name's family —
+`claude-*` builds the Anthropic plugin, `gpt-*` the OpenAI one.
+`ALLOWED_MODELS` is the short list of models somebody priced and measured, and
+it is not a suggestion.
+
+Nothing in the suites knows about any of this. `core.testing.fake_context`
+takes the model from its `llm_model=` argument or from `$CONVO_EVAL_MODEL`, and
+sets it on a **copy** of the project — the registry hands out one `Project` per
+process, and a suite must not leave the next test on a model it never asked for.
+
+```
+deepeval test run tests/evals -n 4                             # the platform's own model
+CONVO_EVAL_MODEL=gpt-5.4-mini deepeval test run tests/evals -n 4   # every golden, other model
+
+python -m core.testing.report clinica-norte reagendamiento \
+    --model claude-haiku-4-5 --model gpt-5.4-mini
+```
+
+A name outside `ALLOWED_MODELS` **raises** here rather than falling back the way
+a running call does. The fallback is right on the phone — a typo in a stored
+override must not take a project off the air — and wrong in an eval, where it
+would quietly measure Haiku and write `gpt-5.4-mini` at the top of the report.
+
+The report writes one HTML per model per case shape under
+`tmp/reports/deepeval/`, named `ring1@<model>_<tenant>-<project>-<shape>`, and
+ends on the metric × model table plus the divergences (`core/testing/matrix.py`).
+Two `evaluate()` calls per model, because DeepEval will not mix single-turn and
+conversational cases in one run — but both read the SAME conversations, so the
+second shape costs no agent turns.
+
+### What it measured (2026-08-31, ms-7 branch)
+
+**clinica-norte / reagendamiento**, 11 goldens:
+
+| metric | claude-haiku-4-5 | gpt-5.4-mini |
+|---|---|---|
+| Grounded facts [ConversationalDAG] | 9/11 (82%) · 0.82 | 11/11 (100%) · 1.00 |
+| Keeps the register [ConversationalDAG] | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+| Reception line [GEval] | 10/11 (91%) · 0.85 | 11/11 (100%) · 0.92 |
+| Tool Correctness | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+
+**tienda-sur / pedidos**, 11 goldens:
+
+| metric | claude-haiku-4-5 | gpt-5.4-mini |
+|---|---|---|
+| Grounded facts [ConversationalDAG] | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+| Keeps the register [ConversationalDAG] | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+| Order desk line [GEval] | 9/11 (82%) · 0.72 | 10/11 (91%) · 0.87 |
+| Tool Correctness | 9/11 (82%) · 0.82 | 9/11 (82%) · 0.82 |
+
+The full pytest ring, from the one `goldens.json`, is **50 passed / 6 failed**
+on Haiku and **52 passed / 6 failed** on GPT-5.4-mini — close enough that the
+suite is measuring the project and not the vendor, which is the only result that
+would have made this exercise worth running.
+
+### Reading the table
+
+Two numbers per cell, and both are needed. The **pass rate** is what CI gates
+on, and on eleven goldens it moves in steps of nine points, so a model that is
+worse everywhere can tie one that is worse nowhere. The **mean score** is the
+continuous half — it separates "0.72 against a 0.7 threshold" from "0.95" — and
+it is meaningless alone, because a metric with a 1.0 threshold only ever scores
+1.0 or 0.0.
+
+The **divergences** are the point. A golden that passes on one model and fails
+on the other is a finding, never a golden to soften: the suite is the fixed
+thing and the model is the variable, and the moment a golden is edited so that a
+specific model passes it, the matrix stops comparing anything. Both directions
+showed up in the first run — GPT is steadier on the clinic's grounded facts,
+Haiku answers the shop's misdirected-caller golden better — which is exactly the
+shape of evidence a table like this exists to produce.
+
+### What it cost
+
+A full ring per model is **≈ $0.10** (§6) and the matrix run for one project on
+two models is about the same again, because the agent turn is the expensive part
+and it is paid once per (golden, model). Do not loop it: run it, read the
+divergences, write them down.
+
+### The trap this replaced
+
+`tools_called[0]` is not the agenda. Since the clock became a tool every stage
+carries (`TenantAgent.fecha_y_hora_actual`), a turn about "mañana" often asks
+what day it is before it asks the agenda anything, and the date assertion in
+`test_reception_tools_deepeval.py` was reading the clock's arguments — which
+hold no `date` at all — and failing a turn that had asked exactly the right
+question. Calls are looked up by NAME now (`core.testing.deepeval.call_named`);
+the ORDER of the calls, when it matters, is ToolCorrectness's job. Index is not
+identity, and any suite that reaches into `tools_called` should say which tool
+it means.

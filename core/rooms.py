@@ -39,14 +39,14 @@ class RoomsUnreachable(RuntimeError):
 
 async def active_rooms() -> list[dict[str, Any]]:
     """Every room an agent is currently in, newest first — one call, then the socket closes."""
-    client = _client()
+    api_client = client()
     try:
-        rooms = (await client.room.list_rooms(api.ListRoomsRequest())).rooms
-        views = [await _room_view(client, room) for room in rooms]
+        rooms = (await api_client.room.list_rooms(api.ListRoomsRequest())).rooms
+        views = [await _room_view(api_client, room) for room in rooms]
     except Exception as error:  # noqa: BLE001 — any failure here is one 503 to the console
         raise RoomsUnreachable(f"livekit: {error}") from error
     finally:
-        await client.aclose()
+        await api_client.aclose()
     live = [view for view in views if view["agent"]]
     return sorted(live, key=lambda view: view["started_at"], reverse=True)
 
@@ -78,17 +78,17 @@ async def create_eval_room(meta: SessionMeta, persona: str | None = None) -> str
         metadata=meta.model_dump_json(),
         attributes={PERSONA_ATTR: persona} if persona else {},
     )
-    client = _client()
+    api_client = client()
     try:
-        await client.agent_dispatch.create_dispatch(request)
+        await api_client.agent_dispatch.create_dispatch(request)
     except Exception as error:  # noqa: BLE001 — any failure here is one 503 to the caller
         raise RoomsUnreachable(f"livekit: {error}") from error
     finally:
-        await client.aclose()
+        await api_client.aclose()
     return room
 
 
-def _client() -> api.LiveKitAPI:
+def client() -> api.LiveKitAPI:
     """The API client, on the same defaults `core.auth` mints tokens with.
 
     `api.LiveKitAPI()` reads the environment itself and raises when `LIVEKIT_URL`

@@ -1,12 +1,17 @@
 """Reading the agenda: the date language, the fake adapter, and the model's tool call.
 
 Three rings in one file, cheapest first: `dates.resolve` and `FakeAgenda` are
-pure and run in milliseconds; the last three tests put a real Claude Haiku in
+pure and run in milliseconds; the last two tests put a real Claude Haiku in
 front of the prompt and are skipped without a key.
 
 The agenda belongs to the ChooseSlot stage from ms-3 on — a call reaches it once
 the patient is identified — so the model tests start there instead of replaying
 an identification whose behaviour is pinned in `tests/test_stages.py`.
+
+Nothing here asks a judge anything. What the reply SAYS about the hours it was
+given is scored in the evals ring, on the «¿qué turnos hay el jueves?» golden of
+`tenants/clinica-norte/projects/reagendamiento/evals/goldens.json` — see the
+note on `test_asking_for_thursday_calls_the_tool_with_the_day_the_patient_said`.
 """
 
 import datetime
@@ -15,7 +20,7 @@ import json
 
 import pytest
 
-from core.testing import TODAY, fake_context, final_message, run_conversation
+from core.testing import TODAY, fake_context, run_conversation
 from tests.conftest import needs_llm
 from tests.test_stages import identified_context
 
@@ -153,36 +158,30 @@ async def test_the_tool_reaches_the_adapter_through_the_platform_executor(tc) ->
 
 @needs_llm
 async def test_asking_for_thursday_calls_the_tool_with_the_day_the_patient_said(choosing) -> None:
-    """The turn reaches the agenda, and with the day the patient named — not one the model invented.
+    """The turn reaches the agenda, and with the day the patient named — not one it invented.
 
-    Haiku often opens with "Un momento, le consulto la agenda…" before calling,
-    so the leading message is skipped rather than asserted against: whether the
-    model says something first is style, and pinning it would make this test
-    fail on a politer answer. What must hold is that the call happens and that
-    its `date` argument, resolved against the frozen `today`, is the Thursday.
+    Nothing about the SHAPE of the turn is asserted any more. Haiku usually
+    opens with "Un momento, le consulto la agenda…" before calling, sometimes
+    says nothing at all, and sometimes asks the agenda twice because the
+    patient's appointment carries a specialty — all three are correct calls, and
+    walking the events in order and demanding the call be the next one after a
+    single skipped message failed a whole run for a politer answer. What must
+    hold is that the agenda was asked at all, and that every day it was asked
+    about, resolved against the frozen `today`, is the Thursday the patient said.
+
+    Whether the reply then OFFERS those hours is a judgement, and a judgement
+    does not belong in a gate that has to be green three runs out of three: the
+    «¿qué turnos hay el jueves?» golden scores it in the evals ring, where
+    `reception_line` reads it against the expected behaviour and
+    `grounded_facts_dag` proves every hour came off the agenda.
     """
     tc, stage = choosing
     conversation = await run_conversation(tc, ["¿qué turnos hay el jueves?"], stage)
 
-    turn = conversation.results[0].expect
-    turn.skip_next_event_if(type="message", role="assistant")
-    call = turn.next_event().is_function_call(name="find_availability")
-    said = call.event().item.arguments
-    assert dates.resolve(_argument(said, "date"), tc.today) == THURSDAY
+    days = _days_asked_of_the_agenda(conversation.results[0], tc.today)
 
-
-@needs_llm
-async def test_the_reply_offers_the_hours_the_agenda_returned(choosing, judge_llm) -> None:
-    """The answer, not the filler: `final_message` skips the "un momento" said before the call."""
-    tc, stage = choosing
-    conversation = await run_conversation(tc, ["¿qué turnos hay el jueves?"], stage)
-
-    message = final_message(conversation.results[0])
-    await message.judge(
-        judge_llm,
-        intent="ofrece al menos una hora concreta para el jueves y pregunta cuál prefiere el "
-        "paciente, sin inventar que va a llamar más tarde para comprobarlo",
-    )
+    assert days, "the turn never reached the agenda"
+    assert set(days) == {THURSDAY}, f"the agenda was asked about {days}, not {THURSDAY}"
 
 
 @needs_llm
@@ -198,6 +197,15 @@ async def test_the_system_prompt_is_served_from_the_cache_on_the_second_turn(cho
     )
 
 
-def _argument(raw: str, name: str) -> str:
-    """One argument out of the JSON the model produced for a function call."""
-    return json.loads(raw)[name]
+def _days_asked_of_the_agenda(result, today: datetime.date) -> list[datetime.date]:
+    """Every day `find_availability` was asked about in one turn, as calendar dates.
+
+    The model passes the day in the patient's own words — that is what the tool
+    documents — so the raw argument is read through `dates.resolve` before it is
+    compared to anything.
+    """
+    return [
+        dates.resolve(json.loads(event.item.arguments)["date"], today)
+        for event in result.events
+        if event.type == "function_call" and event.item.name == "find_availability"
+    ]

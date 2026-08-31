@@ -1,12 +1,18 @@
 /* One live session, raw livekit-client: the door, the microphone, the words, the state.
  *
- * Three doors, one hook. `voice` and `chat` mint a ticket at POST /token and
- * open a fresh room the agent is dispatched into; `observe` mints a hidden,
- * publish-nothing ticket at POST /observe and joins a room somebody is
- * already in — a phone call, usually, which never passed through /token at
- * all. After connect the three are the same object: the same
- * `lk.transcription` streams, the same `lk.agent.state` attribute, the same
- * transcript on screen.
+ * Four doors, one hook. `voice` and `chat` mint a ticket at POST /token and
+ * open a fresh room the agent is dispatched into; `observe` and `supervise`
+ * join a room somebody is already in — a phone call, usually, which never
+ * passed through /token at all. After connect all four are the same object:
+ * the same `lk.transcription` streams, the same `lk.agent.state` attribute,
+ * the same transcript on screen.
+ *
+ * `observe` and `supervise` differ only in who is knocking. /observe mints an
+ * anonymous `observer:<hex>` ticket — a developer peeking at a room from the
+ * tenant screen. /supervise mints a named, short-lived, role-scoped
+ * `sup:<uid>` one, and the supervisor desk is expected to follow it with
+ * `superviseEntered` so the arrival reaches the caller's log. Both are hidden
+ * and publish nothing; only one of them is on the record.
  *
  * Deliberately not here: no components package, no audio element in JSX, no
  * global store. The Room is a ref because it is not React state — what React
@@ -14,16 +20,15 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ParticipantKind,
-  Room,
-  RoomEvent,
-  Track,
-  type Participant,
-  type TextStreamReader,
-} from "livekit-client";
+import { Room, RoomEvent, Track, type Participant, type TextStreamReader } from "livekit-client";
 
-import { mintToken, observe, type Channel } from "./api";
+import {
+  mintToken,
+  observe,
+  supervise,
+  type Channel,
+  type SupervisorCapability,
+} from "./api";
 import {
   AGENT_STATE,
   SEGMENT_ID,
@@ -34,12 +39,25 @@ import {
   type Line,
   type Speaker,
 } from "./transcript";
+import { aim, isAgent } from "./verbs";
 
 const TRANSCRIPTION_TOPIC = "lk.transcription";
 const CHAT_TOPIC = "lk.chat";
 
-/** Which door this session came in by. `observe` is the only one that publishes nothing. */
-export type Mode = Channel | "observe";
+/** Which door this session came in by. `observe` publishes nothing; `supervise` depends. */
+export type Mode = Channel | "observe" | "supervise";
+
+/** Who is knocking and with which powers — the only thing a supervisor's ticket varies.
+ *
+ * `userId` is deliberately stable for the life of a desk: LiveKit admits one
+ * connection per identity, so re-minting `sup:<userId>` with a bigger grant
+ * UPGRADES the participant already in the room instead of adding a second
+ * ghost of the same person. Leave it empty and every escalation is a stranger.
+ */
+export interface Ticketed {
+  capability: SupervisorCapability;
+  userId: string;
+}
 
 /** Where the session is. `ended` is a call that finished; `failed` is one that never opened. */
 export type Phase = "idle" | "connecting" | "live" | "ended" | "failed";
@@ -50,13 +68,17 @@ export interface Live {
   phase: Phase;
   error: string | null;
   room: string | null;
+  identity: string | null;
   lines: Line[];
   state: AgentState | null;
   audible: boolean;
-  open: (mode: Mode, room?: string) => Promise<void>;
+  capability: SupervisorCapability | null;
+  open: (mode: Mode, room?: string, as?: Ticketed) => Promise<void>;
   close: () => Promise<void>;
   say: (text: string) => Promise<void>;
   listen: (on: boolean) => void;
+  mic: (on: boolean) => Promise<void>;
+  verb: (kind: string, body?: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }
 
 /** Open, hold and close one session against this tenant's project. */
@@ -66,10 +88,14 @@ export function useRoom(tenant: string, project: string): Live {
   const audibleRef = useRef(true);
   const typed = useRef(0);
 
+  const joined = useRef<string | null>(null);
+
   const [mode, setMode] = useState<Mode | null>(null);
+  const [capability, setCapability] = useState<SupervisorCapability | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
+  const [identity, setIdentity] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [state, setState] = useState<AgentState | null>(null);
   const [audible, setAudible] = useState(true);
@@ -80,33 +106,46 @@ export function useRoom(tenant: string, project: string): Live {
     speakers.current.forEach((element) => element.remove());
     speakers.current = [];
     if (open) await open.disconnect();
+    joined.current = null;
     setPhase((was) => (was === "idle" || was === "failed" ? was : "ended"));
     setState(null);
+    setIdentity(null);
   }, []);
 
   const open = useCallback(
-    async (next: Mode, target?: string) => {
+    async (next: Mode, target?: string, as?: Ticketed) => {
+      // Re-entering the SAME room with a bigger ticket is an escalation, not a
+      // new call: the transcript on screen is the one the supervisor has been
+      // reading and throwing it away would hide what they are about to act on.
+      const escalating = Boolean(target) && target === joined.current;
       await close();
       setMode(next);
       setPhase("connecting");
       setError(null);
-      setLines([]);
+      if (!escalating) setLines([]);
       setName(target ?? null);
-      const listen = next !== "observe";
-      audibleRef.current = listen;
-      setAudible(listen);
+      setIdentity(null);
+      setCapability(null);
+      // A watched call starts SILENT: a supervisor reads it by default and only
+      // then chooses to hear it. `startAudio` is still called — it needs the
+      // click that opened the door — so the toggle has something to unmute.
+      if (!escalating) {
+        const listen = next === "voice" || next === "chat";
+        audibleRef.current = listen;
+        setAudible(listen);
+      }
       try {
-        const ticket =
-          next === "observe"
-            ? await observe(target ?? "")
-            : await mintToken({ tenant, project, channel: next });
-        const joined = new Room({ adaptiveStream: false, dynacast: false });
-        wire(joined, { setLines, setState, speakers, audibleRef });
-        room.current = joined;
-        await joined.connect(ticket.url, ticket.token);
-        if (next === "voice") await joined.localParticipant.setMicrophoneEnabled(true);
-        if (listen) await joined.startAudio();
+        const ticket = await ticketFor(next, target ?? "", tenant, project, as);
+        const live = new Room({ adaptiveStream: false, dynacast: false });
+        wire(live, { setLines, setState, speakers, audibleRef });
+        room.current = live;
+        await live.connect(ticket.url, ticket.token);
+        if (next === "voice") await live.localParticipant.setMicrophoneEnabled(true);
+        await live.startAudio();
         setName(ticket.room);
+        joined.current = ticket.room;
+        setIdentity(live.localParticipant.identity);
+        setCapability(as?.capability ?? null);
         setPhase("live");
       } catch (cause) {
         room.current = null;
@@ -130,6 +169,20 @@ export function useRoom(tenant: string, project: string): Live {
     await open.localParticipant.sendText(said, { topic: CHAT_TOPIC });
   }, []);
 
+  /** The supervisor's own microphone — the half of a takeover the caller actually hears. */
+  const mic = useCallback(async (on: boolean) => {
+    const open = room.current;
+    if (!open) return;
+    await open.localParticipant.setMicrophoneEnabled(on);
+  }, []);
+
+  /** Aim one supervision verb at this room's agent — `core/lib/verbs` owns the protocol. */
+  const verb = useCallback(async (kind: string, body: Record<string, unknown> = {}) => {
+    const open = room.current;
+    if (!open) throw new Error("not in a room");
+    return aim(open, kind, body);
+  }, []);
+
   const listen = useCallback((on: boolean) => {
     audibleRef.current = on;
     speakers.current.forEach((element) => {
@@ -140,7 +193,36 @@ export function useRoom(tenant: string, project: string): Live {
 
   useEffect(() => () => void close(), [close]);
 
-  return { mode, phase, error, room: name, lines, state, audible, open, close, say, listen };
+  return {
+    mode,
+    phase,
+    error,
+    room: name,
+    identity,
+    lines,
+    state,
+    audible,
+    capability,
+    open,
+    close,
+    say,
+    listen,
+    mic,
+    verb,
+  };
+}
+
+/** The ticket each door is opened with — the only line where the four differ. */
+async function ticketFor(
+  mode: Mode,
+  target: string,
+  tenant: string,
+  project: string,
+  as?: Ticketed,
+): Promise<{ url: string; token: string; room: string }> {
+  if (mode === "supervise") return supervise(target, as?.capability ?? "listen", as?.userId ?? "");
+  if (mode === "observe") return observe(target);
+  return mintToken({ tenant, project, channel: mode });
 }
 
 interface Sinks {
@@ -201,10 +283,6 @@ async function read(
 function speakerOf(room: Room, identity: string): Speaker {
   const participant = room.remoteParticipants.get(identity);
   return participant && isAgent(participant) ? "agent" : "user";
-}
-
-function isAgent(participant: Participant): boolean {
-  return participant.kind === ParticipantKind.AGENT;
 }
 
 function stateOf(participant: Participant): AgentState | null {

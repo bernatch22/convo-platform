@@ -144,6 +144,13 @@ Evals (ring 1, needs `ANTHROPIC_API_KEY`; the judge is Claude Haiku, set
 ```bash
 uv run pytest -m unit                     # includes LLM-judged tests when the key is present
 uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-tenant leakage pair
+
+# the same goldens against the other allowed model — nothing in the suite is edited
+CONVO_EVAL_MODEL=gpt-5.4-mini uv run deepeval test run tests/evals -n 3
+
+# HTML per model plus the metric x model comparison table (needs OPENAI_API_KEY too)
+uv run python -m core.testing.report clinica-norte reagendamiento \
+    --model claude-haiku-4-5 --model gpt-5.4-mini
 ```
 
 Ring 2 (live voice) calls the agent out loud with a synthetic caller, so it
@@ -162,15 +169,55 @@ transcribed. `CONVO_API` points the caller at another control plane.
 
 [`docs/evals.md`](docs/evals.md) explains every metric and how to add one.
 
+A run also has a screen: the console's Evals page lists every run with its
+scores, diffs it against the previous run of the same suite, and can launch one
+on the box (one at a time, killed at fifteen minutes, log tail on screen).
+
+[`docs/evals.md`](docs/evals.md) explains every metric, how to add one, and how
+a project declares the suites the console can run (§8); §9 is the model matrix.
+
 ## The web UI
 
 `ui/` is the operator console: the tenant/project switcher, Talk (the three
 channels — WebRTC voice, web chat, and the phone line on **+1 417 674 3169**),
-Sessions, Pipeline, and the shells for Evals and Supervisor. Vite + React +
+Sessions, Pipeline, Evals (every stored run with its per-metric diff, and the
+button that launches another on the box) and the Supervisor desk. Vite + React +
 TypeScript + react-router; no state library, no CSS framework.
 
+**The Supervisor desk** (`/supervisor`) lists every call live on the fleet,
+phone calls included. Clicking one joins that room with a short-lived,
+subscribe-only ticket from `POST /supervise` and shows the transcript live,
+audio muted until you press *listen in*. The supervisor is `hidden` at the SFU,
+so the caller is never told anybody joined — and the badge on the screen is the
+server's own answer, read back off `list_participants`, not our claim. The
+arrival is written into the caller's own log as `supervisor.join`:
+
+```bash
+uv run python -m convo sessions show <id> | grep supervisor
+```
+
+From that desk a supervisor can also **whisper** to the agent, **take the
+line**, and **transfer the call to a phone** — cold (a SIP REFER: the caller
+leaves for that number and this job ends) or warm (the colleague is dialled
+into the room, briefed where the caller provably cannot hear it, then bridged).
+Every verb is one line in the caller's own log, and a transfer carries its mode
+and its outcome, so a transfer that did NOT happen is as readable as one that
+did. Warm needs an outbound trunk (`SIP_OUTBOUND_TRUNK_ID`) this box does not
+have yet and says so instead of failing mid-call; cold needs only
+`transfer_mode=enable-all` on the Twilio trunk — `infra/box/README.md` has the
+exact toggles, and `scripts/twilio_trunk.py` reports whether they are set.
+
+The same three verbs without a browser, for an escalation rule or a terminal:
+
+```bash
+curl -XPOST localhost:8090/supervise/verb -H 'content-type: application/json' \
+  -d '{"room":"call-…","identity":"sup:berna","verb":"transfer",
+       "mode":"cold","to":"+34600111222"}'
+```
+
 Two ways to run it. In development the vite server serves the app and proxies
-`/tenants`, `/token`, `/sessions` and `/pipeline` to the control plane:
+`/tenants`, `/token`, `/sessions`, `/pipeline` and `/evals` to the control
+plane:
 
 ```bash
 uv run uvicorn api:app --port 8090        # terminal 1: the control plane
