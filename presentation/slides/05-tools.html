@@ -3,22 +3,82 @@
 
     <div class="head-block" data-anim="1">
       <div class="eyebrow">05 <span class="sep">·</span> Entregable 4 — diseño de tools y contratos</div>
-      <h2 class="head">Tools y contratos</h2>
+      <h2 class="head" style="max-width:38ch">El contrato se lee dos veces: una la máquina y otra el modelo</h2>
+      <p class="lede">
+        Ninguna función es una tool hasta que declara qué le hace al mundo. El <code>ToolSpec</code>
+        es lo que lee la plataforma; el docstring, lo que lee el modelo. Descrita sólo en el
+        prompt, el guard se queda sin nada que comprobar: no hay dónde escribir «esto es
+        irreversible».
+      </p>
     </div>
 
-    <div class="todo" data-anim="2">
-      <div class="who">Sin escribir <span class="sep">·</span> card tk-a66bd0 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
-      <ul>
-        <li>ToolSpec entero: side_effect (read|write|irreversible), idempotency_key, pii_scope, timeout_s, compensation.</li>
-        <li>El docstring es el esquema que ve el modelo: el contrato se lee dos veces, una por el guard y otra por el LLM.</li>
-        <li>ToolError frente a cualquier otra excepción: qué puede aprender el modelo de un fallo y qué no debe ver jamás.</li>
-        <li>Tool local, adapter y tool remota: el mismo contrato, tres ejecutores.</li>
-      </ul>
-      <div class="note"><b>Figura:</b> pre.code con el ToolSpec real y una tool declarada al lado. Dos columnas.</div>
-      <div class="note">
-        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
-        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+    <div class="grid-7-5 fill">
+
+      <div style="display:flex;flex-direction:column;gap:10px" data-anim="2">
+        <pre class="code" style="font-size:12px">@dataclass(frozen=True)
+class <b>ToolSpec</b>:
+    name: str
+    <b>side_effect</b>: SideEffect          # read | write | irreversible
+    <b>idempotency_key</b>: str | None = None
+    <b>pii_scope</b>: frozenset[str] = field(default_factory=frozenset)
+    <b>timeout_s</b>: float = 8.0
+    <b>compensation</b>: str | None = None
+    <b>result_summary</b>: Callable[[Any], str] | None = None
+    <b>infrastructure</b>: bool = False
+
+<b>BOOK_SLOT</b> = ToolSpec(
+    name="book_slot",
+    side_effect=SideEffect.<b>IRREVERSIBLE</b>,      # exige token de confirmación
+    idempotency_key="slot_id",                # un reintento no reserva dos veces
+    pii_scope=frozenset({"phone", "patient"}),
+    compensation="cancel_slot",               # el deshacer, declarado
+    timeout_s=8.0,
+    result_summary=summarise_change,          # la única línea que el log guarda
+)</pre>
       </div>
+
+      <div class="rows" style="--row-pad:9px" data-anim="3">
+        <div class="row">
+          <div class="idx">01</div>
+          <div class="txt">El efecto decide, no el nombre
+            <span class="why">Gobierna confirmación, reintentos y registro. El tablero cuenta
+              transacciones leyendo <code>irreversible</code> del log, nunca una lista de
+              nombres.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">02</div>
+          <div class="txt">El fallo tiene dos audiencias
+            <span class="why"><code>ToolError</code> es la única que el modelo lee, y su mensaje es
+              una frase que el llamante podría oír. Lo demás se traduce; la causa real va al
+              log.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">03</div>
+          <div class="txt">El log guarda la forma, no el resultado
+            <span class="why"><code>tool.result</code> registra <code>list[3]</code>, jamás la fila
+              de la agenda. <code>result_summary</code> es opcional y pasa por la máscara de PII.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">04</div>
+          <div class="txt">Un contrato, tres ejecutores
+            <span class="why"><code>ToolExecutor</code> es un <code>Protocol</code>: local hoy,
+              en el proceso del cliente mañana. Por encima de esa línea no cambia nada.</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="proof" data-anim="4">
+      <b>Validación.</b> <b>core/tools/contract.py</b> y <b>executor.py</b>, con
+      <span class="n">20</span> tests en <b>tests/test_tools.py</b> — entre ellos
+      <em>an_adapter_that_explodes_never_leaks_its_stack_trace_to_the_llm</em> y
+      <em>a_renderer_that_explodes_costs_the_log_a_line_and_the_caller_nothing</em>.
+      <em>the_clock_is_declared_infrastructure_and_no_project_catalog_holds_it</em> impide que la
+      excepción vuelva a ser una lista de nombres.
     </div>
 
   </div>
