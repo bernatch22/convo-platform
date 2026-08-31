@@ -1,72 +1,76 @@
 <section class="slide" data-title="Introducción" data-entregable="0">
   <style>
-    .i01-title { font: 600 54px/1.12 var(--sans); color: var(--ink); letter-spacing: -.015em; margin: 0 0 12px; }
-    .i01-sub   { font: 400 19px/1.4 var(--sans); color: var(--ink-2); margin: 0 0 30px; }
-    .i01-intro { font: 400 21px/1.6 var(--sans); color: var(--ink); max-width: 84ch; margin: 0 0 38px; }
-    .i01-intro strong { font-weight: 600; }
-    .i01-live  { display: inline-block; border: 1.5px solid var(--accent); border-radius: 10px;
-                 padding: 18px 26px; background: var(--accent-soft); }
-    .i01-live .lbl { font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase;
-                     color: var(--accent); margin: 0 0 6px; }
-    .i01-live .url { font: 500 24px var(--mono); color: var(--ink); margin: 0; }
-    .i01-note  { font: 400 15px/1.5 var(--sans); color: var(--muted); margin: 30px 0 0; }
+    .p1-title { font: 600 50px/1.1 var(--sans); color: var(--ink); letter-spacing: -.015em; margin: 0 0 10px; }
+    .p1-sub   { font: 400 18px/1.4 var(--sans); color: var(--ink-2); margin: 0 0 26px; }
+    .p1-intro { font: 400 19.5px/1.6 var(--sans); color: var(--ink); max-width: 92ch; margin: 0 0 30px; }
+    .p1-intro strong { font-weight: 600; }
+    .p1-intro .shield { color: var(--ink-2); }
+    .p1-live { display: flex; align-items: baseline; gap: 26px; border: 1.5px solid var(--accent);
+               border-radius: 12px; background: var(--accent-soft); padding: 16px 26px; flex: none; }
+    .p1-live .lbl { font: 500 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); flex: none; }
+    .p1-live .url { font: 600 23px var(--mono); color: var(--ink); letter-spacing: -.01em; }
+    .p1-live .tel { font: 400 15px var(--sans); color: var(--ink-2); margin-left: auto; }
+    .p1-live .tel strong { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+    .p1-cards { display: grid; grid-template-columns: 1fr 1fr 1.15fr; gap: 18px; margin-top: 20px; }
+    .p1-cards .c { border: 1px solid var(--rule); border-radius: 12px; background: var(--paper);
+                   padding: 18px 22px; display: flex; flex-direction: column; gap: 9px; }
+    .p1-cards .c.metodo { border: 1.5px solid var(--accent); }
+    .p1-cards .k { font: 500 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+    .p1-cards h3 { font: 600 17px/1.3 var(--sans); color: var(--ink); margin: 0; }
+    .p1-cards p { font: 400 13.5px/1.6 var(--sans); color: var(--ink-2); margin: 0; }
+    .p1-cards p strong { color: var(--ink); font-weight: 600; }
+    .p1-cards .board { font: 500 13px var(--mono); color: var(--accent); }
   </style>
   <div class="slide-body">
 
-    <div data-anim="1" style="margin-top:0">
-      <div class="eyebrow" style="margin-bottom:24px">Prueba técnica <span class="sep">·</span> Principal Platform Architect <span class="sep">·</span> ABAI</div>
-      <h1 class="i01-title">Plataforma conversacional transaccional con IA</h1>
-      <p class="i01-sub">Propuesta de arquitectura</p>
+    <div data-anim="1">
+      <div class="eyebrow" style="margin-bottom:20px">Prueba técnica <span class="sep">·</span> Principal Platform Architect <span class="sep">·</span> ABAI</div>
+      <h1 class="p1-title">Plataforma conversacional transaccional con IA</h1>
+      <p class="p1-sub">Propuesta de arquitectura</p>
     </div>
 
-    <p class="i01-intro" data-anim="2" style="margin-bottom:26px">
+    <p class="p1-intro" data-anim="2">
       Un cliente llama por teléfono o escribe por chat. Un agente de IA lo atiende y
       <strong>ejecuta acciones reales de negocio</strong>. Este documento presenta la
-      arquitectura de una plataforma que lo hace <strong>para múltiples clientes sobre un
-      único despliegue</strong> — y está construida y en operación: dos negocios atienden hoy
-      una línea telefónica real, con cada llamada auditada, grabada y evaluada.
+      arquitectura de una plataforma que lo hace <strong>para múltiples clientes sobre un único
+      despliegue</strong> — y que está construida y en operación.
+      <span class="shield">El sistema en vivo no es el entregable: es la verificación —
+      ninguna decisión se sostiene por estar implementada, sino por su justificación.</span>
     </p>
 
-    <div data-anim="3" style="border:1.5px solid var(--accent);border-radius:10px;overflow:hidden;flex:none">
-      <div style="background:var(--accent-soft);padding:12px 22px;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--accent)">
-        <span><span style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)">Plataforma en vivo&nbsp;&nbsp;</span>
-        <span style="font:500 20px var(--mono);color:var(--ink)">https://lk.bernardocastro.dev</span></span>
-        <span style="font:400 14px var(--sans);color:var(--ink-2)">por teléfono: <strong style="font-family:var(--mono)">+1 417 674 3169</strong> (atiende la clínica)</span>
+    <div class="p1-live" data-anim="3">
+      <span class="lbl">Plataforma en vivo</span>
+      <span class="url">https://lk.bernardocastro.dev</span>
+      <span class="tel">y por teléfono: <strong>+1 417 674 3169</strong> — atiende la clínica</span>
+    </div>
+
+    <div class="p1-cards" data-anim="4">
+      <div class="c">
+        <span class="k">El agente, hoy</span>
+        <h3>Diez encargos reales por voz o chat</h3>
+        <p><strong>Clínica</strong> — identifica al paciente, reserva, mueve y cancela citas,
+        confirma asistencia, actualiza el teléfono, envía SMS.
+        <strong>Comercio</strong> — estado del pedido, cancelación, tickets. Toda acción
+        definitiva, solo tras el «sí» explícito del cliente.</p>
       </div>
-      <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:0">
-        <div style="padding:14px 22px;border-right:1px solid var(--line)">
-          <p style="font:500 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin:0 0 7px">Lo que el agente resuelve, hoy, por voz o chat</p>
-          <p style="font:400 13.5px/1.6 var(--sans);color:var(--ink-2);margin:0">
-            <strong>Clínica</strong> — identifica al paciente · reserva, mueve y cancela citas ·
-            confirma asistencia · actualiza el teléfono · envía SMS
-            &nbsp;&nbsp;<strong>Comercio</strong> — estado del pedido · cancelación · abre y
-            consulta tickets. Toda acción definitiva, solo tras el «sí» explícito del cliente.
-          </p>
-        </div>
-        <div style="padding:14px 22px">
-          <p style="font:500 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin:0 0 7px">Lo que la operación ve</p>
-          <p style="font:400 13.5px/1.6 var(--sans);color:var(--ink-2);margin:0">
-            Llamadas en vivo con supervisión (escuchar, susurrar, tomar la línea) · cada
-            sesión con grabación, coste y nota · el tablero de citas, pedidos y tickets ·
-            las evaluaciones ejecutables.
-          </p>
-        </div>
+      <div class="c">
+        <span class="k">La operación</span>
+        <h3>Cada llamada, gobernada y auditada</h3>
+        <p>Llamadas en vivo con supervisión — escuchar, susurrar, tomar la línea. Cada sesión
+        con grabación, transcripción, coste y nota de calidad automática. El tablero de citas,
+        pedidos y tickets, y las evaluaciones ejecutables desde la consola.</p>
+      </div>
+      <div class="c metodo">
+        <span class="k">Cómo se construyó</span>
+        <h3>Veinte hitos incrementales, dos días</h3>
+        <p>Una flota de agentes <strong>Claude Code trabajando en paralelo sobre worktrees
+        aislados de git</strong> — cada tarea con su rama, su revisión y su merge — y un reporte
+        de aprendizaje por hito. Stack elegido con criterio: <strong>LiveKit autoalojado frente
+        a Vapi o Pipecat</strong>, porque el control transaccional exige poseer el bucle
+        (trade-offs, lámina 15). El board completo es público:</p>
+        <span class="board">https://taskops.bernardocastro.dev/convo</span>
       </div>
     </div>
-    <p data-anim="3" style="font:400 13px/1.5 var(--sans);color:var(--muted);margin:14px 0 0">
-      <strong style="color:var(--ink-2)">Cómo se construyó:</strong> de forma incremental — veinte
-      hitos con su reporte de aprendizaje cada uno, en dos días de desarrollo. El board completo,
-      con cada card, spec y decisión, es público:
-      <span style="font-family:var(--mono)">https://taskops.bernardocastro.dev/convo/</span>
-    </p>
-
-    <p class="i01-note" data-anim="3" style="margin-top:18px">
-      <strong style="color:var(--ink-2)">Construido sobre LiveKit autoalojado</strong> con
-      proveedores intercambiables (Soniox / Deepgram, ElevenLabs, Claude / GPT) — la elección se
-      argumenta en los trade-offs. El documento cubre los trece puntos solicitados; el sistema
-      en vivo no es el entregable, es la verificación — ninguna decisión se sostiene por estar
-      implementada, sino por su justificación.
-    </p>
 
   </div>
 </section>

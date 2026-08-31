@@ -85,9 +85,10 @@
         </div>
         <p class="f15-sec f15-gap">Trade-offs principales — decididos con medición</p>
         <div class="f15-tof">
-          <div class="r"><strong>LiveKit antes que stack propio de medios</strong> — SIP, WebRTC,
-          aislamiento y tokens resueltos el día uno; se asume la dependencia, con la migración
-          como coste conocido.</div>
+          <div class="r"><strong>LiveKit autoalojado, evaluado frente a Vapi y Pipecat</strong> — un SaaS de voz
+          dejaría el bucle, el SIP y los datos fuera de casa; Pipecat daría el pipeline pero no
+          el SFU ni la telefonía. LiveKit resuelve SIP, WebRTC, aislamiento y tokens el día uno;
+          se asume la dependencia, con la migración como coste conocido.</div>
           <div class="r"><strong>Motor conversacional propio</strong> — un motor SaaS dejaría la
           autorización y la auditoría fuera del bucle; el control transaccional exige poseerlo.</div>
           <div class="r"><strong>Generación anticipada apagada</strong> — medida: con fin de turno
