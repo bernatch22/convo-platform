@@ -91,6 +91,12 @@ and, when a decision was made, a short essay in its thread.
   voice test cases `flaky=True`; hard policies use `ConversationalDAGMetric`,
   not `GEval`; eval rooms are created by `api.py` with dispatch metadata (the
   `LiveKitConnector` cannot pass metadata).
+- Ring 4 (`core/scoring/`) scores every finished call from `api.py`, never from
+  the job process: four checks decided by code, then AT MOST one Haiku call,
+  whose worst case is priced against `SCORING_CAP_EUR` BEFORE it is made and
+  skipped under three turns. The verdict is `session.score`, one more
+  append-only log line at `max(seq)+1`. `Project.scoring=False` opts a project
+  out; `SCORING_SWEEP=0` opts a deploy out.
 - Secrets only from env. Never commit `.env*` except `.env.example`.
 
 ## Layout

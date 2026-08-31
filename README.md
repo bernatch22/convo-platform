@@ -129,6 +129,20 @@ uv run python -m convo sessions eval <id>                     # the project's DA
 uv run deepeval test run tests/evals/test_dispatch_ring.py    # the same, as a test
 ```
 
+And every call scores itself without being asked. While `api.py` is up it
+sweeps for calls that have ended and writes a verdict into their own log as
+`session.score` — four checks decided by code (consent, register, cross-tenant
+leakage, provider errors) and at most one Haiku call, about 0.0014 € and only
+when the transcript is worth judging:
+
+```bash
+uv run python -m convo sessions show <id>    # the score is the last row
+uv run python -m convo sessions score <id>   # ask for one by hand (--free skips the judge)
+```
+
+A project opts out with `scoring=False` on its `Project`, and its sessions show
+a dash. The whole design is [`docs/evals.md`](docs/evals.md) §3.13.
+
 `tests/evals/test_dispatch_ring.py` skips itself when no routed session is in
 the store: `scripts/dev_call.py` is its fixture, and a suite that failed
 because nobody started a server would be reporting on the laptop.

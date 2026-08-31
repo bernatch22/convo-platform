@@ -12,6 +12,7 @@ import { ConsentProof } from "../components/ConsentProof";
 import { EmptyState } from "../components/EmptyState";
 import { EventRow } from "../components/EventRow";
 import { LatencyStrip } from "../components/LatencyStrip";
+import { ScoreBreakdown } from "../components/ScoreBreakdown";
 import { getSession, type SessionView } from "../lib/api";
 import {
   authorisedBy,
@@ -80,6 +81,7 @@ export function SessionDetail() {
           <Fact label="duration" value={duration(view) ?? "running"} />
           <Fact label="outcome" value={view.outcome ?? "running"} />
           <Fact label="cost" value={euros(view.cost_eur)} />
+          <Fact label="score" value={view.score ? view.score.score.toFixed(2) : "—"} />
           <Fact label="turns" value={String(view.turns)} />
           <Fact label="events" value={String(view.events)} />
           {endReason(events) && <Fact label="reason" value={endReason(events) ?? ""} />}
@@ -101,6 +103,17 @@ export function SessionDetail() {
       <section className="section">
         <h2 className="section__title">Consent proof</h2>
         <ConsentProof links={links} />
+      </section>
+
+      <section className="section">
+        <h2 className="section__title">Score</h2>
+        <ScoreBreakdown score={view.score} />
+        <p className="note">
+          Written into the log itself as <code className="mono">session.score</code>, with the next{" "}
+          <code className="mono">seq</code> — the same row{" "}
+          <code className="mono">python -m convo sessions show {id}</code> prints at the bottom of
+          the table below.
+        </p>
       </section>
 
       {costLines(events).length > 0 && (

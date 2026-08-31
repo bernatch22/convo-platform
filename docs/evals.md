@@ -29,9 +29,12 @@ consent, grounded facts, register — and share not one sentence of criteria.
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
 | **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live nightly (ms-13) | offline since ms-6 — §3.9; live since ms-13 — §3.11, §3.12 |
 | **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; for grounding since ms-7, once tool results carried a summary — §3.6 |
+| **4** | **Every call, automatically.** Four checks decided by code plus at most one Haiku call, written into the call's own log | unasked, by `api.py`, within a minute of the caller hanging up | live since ms-13 — §3.13 |
 
 The metrics are the same in every ring. A ring changes where the conversation
-comes from, never how it is judged.
+comes from, never how it is judged. Rings 1-3 are things a person runs; ring 4
+is the one nobody runs, which is why its budget is a hard number and not a
+habit.
 
 **No judge runs in the unit ring.** `pytest -m unit` is a gate: it has to be
 green three runs out of three or it stops meaning anything, and a judged
@@ -608,6 +611,83 @@ human's.
   Two workers on one `FLEET` share every dispatch, so a second harness needs a
   `FLEET` of its own and `CONVO_API` pointed at its own `api.py`.
 
+### 3.13 Ring 4 — every call scores itself when it ends
+
+- **What it is:** `core/scoring/`. When a session's log stops, the control
+  plane reads it back, asks four questions code can answer and at most one a
+  judge can, and appends the verdict to the same append-only log as
+  `session.score` with the next `seq`. The console shows it as a chip in the
+  call log and a breakdown on the session; `python -m convo sessions show <id>`
+  prints the same rows.
+- **Nothing runs in the job process.** The job dies with the call, so it is
+  not asked to do anything on the way out — not even a POST. `api.py` runs a
+  sweeper (`core/scoring/sweeper.py`, every 10 s, three sessions a tick) that
+  looks for finished, unscored sessions. A poll beats a callback for one
+  reason: a job killed by the box — SIGKILL, OOM, a redeploy mid-call — never
+  gets to tell anybody it is gone, and those are exactly the calls somebody
+  wants a score for. `report.finished` therefore has three clauses: the row was
+  closed, the log ends in `session.end`, or the log has been silent for
+  `STALE_S` (120 s), which is what a dropped call looks like from here.
+- **The four free checks** (`core/scoring/checks.py`), in the order an auditor
+  asks them:
+
+  | Check | Decided by | Fails when |
+  |---|---|---|
+  | `consent` | a walk over `confirm.granted` and `tool.call` with `side_effect: irreversible` | something irreversible ran that no grant paid for |
+  | `register` | `core.testing.register.slips`, the ring-1 scanner | an agent turn used a form the business does not say |
+  | `no_leakage` | `core.testing.leakage.mentions`, the ring-1 scanner | an agent turn named a noun of the business next door |
+  | `no_errors` | `error` events and the outcome | a provider failed, or the session ended in `error` |
+
+  Two of the four are the ring-1 scanners **imported, not reimplemented**: a
+  rule that fails a golden in CI has to fail a real call the same way and with
+  the same wording, and a second copy of `TU_FORMS` would have drifted inside a
+  milestone.
+- **A check has three answers, not two.** `passed: null` means this call had
+  nothing to check — a project that declares no register, a call that wrote
+  nothing irreversible — and it is dropped from the average rather than counted
+  as a pass. A vacuous 1.0 is how a suite starts looking healthier the less it
+  measures. The console draws those rows dim with a dash, never green.
+- **The judge: one call, three gates in front of it.** A single
+  `ConversationalGEval` ("did the person get what they rang for, or a clear
+  honest no?") on Haiku 4.5, `evaluation_params` limited to role and content.
+  It is skipped when the transcript has **under three non-empty turns** (a
+  wrong number is not a conversation), when there is no key, and when the
+  **estimated worst case exceeds the cap** — input from the rendered prompt,
+  output at its ceiling, both priced from `core.observability.prices`, the same
+  table `session.end` is billed with. The transcript is first cut to the last
+  40 turns at 400 characters each, so a forty-minute call and a two-minute call
+  cost the same to score. The euros written into the log are then the REAL ones
+  from the tokens DeepEval counted: **the estimate exists to refuse, the
+  measurement to audit.**
+- **`evaluation_steps` are given, never generated.** Leave them out and DeepEval
+  spends a second model call turning the criteria into steps — on every session,
+  forever — and paraphrases them differently each run. The steps are project
+  data (`evals/scoring.py`), so the clinic asks about an appointment moved and
+  the shop about an order found; `core.scoring.judge.DEFAULT_STEPS` is the
+  general version a project inherits by writing nothing.
+- **The score is a log line, and that is the whole of the concurrency story.**
+  `session.score` takes `max(seq) + 1` and `events` has `(session_id, seq)` as
+  its primary key under append-only triggers. Two control planes on one
+  database is a supported shape: one wins, the other reads the refusal and
+  reports "another scorer got there first". No lock, no flag column, no window.
+- **What a project writes** is `evals/scoring.py` — one `ScoringRules` reusing
+  the two word lists its `dag.py` already has, plus its judge steps. A project
+  that writes nothing is still scored on `consent` and `no_errors`. A project
+  that wants no score at all sets `scoring=False` on its `Project`, and its
+  sessions show a dash forever; the API says which of the three reasons applies
+  (`POST /sessions/<id>/score` answers `"tienda-sur/pedidos has scoring switched
+  off"`).
+- **Measured, ms-13, a four-turn clinic call:** deterministic checks 0 €,
+  judge **0.0014 €** (0.14 cents), scored **5 s** after the call ended.
+  A hang-up on the greeting: **0 €**, judge skipped, deterministic checks still
+  written.
+- **How to see it:** `uv run uvicorn api:app --port 8090` in one terminal,
+  `python worker.py console` in another; hang up, wait ten seconds, then
+  `python -m convo sessions list` and `python -m convo sessions show <id>` —
+  the last row of the log is the score. `python -m convo sessions score <id>`
+  asks for one by hand (`--free` runs the deterministic half and spends
+  nothing), and `curl -X POST localhost:8090/sessions/<id>/score` is the same
+  door over HTTP.
 ### 3.13 No false success (GEval) — the write was refused; was the patient told?
 
 - **Kind:** judged, **1 judge call** per case. Score 0-1, `threshold=0.8` —
@@ -727,6 +807,7 @@ measure in ms-7, not a default).
 | Keeps the register | 0 | a word list, always |
 | No false success (GEval) | 1 | one case, the refused booking (§3.13) |
 | AudioIntegrity / AgentResponsiveness | 0 | DSP, never a model (§3.9) |
+| Ring 4 per finished call (§3.13) | 0 for the four checks, 1 for the judge | 0.0014 € measured; skipped under 3 turns; cap 0.01 €, proved before spending |
 
 Measured on the ms-5 branch, Haiku everywhere: the clinic's four suites are
 **$0.042** (140 s, 30 metric cases, five simulated calls), and Tienda Sur's two

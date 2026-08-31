@@ -7,7 +7,7 @@
  * would read as "instant" when it means "nobody looked".
  */
 
-import type { SessionEvent, SessionLine, SessionView } from "./api";
+import type { SessionEvent, SessionLine, SessionScore, SessionView } from "./api";
 
 /** What a row of the call log says it is: a browser call, a chat, or the telephone. */
 export type Medium = "voice" | "chat" | "phone";
@@ -100,6 +100,25 @@ export function duration(line: Pick<SessionLine, "started_at" | "ended_at">): st
 /** Four decimals, because a whole call costs less than a cent and 0.00 € is a lie. */
 export function euros(value: number | null | undefined): string {
   return value === null || value === undefined ? "—" : `${value.toFixed(4)} €`;
+}
+
+/** What a score chip says on hover — including what a dash means, which is the harder half.
+ *
+ * Three different facts share the dash, and an operator scanning a column of
+ * them needs to know which one they are looking at: a call still running has
+ * not ended, one that ended a second ago is queued behind the sweeper, and one
+ * whose project opted out will never have a score at all. The console cannot
+ * tell the last two apart from the row alone — the API returns null for both —
+ * so the tooltip names both possibilities rather than guessing at one.
+ */
+export function scoreTitle(score: SessionScore | null, running?: boolean): string {
+  if (running) return "The call is still going: it is scored once it ends.";
+  if (!score) {
+    return "No score yet — either the control plane has not reached it, or this project has scoring switched off.";
+  }
+  const judged = score.judge?.ran ? `judged by ${score.judge.model}` : "deterministic checks only";
+  const failed = score.failed.length > 0 ? ` — failed: ${score.failed.join(", ")}` : "";
+  return `${score.verdict} ${score.score.toFixed(2)} over ${score.checks.length} checks, ${judged}${failed}`;
 }
 
 /** Seconds the way the CLI prints them: `1.73s`, or an em dash when nothing was measured. */

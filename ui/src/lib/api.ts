@@ -81,12 +81,50 @@ export interface SupervisorPresence {
 
 /* ── /sessions ────────────────────────────────────────────────────────────── */
 
+/** One question ring 4 asked of a finished call. `passed: null` = nothing here to check.
+ *
+ * `score` is present only on the judged check and is its raw 0-1; a check code
+ * decided has no number, because consent either happened or it did not.
+ */
+export interface ScoreCheck {
+  name: string;
+  kind: "deterministic" | "judge";
+  passed: boolean | null;
+  score?: number;
+  reason: string;
+}
+
+/** What the one LLM call did, or the sentence saying why it was never made. */
+export interface JudgeRun {
+  ran: boolean;
+  skipped: string | null;
+  model: string;
+  threshold: number;
+  cap_eur: number;
+  cost_eur: number;
+}
+
+/** The payload of a session's `session.score` event: the verdict and everything behind it. */
+export interface SessionScore {
+  version: number;
+  score: number;
+  verdict: "pass" | "fail";
+  failed: string[];
+  turns: number;
+  checks: ScoreCheck[];
+  judge: JudgeRun | null;
+}
+
 /** One line of the call log. `outcome` and `cost_eur` are null while the call runs.
  *
  * `phone` is the caller's number off `session.start`, and null when the
  * session never came in over the telephone: `channel` says "voice" for a
  * browser call and a PSTN call alike, so this is the only field that tells
  * the two apart in the log.
+ *
+ * `score` is null in three different situations and none of them is a bad
+ * call: not scored yet, too short to judge, or a project that opted out. The
+ * screen shows a dash, never a zero.
  */
 export interface SessionLine {
   id: string;
@@ -100,6 +138,7 @@ export interface SessionLine {
   turns: number;
   cost_eur: number | null;
   phone: string | null;
+  score: SessionScore | null;
 }
 
 /** One fact in the append-only log. A turn's latencies live in `payload.metrics`. */
