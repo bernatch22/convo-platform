@@ -22,20 +22,27 @@ type Reading =
 interface LiveCallsProps {
   onObserve?: (call: LiveCall) => void;
   watching?: string | null;
+  /** What the button says. The supervisor desk listens; the tenant screen observes. */
+  verb?: string;
 }
 
-export function LiveCalls({ onObserve, watching = null }: LiveCallsProps) {
+export function LiveCalls({ onObserve, watching = null, verb = "observe" }: LiveCallsProps) {
   const reading = useLiveCalls();
 
   return (
     <section className="section">
       <h2 className="section__title">Live now</h2>
-      {render(reading, onObserve, watching)}
+      {render(reading, verb, onObserve, watching)}
     </section>
   );
 }
 
-function render(reading: Reading, onObserve?: (call: LiveCall) => void, watching?: string | null) {
+function render(
+  reading: Reading,
+  verb: string,
+  onObserve?: (call: LiveCall) => void,
+  watching?: string | null,
+) {
   switch (reading.state) {
     case "loading":
       return <p className="note">asking the SFU…</p>;
@@ -47,7 +54,12 @@ function render(reading: Reading, onObserve?: (call: LiveCall) => void, watching
       return reading.calls.length === 0 ? (
         <p className="note">no call in progress</p>
       ) : (
-        <CallTable calls={reading.calls} {...(onObserve ? { onObserve } : {})} watching={watching ?? null} />
+        <CallTable
+          calls={reading.calls}
+          {...(onObserve ? { onObserve } : {})}
+          watching={watching ?? null}
+          verb={verb}
+        />
       );
   }
 }
@@ -56,9 +68,10 @@ interface CallTableProps {
   calls: LiveCall[];
   onObserve?: (call: LiveCall) => void;
   watching: string | null;
+  verb: string;
 }
 
-function CallTable({ calls, onObserve, watching }: CallTableProps) {
+function CallTable({ calls, onObserve, watching, verb }: CallTableProps) {
   return (
     <div className="table-wrap">
       <table className="table">
@@ -85,7 +98,7 @@ function CallTable({ calls, onObserve, watching }: CallTableProps) {
               {onObserve && (
                 <td className="num">
                   <button type="button" className="link" onClick={() => onObserve(call)}>
-                    {call.room === watching ? "watching" : "observe"}
+                    {call.room === watching ? "watching" : verb}
                   </button>
                 </td>
               )}

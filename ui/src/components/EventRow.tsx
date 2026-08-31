@@ -11,10 +11,19 @@ import { asRecord, text, turnChips, type ConsentLink } from "../lib/sessions";
 import type { SessionEvent } from "../lib/api";
 
 /** The visual family a kind belongs to: it decides the row's rule colour, nothing else. */
-export type Family = "turn" | "tool" | "consent" | "stage" | "state" | "envelope" | "audio";
+export type Family =
+  | "turn"
+  | "tool"
+  | "consent"
+  | "stage"
+  | "state"
+  | "envelope"
+  | "audio"
+  | "supervisor";
 
 const FAMILIES: [string, Family][] = [
   ["turn.", "turn"],
+  ["supervisor.", "supervisor"],
   ["tool", "tool"],
   ["confirm.", "consent"],
   ["stage.", "stage"],
@@ -68,8 +77,21 @@ function Detail({ event, authorised }: EventRowProps) {
   if (kind.startsWith("confirm.")) return <Confirm kind={kind} payload={payload} />;
   if (kind === "tools.executed") return <Chip label="tools" value={String(payload["count"])} />;
   if (kind === "audio.start") return <Chip label="recording" value={String(payload["path"])} />;
+  if (kind.startsWith("supervisor.")) return <Supervision payload={payload} />;
   return <Raw payload={payload} />;
 }
+
+/** A second human on the line: who, with which powers, and whether the caller could see them. */
+function Supervision({ payload }: { payload: Record<string, unknown> }) {
+  return (
+    <span className="detail">
+      <Chip label="who" value={text(payload["identity"]) ?? "?"} />
+      <Chip label="as" value={text(payload["capability"]) ?? "?"} />
+      <Chip label="hidden" value={payload["hidden"] === false ? "no" : "yes"} />
+    </span>
+  );
+}
+
 
 /* ── the envelope ────────────────────────────────────────────────────────── */
 
