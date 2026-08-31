@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from livekit.agents.llm import ToolError
 
+from core.adapters.human import HumanTransfer
 from core.state.log import record
 from core.tools import guard
 from core.tools.contract import ToolSpec
@@ -185,8 +186,15 @@ def attach_local_tools(tc: "TenantContext") -> "TenantContext":
     Two steps that only make sense together and only after the context exists
     (the executor holds it), so every builder of a TenantContext — the router in
     production, the harness in tests — ends with this one line.
+
+    One adapter is the PLATFORM's and not the tenant's: `HumanTransfer` reaches
+    the carrier rather than a customer system, and it is here so that handing a
+    call to a person is a write like any other — declared in a catalog, vetted
+    by the guard, timed by its spec and logged twice. It is unreachable for a
+    project whose catalog does not name `transfer_to_human`, so a tenant that
+    never opts in is exactly where it was.
     """
-    tc.adapters = tc.tenant.build_adapters()
+    tc.adapters = {**tc.tenant.build_adapters(), "human": HumanTransfer(tc)}
     tc.tools = LocalExecutor(tc)
     return tc
 

@@ -18,6 +18,7 @@ project's `messages`, and in nothing under `core/`.
 
 from core.context import TenantContext
 from core.security.protocol import SUPERVISOR_PROTOCOL
+from core.telephony import human
 
 from .desk import CONFIRM_INSTRUCTIONS, DESK_EXAMPLES, DESK_INSTRUCTIONS, DESK_ROLE
 from .reception import RECEPTION_EXAMPLES, RECEPTION_INSTRUCTIONS, RECEPTION_ROLE
@@ -48,6 +49,19 @@ def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str 
     exist ranks its own script above them and ignores the whisper (measured 0/3;
     3/3 with this paragraph — `core.security.protocol`). It is fixed text, so it
     rides inside the cached prefix and costs nothing per turn.
+
+    The transfer paragraph sits just BEFORE it, and `human.protocol` answers ""
+    for a project that never declared the verb, so that rule and its tool appear
+    together — a rule about a tool the model does not have is the surest way to
+    have it reach for one.
+
+    The last slot is the supervisor rule's to keep: the final paragraph is the
+    most recent instruction the model reads, and `SUPERVISOR_PROTOCOL` is the one
+    that exists to outrank the stage script (0/3 without it, 3/3 with —
+    `core.security.protocol`). That is the whole argument for the order. It was
+    ALSO the prime suspect in an ms-20 flake and it was innocent: moving it
+    changed nothing measurable (p=1.0). `core.telephony.human.protocol` carries
+    the 154 runs that say so, and what they blame instead.
     """
     return "\n".join(
         [
@@ -59,6 +73,7 @@ def stage_prompt(tc: TenantContext, role: str, instructions: str, examples: str 
             "",
             instructions,
             examples,
+            human.protocol(tc.project),
             SUPERVISOR_PROTOCOL,
         ]
     )

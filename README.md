@@ -356,6 +356,18 @@ have yet and says so instead of failing mid-call; cold needs only
 `transfer_mode=enable-all` on the Twilio trunk — `infra/box/README.md` has the
 exact toggles, and `scripts/twilio_trunk.py` reports whether they are set.
 
+**The agent transfers too, and it does not need a supervisor to decide.**
+`transfer_to_human` is a tool of every stage of a project that names a
+`transfer_number` — E.164, set from the Pipeline screen's Control panel — and
+the prompt teaches it to announce the handover («le paso con un compañero, un
+momento») before the REFER goes out. A project with the field empty is never
+offered the tool at all: the model cannot reach for a verb it was never shown,
+and the Phone panel greys it out with the control plane's own sentence saying
+which half is missing. Only a phone call can be moved, so a browser call and a
+chat get an honest refusal and the business's own number instead of a promise
+nobody can keep. Every attempt — moved, refused by the carrier, or never
+attempted — is one more `supervisor.transfer` line in the caller's log.
+
 The same three verbs without a browser, for an escalation rule or a terminal:
 
 ```bash

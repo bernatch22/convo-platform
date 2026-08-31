@@ -45,6 +45,7 @@ nine o'clock and the agent said it".
 from dataclasses import dataclass
 
 from core.context import Project, TenantContext
+from core.telephony.human import TRANSFER_TO_HUMAN
 from core.tools.catalog import ToolCatalog, platform_specs
 from core.tools.contract import SideEffect, ToolSpec
 from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
@@ -154,6 +155,10 @@ REBOOK_SLOT = ToolSpec(
     timeout_s=5.0,
     result_summary=summarise_change,
 )
+# The one verb of this project that is not the clinic's at all: handing the call to a
+# person at reception (ms-20). The spec is the platform's — `core.telephony.human` — and
+# declaring it here is the opt-in: a project that leaves it out is never offered the tool,
+# and so is a project that declares it and names no `transfer_number` below.
 SEND_SMS = ToolSpec(
     name="send_sms",
     side_effect=SideEffect.WRITE,
@@ -212,6 +217,10 @@ PROJECT = ReagendamientoProject(
     greeting="Clínica Norte, buenos días, le atiende recepción. ¿En qué puedo ayudarle?",
     voice="UOIqAnmS11Reiei1Ytkc",  # ElevenLabs "Carolina - Spanish woman - es_ES" (used from ms-6)
     tts_model="eleven_flash_v2_5",  # latency profile: ~100ms ttfb vs ~700ms measured on v3 (PSTN)
+    # The clinic's own switchboard, the number the SMS already tells patients to ring.
+    # Overridable from the console: which phone reception overflows to is a business
+    # decision that changes between two calls, not between two deploys.
+    transfer_number="+34910000000",
     tools=platform_specs().merge(
         ToolCatalog.of(
             FIND_AVAILABILITY,
@@ -224,6 +233,7 @@ PROJECT = ReagendamientoProject(
             CONFIRM_ATTENDANCE,
             REBOOK_SLOT,
             SEND_SMS,
+            TRANSFER_TO_HUMAN,
         )
     ),
     messages=MESSAGES,

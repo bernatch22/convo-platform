@@ -303,6 +303,12 @@
   font-size: var(--text-sm);
 }
 
+/* A note INTRODUCES the block under it, so it must not touch it: without this the
+ * paragraph above the phone panel sat flush against its top border. */
+.note + .panel {
+  margin-top: var(--s4);
+}
+
 .note--warn {
   color: var(--warn);
 }

@@ -12,6 +12,13 @@ reads the agent's words on their way out and times them in the log, and
 applied, where a human holding the line cancels the reply, and where a murmur
 that landed on the agent's voice is dropped. All of it is audit and turn-taking,
 not business, so no stage overrides them.
+
+The platform's own verbs reach a stage two different ways, and the difference
+is whether they can be ABSENT. The clock is a method: every stage of every
+project has it, forever. The transfer is layered into `tools=` at construction
+(`core.agents.human`), because a project that names no `transfer_number` must
+never be shown a tool it cannot run — the model cannot reach for a verb it was
+never given.
 """
 
 import logging
@@ -22,6 +29,7 @@ from livekit.agents import Agent, RunContext, StopResponse, stt
 from livekit.agents.llm import ChatContext, ChatMessage, function_tool
 from livekit.agents.voice.agent import ModelSettings
 
+from core.agents.human import transfer_tools
 from core.barge_in import backchannels_of, holds_the_floor, is_backchannel
 from core.context import TenantContext
 from core.dates_note import clock_reading, date_note
@@ -37,8 +45,14 @@ SUMMARY_ROLE = "system"
 class TenantAgent(Agent):
     """One conversation stage of a project, with its own prompt and tools."""
 
-    def __init__(self, tc: TenantContext, *, instructions: str, **kwargs) -> None:
-        super().__init__(instructions=instructions, **kwargs)
+    def __init__(
+        self, tc: TenantContext, *, instructions: str, tools: list | None = None, **kwargs
+    ) -> None:
+        # The platform's own verbs are layered here, not declared as methods, so
+        # that one of them can be ABSENT: a project with no `transfer_number`
+        # must never be shown a transfer tool it cannot run (`core.agents.human`).
+        platform = transfer_tools(tc)
+        super().__init__(instructions=instructions, tools=[*(tools or []), *platform], **kwargs)
         self.tc = tc
 
     async def on_enter(self) -> None:

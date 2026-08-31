@@ -192,6 +192,7 @@ def test_every_tool_the_project_can_call_declares_what_it_does_to_the_world() ->
         "restore_order",
         "send_sms",
         "ticket_status",
+        "transfer_to_human",
     ]
     assert catalog.get("cancel_order").side_effect is SideEffect.IRREVERSIBLE
     assert catalog.get("cancel_order").needs_confirmation() is True

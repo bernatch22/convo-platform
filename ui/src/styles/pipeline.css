@@ -107,6 +107,21 @@
   margin-top: 2px;
 }
 
+/* Inside the phone panel the two sentences under the number both come from
+ * GET /pipeline, verbatim — the line's note and the transfer row's — so they get
+ * one face, and the first gets air under an accent-sized number instead of the
+ * 4px a provider row wants. Scoped to --panel: the Talk header strip shows
+ * neither and must not move. */
+.dial--panel .leg__note {
+  margin-top: var(--s3);
+  font-family: var(--font-mono);
+}
+
+.dial--panel .leg__refused-why {
+  margin-top: var(--s2);
+  font-family: var(--font-mono);
+}
+
 /* ── the waterfall ───────────────────────────────────────────────────────── */
 
 .wf {

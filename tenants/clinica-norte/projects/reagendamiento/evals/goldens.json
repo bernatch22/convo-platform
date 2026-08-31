@@ -246,5 +246,23 @@
     "expected_tools": [
       "start_attendance_confirmation"
     ]
+  },
+  {
+    "input": "mire, prefiero hablar esto con una persona. ¿me pasa con alguien?",
+    "expected_behaviour": "Le anuncia en una frase corta que le pasa con un compañero y llama a transfer_to_human, sin prometer nada más ni despedirse. Cuando la herramienta le responde que esta conversación no es una llamada de teléfono y que no hay ninguna línea que pasar, se lo dice con naturalidad y sin tecnicismos, le da el teléfono del centro para que le atienda una persona y se ofrece a seguir ayudándole él. En ningún momento dice que ya le ha pasado con alguien.",
+    "expected_tools": [
+      "transfer_to_human"
+    ]
+  },
+  {
+    "input": "es que no me fío de una máquina, quiero hablar con una persona de verdad",
+    "before": [
+      "hola, quería cambiar la cita que tengo",
+      "soy Ana García Ruiz"
+    ],
+    "expected_behaviour": "Lo intenta: anuncia el traspaso en una frase y llama a transfer_to_human. Como no puede hacerse, se lo cuenta sin tecnicismos y sin insistir, le ofrece el teléfono del centro por si prefiere llamar, y retoma él mismo el cambio de cita que estaban haciendo. Ni abandona la gestión ni deja creer al paciente que ya está hablando con otra persona.",
+    "expected_tools": [
+      "transfer_to_human"
+    ]
   }
 ]

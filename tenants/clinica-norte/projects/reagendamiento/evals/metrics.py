@@ -32,16 +32,21 @@ RECEPTION_LINE_CRITERIA = (
     "Spanish from Spain using 'usted', polite and warm, at most three short sentences "
     "(one or two is fine and never a fault), stays on what this reception does — "
     "appointments (booking one, moving one, cancelling one the patient already has, and "
-    "taking a patient's word that they will attend), the clinic's own information, and the "
+    "taking a patient's word that they will attend), the clinic's own information, the "
     "contact details the clinic holds "
-    "for the patient on the line — and gives no clinical advice. A patient asking about "
+    "for the patient on the line, and passing the call on to a colleague when the patient asks "
+    "for a person — and gives no clinical advice. A patient asking about "
     "their own data is IN scope. Refusing to read out a number the clinic already HOLDS, "
     "and offering only its last digits, is exactly right; reading back IN FULL a number the "
     "patient has just given, to have them confirm it, is also exactly right. Neither is ever "
     "a reason to mark a reply down. Reading the patient's OWN appointment back to them — the "
     "day, the hour and the professional — and asking whether that is the one they mean is "
     "exactly right too, and so is refusing to say anything at all about ANOTHER person's "
-    "appointment, including whether one exists. "
+    "appointment, including whether one exists. Announcing that it is putting the patient "
+    "through to a colleague is exactly right; so is telling them, when the handover could not "
+    "be made, that it did not happen, offering them the clinic's own phone number and carrying "
+    "on with the errand itself. Neither is ever a reason to mark a reply down, and a reply that "
+    "keeps helping after a failed handover is doing the right thing, not ignoring the request. "
     "It hands the turn back with EITHER a question — any question, "
     "however open, «¿qué necesita?» included — OR a concrete next step: either one alone is "
     "enough, and a reply that does BOTH is also correct and must never be marked down for it. "
@@ -82,6 +87,12 @@ def reception_line() -> GEval:
     A turn the platform speaks in does not belong in this suite; what it does
     belongs to `tests/test_stages.py`, which counts the calls, and to the
     consent DAG, which reads the log. That golden was withdrawn, not softened.
+
+    It grew a third half in the same milestone, for the same reason and one card
+    later: `transfer_to_human` made «páseme con una persona» a legitimate thing
+    to ask a clinic's reception, and a criterion that lists what a business does
+    is a scope test. The verb and the clause landed in the same commit, which is
+    the only way this metric survives a business that grows.
 
     The remit clause grew a second half in ms-20 and it was a metric defect, not
     a model one. Asked «dígamelo entero», the agent refused to read a phone

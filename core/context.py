@@ -61,6 +61,11 @@ class Project:
     where the others show a chip — which is a business decision (a queue whose
     calls are two sentences long, a tenant that has not agreed to it), so it
     lives with the project's data and not in an environment variable.
+    `transfer_number` is where the agent hands a call when the caller asks for a
+    person (ms-20). It is project data and overridable, like the voice: which
+    phone a reception overflows to changes far more often than a deploy does.
+    Empty means the model is never offered `transfer_to_human` at all — the
+    tool that cannot work is not offered, `core.telephony.human`.
     `recording` is the same shape of decision about the call's AUDIO (ms-17):
     False and no OGG is ever written for this project, so its sessions show no
     player. It is deliberately not one flag with `scoring` — a tenant may want
@@ -81,6 +86,7 @@ class Project:
     tools: ToolCatalog = field(default_factory=ToolCatalog)
     messages: dict[str, str] = field(default_factory=dict)
     knowledge_seed: str = ""
+    transfer_number: str | None = None  # E.164; None/"" = the agent is offered no transfer
     scoring: bool = True  # False = this project's finished calls are never scored (ms-13)
     recording: bool = True  # False = this project's calls keep no audio at all (ms-17)
 
