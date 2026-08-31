@@ -28,10 +28,18 @@ scp -q "$HERE/../../.env" "$BOX:$APP/.env"
 ssh "$BOX" "cd $APP && chmod 600 .env && set -a && . /home/berna/convo/livekit.env && set +a && python3 - <<'PY'
 import os
 lines = [l for l in open('.env').read().splitlines()
-         if not l.startswith(('LIVEKIT_URL=', 'LIVEKIT_API_KEY=', 'LIVEKIT_API_SECRET=', 'TENANT=', 'PROJECT='))]
+         if not l.startswith(('LIVEKIT_URL=', 'LIVEKIT_PUBLIC_URL=', 'LIVEKIT_API_KEY=',
+                              'LIVEKIT_API_SECRET=', 'TENANT=', 'PROJECT='))]
 lines += ['LIVEKIT_URL=ws://127.0.0.1:7880',
           'LIVEKIT_API_KEY=' + os.environ['LIVEKIT_API_KEY'],
-          'LIVEKIT_API_SECRET=' + os.environ['LIVEKIT_API_SECRET']]
+          'LIVEKIT_API_SECRET=' + os.environ['LIVEKIT_API_SECRET'],
+          # The laptop's .env has no PUBLIC url — it has no public host — so copying it
+          # over the box's DELETES this line, and every ticket the control plane mints
+          # then carries the loopback the WORKER uses. A browser handed that connects to
+          # its own machine: 'invalid API key', with the box's key in the message, from a
+          # server that never signed it. It is written here, next to the two keys, because
+          # this is the script that overwrites the file.
+          'LIVEKIT_PUBLIC_URL=wss://lk.bernardocastro.dev']
 open('.env', 'w').write('\n'.join(lines) + '\n')
 print('env written (values not shown)')
 PY"
