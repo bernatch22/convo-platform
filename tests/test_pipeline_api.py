@@ -5,6 +5,8 @@ round-trip is asserted where it matters — through `core.router.resolve`, the
 one function every session (voice, chat, console) passes through.
 """
 
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -152,6 +154,58 @@ def test_the_deprecated_turbo_model_is_refused_too(client) -> None:
     reply = client.put(PIPELINE, json={"tts_model": "eleven_turbo_v2_5"})
 
     assert reply.status_code == 422 and "deprecated" in reply.json()["detail"]
+
+
+CAROLINA_RUIZ = "h2cd3gvcqTp3m65Dysk7"
+
+
+def test_an_empty_voice_is_refused_before_it_can_mute_the_next_call(client, store) -> None:
+    reply = client.put(PIPELINE, json={"voice": "   "})
+
+    assert reply.status_code == 422
+    detail = reply.json()["detail"]
+    assert "mute" in detail and "ELEVENLABS_API_KEY" in detail, "the refusal names the symptom"
+    assert store.pipeline_overrides(TENANT, PROJECT) == [], "nothing empty reaches the store"
+
+
+def test_a_pasted_voice_id_is_stored_without_its_stray_whitespace(client) -> None:
+    view = client.put(PIPELINE, json={"voice": f"  {CAROLINA_RUIZ}\n"}).json()
+
+    assert view["tts"]["voice"] == CAROLINA_RUIZ
+
+
+async def test_a_voice_stored_empty_before_the_rule_cannot_silence_a_call(store) -> None:
+    store.set_pipeline_override(PipelineOverride(TENANT, PROJECT, "voice", ""))
+
+    tc = await router.resolve(fake_job_context(metadata=META), store)
+
+    assert tc.project.voice == CAROLINA, "a blank row is ignored, not applied"
+    assert tts.tts_for(tc.tenant, tc.project) is not None or "ELEVENLABS_API_KEY" not in os.environ
+
+
+async def test_session_start_names_the_voice_the_call_really_spoke_with(store) -> None:
+    client_put = TestClient(app)
+    app.dependency_overrides[open_store] = lambda: store
+    client_put.put(PIPELINE, json={"voice": CAROLINA_RUIZ})
+    app.dependency_overrides.clear()
+
+    tc = await router.resolve(fake_job_context(metadata=META), store)
+
+    start = next(event for event in tc.log.events() if event.kind == "session.start")
+    assert start.payload["pipeline"]["voice"] == CAROLINA_RUIZ
+    assert start.payload["pipeline"]["tts_model"] == tts.LATENCY_MODEL
+    assert start.payload["pipeline"]["llm_model"] == llm.DEFAULT_MODEL
+    assert start.payload["pipeline"]["stt_provider"] == stt.SONIOX
+
+
+async def test_a_chat_session_claims_no_voice_because_it_builds_none(store) -> None:
+    chat = '{"tenant": "clinica-norte", "project": "reagendamiento", "channel": "chat"}'
+
+    tc = await router.resolve(fake_job_context(metadata=chat), store)
+
+    start = next(event for event in tc.log.events() if event.kind == "session.start")
+    assert start.payload["pipeline"]["voice"] is None
+    assert start.payload["pipeline"]["llm_model"] == llm.DEFAULT_MODEL, "the model still decides"
 
 
 def test_an_unknown_field_and_an_empty_body_are_both_refused(client) -> None:
