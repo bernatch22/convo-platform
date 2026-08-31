@@ -13,6 +13,7 @@ const API_PATHS = [
   "/supervise",
   "/sessions",
   "/outcomes",
+  "/reservations",
   "/live-calls",
   "/pipeline",
   "/evals",

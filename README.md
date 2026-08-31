@@ -227,22 +227,43 @@ that it has none), Evals (every stored run with its per-metric diff, and the
 button that launches another on the box) and the Supervisor desk. Vite + React +
 TypeScript + react-router; no state library, no CSS framework.
 
-**The Board** (`/t/<tenant>/<project>/board`) is the business half of the same
-evidence: every *irreversible* thing the platform did — appointments booked,
-orders cancelled — counted straight off the append-only log, by verb and by
-day, each row linking to the call that did it. There is no rollup table: a
-transaction is one `tool.call` whose `side_effect` is `irreversible`, and the
+**The Board** (`/t/<tenant>/<project>/board`) reads like an agenda, and it is
+the one screen fed by two different places. It **leads with the reservations
+themselves** — patient, day, hour, professional, state — read off the
+customer's OWN system through the tenant's adapter (`GET /reservations` →
+`core.registry` → the adapter's `list_records` capability). That is where a
+name belongs: our append-only log masks PII on the way in, so it can prove a
+cita was booked and must not be the place the patient is stored. A project
+whose systems offer no such view says so plainly instead of drawing an empty
+agenda, and a project with a different shape answers with its own — Tienda Sur
+gets its orders, with an order's own columns, because nothing in `core` or in
+the console holds a list of shapes, columns or state words.
+
+Under the table, demoted to one strip, is the other reading: every
+*irreversible* thing the platform did, counted straight off the log, by verb
+and by day, each row linking to the call that did it. There is no rollup table:
+a transaction is one `tool.call` whose `side_effect` is `irreversible`, and the
 verb is the tool's own name, so a project that declares a new irreversible tool
 appears here the first time it runs with nothing changed in the console. The
-window is in the URL (`?days=30`). A laptop that has only ever been talked to
-has no transactions to show; `scripts/seed_board_demo.py` writes three real
-ones through the real executor, with no LLM and no keys:
+two halves are joined on the business's own identifier — the one thing that
+crosses the PII mask, because an id is not a person. The window is in the URL
+(`?days=30`).
+
+A laptop that has only ever been talked to has no transactions to show;
+`scripts/seed_board_demo.py` writes three real ones through the real executor,
+with no LLM and no keys:
 
 ```bash
-CONVO_DB=tmp/board-demo.db uv run python scripts/seed_board_demo.py
-CONVO_DB=tmp/board-demo.db uv run uvicorn api:app --port 8090
+export CONVO_DB=tmp/board-demo.db CONVO_LEDGER=tmp/board-demo.json
+uv run python scripts/seed_board_demo.py
+uv run uvicorn api:app --port 8090
 open http://localhost:8090/t/clinica-norte/reagendamiento/board
 ```
+
+`CONVO_LEDGER` is the file the demo adapters record their rows in
+(`core/adapters/ledger.py`): a fake agenda lives in the job process and the
+console is a different one, so the fake needs the property a real booking
+system already has — the rows outlive the call. Point both at throwaway files.
 
 A number belongs to a project, never to the fleet: it is one row of the control
 plane's `routes` table (`python -m convo routes list | seed | add`), the same
@@ -282,7 +303,8 @@ curl -XPOST localhost:8090/supervise/verb -H 'content-type: application/json' \
 ```
 
 Two ways to run it. In development the vite server serves the app and proxies
-`/tenants`, `/token`, `/sessions`, `/outcomes`, `/pipeline` and `/evals` to the control
+`/tenants`, `/token`, `/sessions`, `/outcomes`, `/reservations`, `/pipeline` and
+`/evals` to the control
 plane:
 
 ```bash
