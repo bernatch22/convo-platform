@@ -1,7 +1,7 @@
 <section class="slide" data-title="Introducción" data-entregable="0">
   <style>
     .i01-title { font: 600 54px/1.12 var(--sans); color: var(--ink); letter-spacing: -.015em; margin: 0 0 12px; }
-    .i01-sub   { font: 400 19px/1.4 var(--sans); color: var(--ink-2); margin: 0 0 40px; }
+    .i01-sub   { font: 400 19px/1.4 var(--sans); color: var(--ink-2); margin: 0 0 30px; }
     .i01-intro { font: 400 21px/1.6 var(--sans); color: var(--ink); max-width: 84ch; margin: 0 0 38px; }
     .i01-intro strong { font-weight: 600; }
     .i01-live  { display: inline-block; border: 1.5px solid var(--accent); border-radius: 10px;
@@ -13,51 +13,59 @@
   </style>
   <div class="slide-body">
 
-    <div data-anim="1" style="margin-top:12px">
+    <div data-anim="1" style="margin-top:0">
       <div class="eyebrow" style="margin-bottom:24px">Prueba técnica <span class="sep">·</span> Principal Platform Architect <span class="sep">·</span> ABAI</div>
       <h1 class="i01-title">Plataforma conversacional transaccional con IA</h1>
       <p class="i01-sub">Propuesta de arquitectura</p>
     </div>
 
-    <p class="i01-intro" data-anim="2">
-      Un cliente llama por teléfono o escribe por chat. Un agente de IA lo atiende en lenguaje
-      natural y, durante la conversación, <strong>ejecuta acciones reales de negocio</strong>:
-      reservar una cita, cancelar un pedido, abrir un ticket, derivar a una persona. Este
-      documento presenta la arquitectura de una plataforma que lo hace <strong>para múltiples
-      clientes sobre un único despliegue</strong> — incorporar un nuevo negocio es configuración,
-      no un desarrollo a medida. La arquitectura está construida y en operación: dos negocios
-      atienden hoy sobre una línea telefónica real, con cada llamada auditada, grabada y
-      evaluada automáticamente.
+    <p class="i01-intro" data-anim="2" style="margin-bottom:26px">
+      Un cliente llama por teléfono o escribe por chat. Un agente de IA lo atiende y
+      <strong>ejecuta acciones reales de negocio</strong>. Este documento presenta la
+      arquitectura de una plataforma que lo hace <strong>para múltiples clientes sobre un
+      único despliegue</strong> — y está construida y en operación: dos negocios atienden hoy
+      una línea telefónica real, con cada llamada auditada, grabada y evaluada.
     </p>
 
-    <div class="i01-live" data-anim="3" style="display:grid;grid-template-columns:auto 1fr;gap:8px 36px;align-items:start;width:100%;box-sizing:border-box">
-      <div>
-        <p class="lbl">Plataforma en vivo</p>
-        <p class="url">https://lk.bernardocastro.dev</p>
-        <p style="font:400 14px var(--sans);color:var(--ink-2);margin:8px 0 0">y por teléfono:
-        <strong style="font-family:var(--mono)">+1 417 674 3169</strong> (atiende la clínica)</p>
+    <div data-anim="3" style="border:1.5px solid var(--accent);border-radius:10px;overflow:hidden;flex:none">
+      <div style="background:var(--accent-soft);padding:12px 22px;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--accent)">
+        <span><span style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)">Plataforma en vivo&nbsp;&nbsp;</span>
+        <span style="font:500 20px var(--mono);color:var(--ink)">https://lk.bernardocastro.dev</span></span>
+        <span style="font:400 14px var(--sans);color:var(--ink-2)">por teléfono: <strong style="font-family:var(--mono)">+1 417 674 3169</strong> (atiende la clínica)</span>
       </div>
-      <div>
-        <p class="lbl">Qué encontrará desplegado</p>
-        <p style="font:400 13.5px/1.55 var(--sans);color:var(--ink-2);margin:0">
-          Dos negocios independientes sobre un mismo despliegue — una <strong>clínica</strong>
-          (reservar, mover, cancelar y confirmar citas; actualizar datos) y un
-          <strong>comercio</strong> (pedidos y tickets). En la consola: las llamadas en vivo con
-          su supervisión, cada sesión con grabación, transcripción, coste y nota de calidad,
-          el tablero de transacciones, y las evaluaciones — visibles y ejecutables.
-        </p>
+      <div style="display:grid;grid-template-columns:1.25fr 1fr;gap:0">
+        <div style="padding:14px 22px;border-right:1px solid var(--line)">
+          <p style="font:500 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin:0 0 7px">Lo que el agente resuelve, hoy, por voz o chat</p>
+          <p style="font:400 13.5px/1.6 var(--sans);color:var(--ink-2);margin:0">
+            <strong>Clínica</strong> — identifica al paciente · reserva, mueve y cancela citas ·
+            confirma asistencia · actualiza el teléfono · envía SMS
+            &nbsp;&nbsp;<strong>Comercio</strong> — estado del pedido · cancelación · abre y
+            consulta tickets. Toda acción definitiva, solo tras el «sí» explícito del cliente.
+          </p>
+        </div>
+        <div style="padding:14px 22px">
+          <p style="font:500 10.5px var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--accent);margin:0 0 7px">Lo que la operación ve</p>
+          <p style="font:400 13.5px/1.6 var(--sans);color:var(--ink-2);margin:0">
+            Llamadas en vivo con supervisión (escuchar, susurrar, tomar la línea) · cada
+            sesión con grabación, coste y nota · el tablero de citas, pedidos y tickets ·
+            las evaluaciones ejecutables.
+          </p>
+        </div>
       </div>
     </div>
-
-    <p class="i01-note" data-anim="3" style="margin-top:26px">
-      <strong style="color:var(--ink-2)">Construido sobre LiveKit autoalojado</strong> (medios,
-      telefonía SIP y runtime de agentes) con proveedores intercambiables: Soniox / Deepgram,
-      ElevenLabs, Claude / GPT. La elección se argumenta en los trade-offs (lámina 15).
+    <p data-anim="3" style="font:400 13px/1.5 var(--sans);color:var(--muted);margin:14px 0 0">
+      <strong style="color:var(--ink-2)">Cómo se construyó:</strong> de forma incremental — veinte
+      hitos con su reporte de aprendizaje cada uno, en dos días de desarrollo. El board completo,
+      con cada card, spec y decisión, es público:
+      <span style="font-family:var(--mono)">https://taskops.bernardocastro.dev/convo/</span>
     </p>
-    <p class="i01-note" data-anim="3" style="margin-top:10px">
-      El documento cubre los trece puntos solicitados. El sistema en vivo no es el entregable:
-      es la verificación — ninguna decisión se sostiene por estar implementada, sino por su
-      justificación.
+
+    <p class="i01-note" data-anim="3" style="margin-top:18px">
+      <strong style="color:var(--ink-2)">Construido sobre LiveKit autoalojado</strong> con
+      proveedores intercambiables (Soniox / Deepgram, ElevenLabs, Claude / GPT) — la elección se
+      argumenta en los trade-offs. El documento cubre los trece puntos solicitados; el sistema
+      en vivo no es el entregable, es la verificación — ninguna decisión se sostiene por estar
+      implementada, sino por su justificación.
     </p>
 
   </div>
