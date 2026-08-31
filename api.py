@@ -265,6 +265,11 @@ async def pipeline_set(
     422 as well: nothing downstream refuses it — `tts_for` absorbs it as "no
     voice configured" and the next call is mute — so the rule lives here.
     Every value but the greeting is stripped before it is judged and stored.
+
+    One 422 is about the BOX, not the value: this process runs where the worker
+    runs, so a provider slot whose vendor key is absent from the environment is
+    refused here, naming the variable that would have to exist — an override
+    the fleet cannot honour is caught at the door instead of by a dead call.
     """
     edits = {
         name: pipeline.cleaned(name, value)

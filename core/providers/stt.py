@@ -19,15 +19,25 @@ speaks Spanish — `flux-general-en` is English-only and answers a `language_hin
 with a 400 — and Flux takes its vocabulary as `keyterm`, the argument Soniox
 ignores.
 
+Either ear needs its own key on the box that runs it, and a console that sets
+`stt_provider` may be pointing at a fleet that does not carry it. `KEY_ENV_FOR`
+names where each key lives and `runnable` asks whether this host has it: the
+control plane refuses such an override at the door, and `provider_for` treats
+one already stored as unusable config and falls back, so a switched ear can
+never leave a project deaf. Only the variable NAME is ever printed.
+
 The turn detector in `core.providers.turn` is the second opinion either way;
 the session combines both.
 """
 
+import logging
 import os
 
 from livekit.plugins import deepgram, soniox
 
 from core.context import Project, Tenant
+
+log = logging.getLogger("platform.stt")
 
 SONIOX = "soniox"
 DEEPGRAM = "deepgram"
@@ -52,22 +62,48 @@ DEEPGRAM_EOT_THRESHOLD = 0.7  # how sure Flux must be the sentence closed (0.5�
 DEEPGRAM_EOT_TIMEOUT_MS = 1000  # the hard stop, matching Soniox's max endpoint delay
 DEEPGRAM_KEY_ENV = "DEEPGRAM_API_KEY"
 
+# Where each ear's key lives on the box. The NAME travels — into a refusal,
+# into a warning, into the console; the VALUE never leaves this module.
+KEY_ENV_FOR = {SONIOX: KEY_ENV, DEEPGRAM: DEEPGRAM_KEY_ENV}
+
 
 def stt_for(tenant: Tenant, project: Project):
-    """The STT the project chose, or None when its key is absent (text-only still runs)."""
-    if provider_for(project) == DEEPGRAM:
+    """The ear the project chose, or the default one when this box has no key for it."""
+    provider = provider_for(project)
+    _warn_if_swapped(project, provider)
+    if provider == DEEPGRAM:
         return deepgram_stt(tenant, project)
     return soniox_stt(tenant, project)
 
 
 def provider_for(project: Project) -> str:
-    """The provider that will really run: the project's, unless it names one we do not have.
+    """The ear that will really run: the project's, unless this host cannot open it.
 
-    Same rule as `core.providers.tts.tts_model`: unknown data falls back to the
-    platform default instead of failing a call. The control plane refuses to
-    store an unknown provider in the first place (`core.pipeline.overridable`).
+    Same rule as `core.providers.tts.tts_model`: unusable data falls back to the
+    platform default instead of failing a call, and a key this box does not
+    carry makes the choice unusable exactly as an unknown name does. Soniox is
+    the floor — when its own key is absent too, `soniox_stt` answers None and
+    the session is text-only, which is what it has always done.
+
+    The control plane refuses both at the door (`core.pipeline.overridable`):
+    an unknown provider, and one whose key is missing from the host it would
+    run on. This is the second line, for an override stored before the key
+    went away.
     """
-    return project.stt_provider if project.stt_provider in PROVIDERS else SONIOX
+    wanted = project.stt_provider
+    if wanted not in PROVIDERS:
+        return SONIOX
+    return wanted if runnable(wanted) else SONIOX
+
+
+def key_env(provider: str) -> str:
+    """The environment variable this provider's key must live in on the box."""
+    return KEY_ENV_FOR[provider]
+
+
+def runnable(provider: str) -> bool:
+    """Whether this host carries the key this ear needs — the name, never the value."""
+    return provider in KEY_ENV_FOR and bool(os.getenv(key_env(provider)))
 
 
 def soniox_stt(tenant: Tenant, project: Project):
@@ -114,3 +150,21 @@ def deepgram_options(project: Project) -> dict:
         "eot_timeout_ms": DEEPGRAM_EOT_TIMEOUT_MS,
         "keyterm": list(project.keyterms),
     }
+
+
+def _warn_if_swapped(project: Project, provider: str) -> None:
+    """One line per built session when the chosen ear was swapped for want of a key.
+
+    Only the keyless case earns a line: a provider name nobody recognises is a
+    deploy-time mistake the console already shows, while a key absent from THIS
+    box is an operational fact nobody can see from there.
+    """
+    wanted = project.stt_provider
+    if wanted == provider or wanted not in PROVIDERS:
+        return
+    log.warning(
+        "stt: %s needs %s and this host carries none; listening with %s instead",
+        wanted,
+        key_env(wanted),
+        provider,
+    )

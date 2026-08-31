@@ -80,15 +80,20 @@ def stt_view(project: Project) -> dict[str, Any]:
     view = _soniox_view(project) if chosen == stt.SONIOX else _deepgram_view(project)
     view["requested_provider"] = project.stt_provider
     view["providers"] = list(stt.PROVIDERS)
+    view["unavailable_reasons"] = _unavailable("stt_provider", stt.PROVIDERS)
     return view
 
 
 def llm_view(project: Project) -> dict[str, Any]:
     """The model the next session will really build, its family's caching story, the whole menu.
 
-    `requested_model` is what the project asked for and `model` is what runs:
-    they differ only when git names a model outside `ALLOWED_MODELS`, which
-    `llm_model()` falls back on rather than opening a connection nobody priced.
+    `requested_model` is what the project asked for and `model` is what runs.
+    They differ for two reasons: git names a model outside `ALLOWED_MODELS`,
+    which `llm_model()` falls back on rather than opening a connection nobody
+    priced, or this host carries no key for the vendor, which it falls back on
+    rather than dying mid-job. `unavailable_reasons` is the second case said in
+    the server's own words — the very sentence a PUT would be refused with —
+    so the console greys a model out before somebody chooses it.
     """
     model = llm.llm_model(project)
     kind = llm.family(model)
@@ -102,6 +107,7 @@ def llm_view(project: Project) -> dict[str, Any]:
         "max_tokens": llm.MAX_TOKENS,
         "cache_minimum_tokens": llm.CACHE_FLOOR[kind],
         "cache_note": CACHE_NOTES[kind],
+        "unavailable_reasons": _unavailable("llm_model", llm.ALLOWED_MODELS),
     }
 
 
@@ -186,7 +192,21 @@ def cleaned(field: str, value: str) -> str:
 def overridable(field: str, value: str) -> str | None:
     """Why this override is refused, or None when the platform will run it.
 
-    Four rules. The voice one exists because an empty id is not refused
+    Four rules about the value, and one about the box.
+
+    The box one is the youngest and it was bought at full price: on 2026-08-31
+    the console stored `llm_model=gpt-5.4-mini` — legal, priced, on the
+    allow-list — onto a host with no `OPENAI_API_KEY`, and every job of that
+    project died building its LLM until somebody went and read a worker log.
+    `api.py` runs ON the box the worker runs on, so the one question a console
+    somewhere else cannot answer, this function can: is the key here? A
+    provider slot the host cannot open is refused with the variable that would
+    have to exist, never with anything read out of it. The worker no longer
+    crashes either (`llm_model`, `provider_for`), but that is the net, not the
+    door: an operator who asks for an ear the box cannot open deserves the
+    answer now, not a project quietly running on the other one.
+
+    The four value rules. The voice one exists because an empty id is not refused
     anywhere downstream — it is *absorbed*: `tts_for` reads it as "no voice
     configured", builds no TTS, and the call is silent with a log line blaming
     a missing API key. A rule that only the store can enforce belongs here.
@@ -227,7 +247,39 @@ def overridable(field: str, value: str) -> str | None:
             f"{value!r} is not an STT provider this platform runs: "
             f"the console may choose {list(stt.PROVIDERS)}."
         )
+    if field == "llm_model" and not llm.runnable(value):
+        other = f"the default model {llm.DEFAULT_MODEL!r}" if value != llm.DEFAULT_MODEL else None
+        return _absent(value, llm.key_env(value), other)
+    if field == "stt_provider" and not stt.runnable(value):
+        other = f"the default ear {stt.SONIOX!r}" if value != stt.SONIOX else None
+        return _absent(value, stt.key_env(value), other)
     return None
+
+
+def _unavailable(field: str, values: tuple[str, ...]) -> dict[str, str]:
+    """The choices this host cannot open, each with the sentence a PUT would be refused with."""
+    refusals = {value: overridable(field, value) for value in values}
+    return {value: why for value, why in refusals.items() if why}
+
+
+def _absent(value: str, variable: str, fallback: str | None) -> str:
+    """The refusal for a provider this host has no key for — the variable, never its value.
+
+    `fallback` is what the worker would run instead, and None when the value IS
+    the platform default: there is nothing under it, so the sentence has to ask
+    for the variable rather than offer an alternative.
+    """
+    said = (
+        f"{value!r} needs {variable} on this host and the box carries none: the variable is "
+        f"not set in the worker's environment. Nothing here reads its contents."
+    )
+    if fallback is None:
+        return f"{said} It is the platform default, so put it in the fleet's env and restart."
+    return (
+        f"{said} Put it there and restart the fleet, or leave this project on {fallback}: "
+        f"stored now, every session would quietly fall back to it anyway, with a warning "
+        f"nobody reading this console would ever see."
+    )
 
 
 def _soniox_view(project: Project) -> dict[str, Any]:
