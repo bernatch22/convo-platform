@@ -393,7 +393,48 @@ them. Cold-start TTFB: 0.98 s v3_conversational, 0.84 s flash; in-call
 in `tmp/reports/ms-6.html` because the last word on how a number sounds is a
 human's.
 
-### 3.10 Ring 2 live — a synthetic caller who really speaks
+### 3.10 The phantom turn (voice regression) — a transcript with no audio behind it
+
+- **Kind:** no judge, no model, no key. `tests/test_stt_gate.py` — the arithmetic
+  with the clock in the test's hand, and a real `AgentSession` running the
+  framework's own audio path.
+- **The call it pins.** AJ_rt86KogpPxDa, seq 9 (2026-08-31). During the opening
+  comfort noise Soniox emitted a FINAL `"Thank you."` — language `en`,
+  transcription delay 3.32 s — nobody had spoken, and the agent answered "De
+  nada". A streaming STT is a language model with a microphone; over a silent
+  line it invents, and the invention is different every time, so a blocklist of
+  hallucinated phrases is a diary, not a fix.
+- **What is measured instead.** `core/stt_gate.py` reads the RMS level of the
+  very frames going into the STT, tracks the LINE's own noise floor (fast to
+  fall, slow to rise, so speech cannot lift it) and accepts a transcript only
+  when the last `max_lag_s` seconds carried at least `min_voiced_ms` above that
+  floor. The threshold is clamped into `[-55, -40] dBFS`, so the gate can never
+  demand more of a quiet caller than a bad line can deliver, nor believe hiss on
+  a dead one. Defaults: 100 ms inside 2.5 s, 12 dB of margin — thresholds a
+  project overrides with `Project.stt_gate`, like `backchannels`.
+- **Where it stands.** `TenantAgent.stt_node`, the last seam before a transcript
+  becomes an interruption, a user turn and a reply. The price is the framework's
+  STT-pipeline reuse across a handoff, which `AgentActivity` grants only to the
+  DEFAULT `stt_node`: each stage now opens its own STT stream. Frames queue
+  while it connects and none are lost, and a handoff is the moment the agent
+  takes the floor, not the caller.
+- **The golden runs twice.** Gate on, the phantom never reaches the session and
+  the log carries `stt.phantom` with the evidence (text, language, confidence,
+  voiced ms, threshold). Gate off (`stt_gate={"min_voiced_ms": 0}`), the same
+  script reproduces the bug — `stt.final` in the log. A green run therefore
+  cannot be a test that proves nothing. Real speech in `es` and `en` passes in
+  both directions.
+- **The fake half is reusable:** `core/testing/stt_script.py` — `ScriptedSTT`
+  (an STT that transcribes the script it was handed, not the audio), a
+  `ScriptedMicrophone`, and `comfort_noise` / `speech` frame builders at a
+  level. Nothing in it knows about tenants.
+- **What it does NOT catch:** line echo. If the caller's leg returns the agent's
+  own TTS loudly enough to clear the threshold, the gate sees voiced audio and
+  lets the transcript through — a different failure (the agent transcribing
+  itself) with a different fix. Ring 2's live half against a real room is where
+  that gets measured.
+
+### 3.11 Ring 2 live — a synthetic caller who really speaks
 
 - **What it is:** `core/testing/ring2.py:converse(persona, tenant, project,
   turns)` — the door and the result — over `core/testing/caller.py:Call`, the
@@ -587,6 +628,10 @@ about four minutes.
   dropout detector reads normal inter-word pauses as defects, so the score is
   0.0 for any well-formed sentence longer than a phrase (§3.9). We assert the
   breakdown instead. Upstream fix: scale the dropout threshold with the clip.
+- **The phantom-turn gate is deaf to echo** (§3.10). It refuses a transcript
+  with no voiced audio behind it, which is every hallucination over comfort
+  noise; it cannot tell the caller's voice from the agent's own TTS coming back
+  down a leg with echo. Measuring that needs ring 2's live room.
 - **A `--record` run with a microphone has never been scored.** Everything in
   §3.9 is measured on a recording whose caller channel is silent, so nothing
   yet exercises overlap, barge-in or the caller's own audio. §3.10 closes half

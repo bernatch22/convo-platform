@@ -5,16 +5,18 @@ history across a handoff, so the stage that enters writes a one-line summary of
 the stage it replaces into its own chat context before saying anything: what
 the caller already told us travels, the whole transcript does not.
 
-Two of the framework's nodes are overridden here, once, for every project:
-`transcription_node` reads the agent's words on their way out and times them in
-the log, and `on_user_turn_completed` drops a murmur that landed on the agent's
-voice. Both are audit and turn-taking, not business, so no stage overrides them.
+Three of the framework's nodes are overridden here, once, for every project:
+`stt_node` refuses a transcript no audio can account for, `transcription_node`
+reads the agent's words on their way out and times them in the log, and
+`on_user_turn_completed` drops a murmur that landed on the agent's voice. All
+three are audit and turn-taking, not business, so no stage overrides them.
 """
 
 import logging
 from collections.abc import AsyncGenerator, AsyncIterable
 
-from livekit.agents import Agent, StopResponse
+from livekit import rtc
+from livekit.agents import Agent, StopResponse, stt
 from livekit.agents.llm import ChatContext, ChatMessage
 from livekit.agents.voice.agent import ModelSettings
 
@@ -22,6 +24,7 @@ from core.barge_in import backchannels_of, holds_the_floor, is_backchannel
 from core.context import TenantContext
 from core.observability.voice import TimedWords
 from core.state.log import record
+from core.stt_gate import TranscriptGate, gate_options_for
 
 log = logging.getLogger("platform.agents")
 
@@ -56,6 +59,35 @@ class TenantAgent(Agent):
             self.session.say(opener, allow_interruptions=True)
         else:
             self.session.generate_reply()
+
+    async def stt_node(
+        self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
+    ) -> AsyncGenerator[stt.SpeechEvent, None]:
+        """Transcribe as the framework does, dropping any transcript the audio cannot account for.
+
+        A streaming STT invents sentences over a silent line — Soniox put a
+        final "Thank you." into the human's call AJ_rt86KogpPxDa while nobody
+        had spoken, and the agent answered it. `core.stt_gate` measures the very
+        frames going into the STT and refuses a transcript with no voiced audio
+        behind it; the refusal is a `stt.phantom` line in the log, never a
+        silent drop, because a gate nobody can audit is worse than the bug.
+
+        This is the last seam where a transcript can still be stopped: one node
+        later it is an interruption, a user turn and a reply. The price of
+        standing here is the framework's STT-pipeline reuse across a handoff
+        (`AgentActivity._detach_reusable_resources` reuses it only for the
+        DEFAULT `stt_node`), so each stage opens its own STT stream. Frames
+        queue while it connects and none are lost — a handoff is the moment the
+        agent takes the floor, not the caller.
+        """
+        gate = TranscriptGate(gate_options_for(self.tc.project))
+        async for event in super().stt_node(gate.hear(audio), model_settings):
+            if gate.accepts(event):
+                yield event
+                continue
+            evidence = gate.evidence(event)
+            log.warning("stt.phantom %s %s", self.tc.label(), evidence)
+            record(self.tc, "stt.phantom", evidence)
 
     async def transcription_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings

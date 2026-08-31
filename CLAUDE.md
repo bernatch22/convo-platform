@@ -61,6 +61,13 @@ and, when a decision was made, a short essay in its thread.
   The provider is a slot (`Project.stt_provider`, overridable from the console):
   the alternative is Deepgram Flux `flux-general-multi` via the plugin's `STTv2`
   (`/v2/listen`) — never `flux-general-en`, which 400s on a `language_hint`.
+- Every transcript passes `core.stt_gate` in `TenantAgent.stt_node`: a streaming
+  STT hallucinates over comfort noise (real call AJ_rt86KogpPxDa: a final
+  "Thank you." into an empty line), so a final with no voiced audio behind it in
+  the last 2.5 s is refused and logged as `stt.phantom`. Never a phrase
+  blocklist — the invention changes every time. Thresholds are project data
+  (`Project.stt_gate`). Overriding `stt_node` forfeits the framework's
+  STT-pipeline reuse across a handoff; that price is paid knowingly.
 - TTS: ElevenLabs `eleven_v3_conversational` (primary) / `eleven_flash_v2_5`
   (latency profile), `sync_alignment=True`. Never `eleven_turbo_v2_5`
   (deprecated) and never `eleven_v3` (non-realtime). On interruption the
