@@ -3,23 +3,94 @@
 
     <div class="head-block" data-anim="1">
       <div class="eyebrow">03 <span class="sep">·</span> Entregable 2 — dominios / bounded contexts</div>
-      <h2 class="head">Dominios y bounded contexts</h2>
+      <h2 class="head" style="max-width:46ch">Siete contextos y una sola flecha permitida</h2>
+      <p class="lede">
+        Los contextos no se declaran en un diagrama: se declaran en el árbol y los obliga un test.
+        <code>core/</code> es el runtime y no importa ningún tenant; los clientes importan
+        <code>core</code>, nunca al revés. La alternativa —un runtime que conoce a sus clientes—
+        convierte cada alta de negocio en un release de la plataforma.
+      </p>
     </div>
 
-    <div class="todo" data-anim="2">
-      <div class="who">Sin escribir <span class="sep">·</span> card tk-14fc29 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
-      <ul>
-        <li>Siete contextos: Session, Process, Tools & Adapters, Tenancy & Config, Audit, Evaluation, Supervision.</li>
-        <li>Una línea por contexto: qué posee y qué se niega a hacer.</li>
-        <li>La regla de dependencia que los mantiene honestos: core/ nunca importa tenants/, y un test lo obliga.</li>
-        <li>Dónde están las costuras en el árbol, para que el lector pueda abrirlas.</li>
-        <li>El contexto que hoy es deliberadamente delgado, y por qué.</li>
-      </ul>
-      <div class="note"><b>Figura:</b> Mapa de contextos pequeño en SVG, o .rows. No otro diagrama de cajas: la lámina 02 ya gastó esa carta.</div>
-      <div class="note">
-        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
-        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+    <div class="grid-7-5 fill">
+
+      <div style="display:flex;flex-direction:column;gap:16px" data-anim="2">
+        <table class="plain">
+          <thead>
+            <tr>
+              <th style="width:16%">Contexto</th>
+              <th style="width:42%">Qué posee</th>
+              <th>Qué se niega a hacer</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Session</td><td>el turno vivo, la etapa y el canal</td><td>guardar estado propio fuera del log</td></tr>
+            <tr><td>Process</td><td>etapas, saga, confirmación y compensación</td><td>delegar la autoridad al prompt</td></tr>
+            <tr><td>Tools &amp; Adapters</td><td>el <code>ToolSpec</code>, el guard y los puertos</td><td>ejecutar irreversible sin token</td></tr>
+            <tr><td>Tenancy &amp; Config</td><td>rutas, proyectos, versiones y overrides</td><td>resolverse en tiempo de compilación</td></tr>
+            <tr><td>Audit</td><td>el log append-only con <code>seq</code> y el informe</td><td>editar o reordenar un evento escrito</td></tr>
+            <tr><td>Evaluation</td><td>goldens, DAGs, réplicas y el juicio por llamada</td><td>entrar en el camino de producción</td></tr>
+            <tr><td>Supervision</td><td>el ticket de observador y la escucha</td><td>conceder más de lo que firmó el ticket</td></tr>
+          </tbody>
+        </table>
+        <div class="note">
+          <b>Supervision es delgado a propósito.</b> Hoy existen el ticket firmado y la escucha
+          (<code>mint_observer</code>, <code>/observe</code>, <code>/live-calls</code>): ni susurro ni
+          toma de control. Esperó a tener a quién transferir; la lámina 10 dice qué falta.
+        </div>
       </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px" data-anim="3">
+        <figure class="fig">
+          <svg viewBox="0 0 577 232" role="img" aria-label="Regla de dependencia: tenants importa core, core importa el framework, y core nunca importa tenants">
+            <defs>
+              <marker id="a03" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0 0 L8 4 L0 8 z" style="fill:var(--rule)"/>
+              </marker>
+            </defs>
+
+            <rect class="box" x="0" y="0" width="577" height="56"/>
+            <text class="lbl" x="16" y="26">tenants/</text>
+            <text class="lbl-sm" x="16" y="44">clinica-norte · tienda-sur · _template</text>
+
+            <rect class="box-accent" x="0" y="88" width="577" height="56"/>
+            <text class="lbl" x="16" y="114">core/ — el runtime</text>
+            <text class="lbl-sm" x="16" y="132">contexto · contratos · registry · router · tools · estado</text>
+
+            <rect class="box" x="0" y="176" width="577" height="56"/>
+            <text class="lbl" x="16" y="202">livekit-agents 1.7.1</text>
+            <text class="lbl-sm" x="16" y="220">Soniox · Anthropic · ElevenLabs · SFU propio</text>
+
+            <path class="edge" d="M120 56 V84" marker-end="url(#a03)"/>
+            <text class="lbl-sm" x="132" y="77">importa</text>
+            <path class="edge" d="M120 144 V172" marker-end="url(#a03)"/>
+            <text class="lbl-sm" x="132" y="165">importa</text>
+
+            <path class="edge" d="M430 86 V60" marker-end="url(#a03)" stroke-dasharray="3 3"/>
+            <path class="edge" d="M418 61 L442 85 M442 61 L418 85" stroke-width="1.6"/>
+            <text class="lbl-sm" x="404" y="77" text-anchor="end">nunca · lo prueba un test</text>
+          </svg>
+          <figcaption>Figura — la única flecha permitida entre capas</figcaption>
+        </figure>
+
+        <pre class="code">core/context.py    <b>TenantContext</b> — la única definición
+core/contracts.py  SessionMeta · Channel · ToolSpec
+core/registry.py   tenants leídos del disco, en try/except
+core/router.py     resolve(ctx) → un TenantContext
+core/tools/        contract · guard · executor · saga
+core/state/        log append-only · store · overrides
+core/testing/      arneses, DAGs y goldens
+tenants/&lt;t&gt;/projects/&lt;p&gt;/  project · agents · tools</pre>
+      </div>
+
+    </div>
+
+    <div class="proof" data-anim="4">
+      <b>Validación.</b> <b>pytest -m unit tests/test_core_isolation.py</b> recorre los
+      <span class="n">60</span> módulos de <code>core/</code> y falla si alguno importa
+      <code>tenants</code>; hoy pasa con cero infractores. El corolario se mide igual:
+      <code>core/registry.py</code> importa cada tenant en <code>try/except</code>, así que un
+      negocio roto queda <em>no enrutable</em> y el resto de la flota sigue atendiendo.
     </div>
 
   </div>
