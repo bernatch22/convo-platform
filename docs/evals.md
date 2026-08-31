@@ -1230,6 +1230,21 @@ soften:
 - **Reception line, «quiero cambiar mi cita al viernes por la tarde»** — the same
   shape on an older golden: GPT offered a 10:00 slot as an afternoon one.
 
+The consent ring is separate from that table and greener: the eight simulated
+calls (§5) score **1.0 on both models**, run as
+
+```bash
+uv run deepeval test run tests/evals/test_reagendamiento_dag.py -s
+CONVO_EVAL_MODEL=gpt-5.4-mini uv run deepeval test run tests/evals/test_reagendamiento_dag.py -s
+```
+
+and the three new-booking ones behave exactly as designed on both: two reach
+`create_appointment` after an explicit yes and pay one judge call each, and
+`cita-nueva-se-echa-atras` ends at node 1 with the reason "`book_slot /
+create_appointment` never ran; the agent only called `book_appointment /
+request_appointment`, which asks and changes nothing" — **zero judge calls**, on
+Haiku and on GPT alike.
+
 Ms-18 also moved one number by fixing the AGENT rather than the golden. The
 Sunday golden («¿tiene algo el domingo por la mañana?») first ran with Haiku
 answering «los domingos cerramos» straight off the opening-hours sheet, calling
