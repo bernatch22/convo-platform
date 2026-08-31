@@ -18,7 +18,7 @@ cards = briefs). Each milestone lands with a learning report under
 
 ```bash
 uv sync --extra dev
-cp .env.example .env            # add your keys (Anthropic, Soniox, ElevenLabs)
+cp .env.example .env            # keys: Anthropic, Soniox (or Deepgram), ElevenLabs
 pytest -m unit                  # fast tests, no keys needed
 python worker.py --help         # the LiveKit Agents CLI (console/dev/start)
 ```
@@ -34,7 +34,9 @@ TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --te
 ### Talking to it out loud
 
 Drop `--text` and the console runs in **audio mode**: it opens the laptop
-microphone and speaks back through the speakers. Soniox transcribes, ElevenLabs
+microphone and speaks back through the speakers. The project's STT provider
+transcribes (Soniox `stt-rt-v5` by default, Deepgram Flux when the console
+switches it — see `core/providers/stt.py`), ElevenLabs
 answers in the project's voice, and a local turn detector decides when you have
 finished — no LiveKit server, no GPU, nothing to deploy.
 
@@ -78,6 +80,59 @@ The log is append-only and written during the call, so it survives a kill:
 `interruption.false` and `speech.overlap` the barge-in decisions, and the `t_ms`
 column is milliseconds since the call started.
 
+### Run against a local server
+
+The console has no server in it. This is the same worker talking to a real
+LiveKit SFU, dispatched by the token instead of by `TENANT` — three terminals
+and a script:
+
+```bash
+# 1 · the SFU and its redis (livekit-server 1.9.1, dev keypair, ports 7880-7882)
+docker compose -f infra/compose/dev.yml up
+
+# 2 · the control plane: it mints the JWT that carries the agent dispatch
+uv run uvicorn api:app --port 8090
+
+# 3 · the fleet: one worker process, no TENANT and no PROJECT in its environment
+env -u TENANT -u PROJECT uv run python worker.py dev
+```
+
+Then, in a fourth, the browser-less client — it asks `api.py` for a token,
+joins the room that token names, types on `lk.chat` and reads the agent on
+`lk.transcription`:
+
+```bash
+uv run python scripts/dev_call.py                             # both demo tenants
+uv run python scripts/dev_call.py tienda-sur/pedidos          # just one
+uv run python scripts/dev_call.py clinica-norte/reagendamiento "hola" "¿y el jueves?"
+```
+
+```
+── tienda-sur/pedidos · room tienda-sur-pedidos-3128dc53 ──
+agent  ▸ Tienda Sur, buenos días. ¿En qué te puedo ayudar?
+you    ▸ Buenas, llamo por el pedido TS-10432.
+agent  ▸ Perfecto, ahora mismo lo miro. Tengo localizado el pedido TS-10432 de Marta Alonso Gil.
+```
+
+Two businesses answered from one process and neither was named in its
+environment: who picks up is decided by `RoomAgentDispatch(agent_name=$FLEET,
+metadata={tenant, project, channel})`, minted at the door by `api.py` and read
+by `core/router.py`. A chat session joins with
+`RoomOptions(audio_input=False, audio_output=False)` — text both ways, no
+microphone permission asked for.
+
+The calls land in the same log the console writes, and score with the same
+metrics:
+
+```bash
+uv run python -m convo sessions eval <id>                     # the project's DAGs, ring 3
+uv run deepeval test run tests/evals/test_dispatch_ring.py    # the same, as a test
+```
+
+`tests/evals/test_dispatch_ring.py` skips itself when no routed session is in
+the store: `scripts/dev_call.py` is its fixture, and a suite that failed
+because nobody started a server would be reporting on the laptop.
+
 A third business is a copy of [`tenants/_template/`](tenants/_template/README.md),
 which walks a stranger through it in ten minutes;
 [`docs/tenants.md`](docs/tenants.md) is the table of what a tenant owns and what
@@ -98,8 +153,38 @@ uv run python -m core.testing.report clinica-norte reagendamiento \
     --model claude-haiku-4-5 --model gpt-5.4-mini
 ```
 
-[`docs/evals.md`](docs/evals.md) explains every metric and how to add one; §9 is
-the model matrix.
+A run also has a screen: the console's Evals page lists every run with its
+scores, diffs it against the previous run of the same suite, and can launch one
+on the box (one at a time, killed at fifteen minutes, log tail on screen).
+
+[`docs/evals.md`](docs/evals.md) explains every metric, how to add one, and how
+a project declares the suites the console can run (§8); §9 is the model matrix.
+
+## The web UI
+
+`ui/` is the operator console: the tenant/project switcher, Talk (the three
+channels — WebRTC voice, web chat, and the phone line on **+1 417 674 3169**),
+Sessions, Pipeline, Evals (every stored run with its per-metric diff, and the
+button that launches another on the box) and the shell for Supervisor. Vite +
+React + TypeScript + react-router; no state library, no CSS framework.
+
+Two ways to run it. In development the vite server serves the app and proxies
+`/tenants`, `/token`, `/sessions`, `/pipeline` and `/evals` to the control
+plane:
+
+```bash
+uv run uvicorn api:app --port 8090        # terminal 1: the control plane
+cd ui && npm install && npm run dev       # terminal 2: http://localhost:5173
+```
+
+In production there is one port: build once and `api.py` serves the bundle
+itself, with the API paths keeping priority and everything else falling back to
+the SPA.
+
+```bash
+cd ui && npm install && npm run build     # writes ui/dist (never committed)
+uv run uvicorn api:app --port 8090        # http://localhost:8090
+```
 
 ## Layout
 
@@ -107,7 +192,10 @@ the model matrix.
 worker.py     data plane: one AgentServer, one fleet, every tenant
 api.py        control plane (ms-8+): tokens, dispatch, tools hub, call log
 core/         runtime: contracts, agents, tools, adapters, state, observability
+ui/           the operator console: React + vite, served by api.py once built
 tenants/      one folder per customer: adapters + projects (agents, prompts, evals)
+infra/        compose/ — the local dev stack (livekit-server + redis)
+scripts/      dev_call.py: a browser-less chat call against a running server
 tests/        unit tests and ring-1 evals
 docs/         how the platform is meant to be used: tenants, prompts, evals
 .taskops/reports/  per-milestone learning reports (Markdown)
@@ -139,3 +227,16 @@ board holds the plan; this repo carries the board's hooks (`.claude/`,
 Reusable for other teams: the hooks are two lines of JSON, the conventions are
 this section, and the pattern (seams first, then parallel cards, HTML report
 per milestone) does not depend on any particular framework.
+
+## Production box (convo-box)
+
+The dedicated GCP box (`e2-standard-4`, `lk.bernardocastro.dev`) runs the SFU
+stack — livekit-server + livekit-sip + redis, host networking, real keypair
+generated on the box on first run:
+
+```bash
+./infra/box/setup.sh     # idempotent: install docker, render configs, compose up
+```
+
+It also mirrors `LIVEKIT_URL` and the keypair into your local `.env`, so
+`python worker.py dev` registers against the box instead of the laptop stack.

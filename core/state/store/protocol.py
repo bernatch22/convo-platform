@@ -33,6 +33,22 @@ class Route:
 
 
 @dataclass(frozen=True)
+class PipelineOverride:
+    """One field of a project's pipeline set from the console instead of from git.
+
+    Voice, TTS model and greeting are the three a supervisor changes between
+    calls; the row is what makes the change survive without a deploy. The read
+    is one row per field, so the console can show when each was last touched.
+    """
+
+    tenant: str
+    project: str
+    field: str
+    value: str
+    updated_at: float = 0.0
+
+
+@dataclass(frozen=True)
 class ProjectVersion:
     """A pinned prompt version: git is the seed, this row is the override the box serves."""
 
@@ -43,8 +59,42 @@ class ProjectVersion:
     created_at: float = 0.0
 
 
+@dataclass(frozen=True)
+class MetricScore:
+    """One metric's verdict over a whole eval run: its mean score and the cases it decided."""
+
+    metric: str
+    score: float
+    passed: int = 0
+    failed: int = 0
+
+
+@dataclass(frozen=True)
+class EvalRun:
+    """One `deepeval` run of one project's suite: what it scored and where its evidence is.
+
+    Stored the moment it starts (`status="running"`) so the console can watch it
+    land, then replaced by id when it ends. `suite` is free text on purpose —
+    ring 1 today, personas tomorrow — and nothing here knows which is which.
+    """
+
+    id: str
+    tenant: str
+    project: str
+    suite: str
+    status: str = "running"  # running | done | failed
+    started_at: float = 0.0
+    finished_at: float | None = None
+    git_sha: str | None = None
+    milestone: str | None = None
+    metrics: tuple[MetricScore, ...] = ()
+    report_html: str | None = None
+    log_path: str | None = None
+    detail: str | None = None
+
+
 class Store(Protocol):
-    """Sessions and their events, plus the two small tables the router reads."""
+    """Sessions and their events, plus the three small tables the router reads."""
 
     def open_session(self, row: SessionRow) -> None:
         """Register a session before its first event."""
@@ -92,4 +142,20 @@ class Store(Protocol):
 
     def versions(self) -> list[ProjectVersion]:
         """Every pinned version, sorted by tenant and project."""
+        ...
+
+    def pipeline_overrides(self, tenant: str, project: str) -> list[PipelineOverride]:
+        """The console's overrides for one project, one row per field, sorted by field."""
+        ...
+
+    def set_pipeline_override(self, override: PipelineOverride) -> None:
+        """Set (or replace) one overridden field of a project's pipeline."""
+        ...
+
+    def eval_runs(self) -> list[EvalRun]:
+        """Every stored eval run, newest first."""
+        ...
+
+    def add_eval_run(self, run: EvalRun) -> None:
+        """Store one eval run, replacing the row with the same id."""
         ...

@@ -28,6 +28,11 @@ untouched, and the run ends on the metric × model table (`core.testing.matrix`)
 A golden that only passes on one model is a finding for the report, never a
 golden to rewrite until both models pass it: soften it and the matrix stops
 comparing anything.
+
+At the end the run files itself with the control plane (`POST /evals/runs`), so
+a report written on a laptop shows up on the console's evals screen next to the
+runs the box launched itself. A control plane that is not answering costs
+nothing: the HTML on disk is still the evidence.
 """
 
 import argparse
@@ -45,6 +50,7 @@ from deepeval.evaluate.configs import DisplayConfig
 from deepeval.test_case import ConversationalTestCase, LLMTestCase
 from dotenv import load_dotenv
 
+from core.evals.filing import file_run, metrics_from
 from core.providers import llm
 from core.testing import matrix
 from core.testing.deepeval import (
@@ -57,6 +63,7 @@ from core.testing.deepeval import (
 from core.testing.harness import Conversation, fake_context, run_conversation
 
 REPORT_DIR = pathlib.Path("tmp/reports/deepeval")  # generated artifact, not versioned
+DEFAULT_SUITE = "report"  # what this CLI files under when nobody names a suite
 
 # Ring 1 is scored on TEXT, and a .env with the voice keys in it makes
 # `build_session` open a Soniox socket per golden that has no job context to
@@ -187,8 +194,8 @@ def _evaluate(
     model: str,
     shape: str,
 ) -> Any:
-    """One DeepEval run over one case shape, writing its HTML under the model's own name."""
-    return evaluate(
+    """One run over one case shape, filed with the control plane, HTML under the model's name."""
+    result = evaluate(
         test_cases=cases,
         metrics=metrics,
         display_config=DisplayConfig(
@@ -198,6 +205,20 @@ def _evaluate(
         ),
         identifier=suite_name(tenant_id, project_id, model, shape),
     )
+    file_run(
+        tenant_id,
+        project_id,
+        suite_name(tenant_id, project_id, model, shape),
+        metrics_from(result.test_results),
+        report_html=_newest_html(),
+    )
+    return result
+
+
+def _newest_html() -> str | None:
+    """The HTML this run just wrote, so the console links the evidence instead of naming it."""
+    written = sorted(REPORT_DIR.glob("*.html"), key=lambda path: path.stat().st_mtime)
+    return str(written[-1]) if written else None
 
 
 def _evals_dir(tenant_id: str, project_id: str) -> pathlib.Path:

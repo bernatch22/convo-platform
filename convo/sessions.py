@@ -12,7 +12,7 @@ LIST_HEADER = (
 )
 SHOW_HEADER = f"{'seq':>4} {'t_ms':>7}  {'kind':<18} payload"
 METRIC_KEYS = ("llm_node_ttft", "e2e_latency", "transcription_delay", "end_of_turn_delay")
-USAGE = "usage: python -m convo sessions list | show <id> | eval <id> [--voice]"
+USAGE = "usage: python -m convo sessions list | show <id> | tail [<id>] | eval <id> [--voice]"
 NODE_LINES = ("Label:", "Verdict:", "Reason:")
 WIDTH = 160
 
@@ -37,6 +37,8 @@ def main(argv: list[str], store: Store | None = None) -> int:
         return list_sessions(store)
     if argv[:1] == ["show"] and len(argv) == 2:
         return show_session(store, argv[1])
+    if argv[:1] == ["tail"] and len(argv) in (1, 2):
+        return tail_session(store, argv[1] if len(argv) == 2 else None)
     if argv[:1] == ["eval"] and len(argv) in (2, 3):
         return eval_session(store, argv[1], voice="--voice" in argv[2:])
     print(USAGE)
@@ -66,6 +68,54 @@ def show_session(store: Store, session_id: str) -> int:
     for event in store.events(session_id):
         print(f"{event.seq:>4} {event.t_ms:>7}  {event.kind:<18} {render(event)}")
     return 0
+
+
+def tail_session(store: Store, session_id: str | None = None, poll_s: float = 0.3) -> int:
+    """Follow a session live: each new event printed as it lands, with the wall clock.
+
+    Watching the pipeline breathe in the terminal: when the stt.final arrives,
+    when the state flips listening→thinking→speaking, when the first tts word
+    leaves, and each turn's ttft/e2e chips. With no id it waits for the newest
+    session — start it, then call the number. Ctrl+C ends it.
+    """
+    printed_for: str | None = None
+    last_seq = 0
+    try:
+        while True:
+            row = store.session(session_id) if session_id else _newest(store)
+            if row is None:
+                time.sleep(poll_s)
+                continue
+            if row.id != printed_for:
+                print(f"\n{row.id}  {row.tenant}/{row.project}  {row.channel}  (live)")
+                print(f"{'clock':<9}{SHOW_HEADER}")
+                printed_for, last_seq = row.id, 0
+            for event in store.events(row.id):
+                if event.seq <= last_seq:
+                    continue
+                clock = time.strftime("%H:%M:%S", time.localtime())
+                line = f"{event.seq:>4} {event.t_ms:>7}  {event.kind:<18} {render(event)}"
+                print(f"{clock} {line}", flush=True)
+                last_seq = event.seq
+                if event.kind == "session.end" and session_id:
+                    return 0
+            if printed_for and not session_id and _ended(store, printed_for):
+                session_id = None  # jump to the next session when this one closed
+            time.sleep(poll_s)
+    except KeyboardInterrupt:
+        print()
+        return 0
+
+
+def _newest(store: Store):
+    """The most recently started session, or None when the store is empty."""
+    rows = store.sessions()
+    return rows[0] if rows else None
+
+
+def _ended(store: Store, session_id: str) -> bool:
+    events = store.events(session_id)
+    return bool(events) and events[-1].kind == "session.end"
 
 
 def eval_session(store: Store, session_id: str, voice: bool = False) -> int:

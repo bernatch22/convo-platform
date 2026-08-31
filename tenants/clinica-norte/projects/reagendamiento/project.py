@@ -114,7 +114,9 @@ PROJECT = ReagendamientoProject(
     id="reagendamiento",
     name="Reagendamiento de citas",
     language="es-ES",
+    greeting="Clínica Norte, buenos días, le atiende recepción. ¿En qué puedo ayudarle?",
     voice="UOIqAnmS11Reiei1Ytkc",  # ElevenLabs "Carolina - Spanish woman - es_ES" (used from ms-6)
+    tts_model="eleven_flash_v2_5",  # latency profile: ~100ms ttfb vs ~700ms measured on v3 (PSTN)
     tools=platform_specs().merge(
         ToolCatalog.of(
             FIND_AVAILABILITY, FIND_PATIENT, CANCEL_SLOT, BOOK_SLOT, REBOOK_SLOT, SEND_SMS

@@ -51,6 +51,22 @@ async def test_a_sip_call_is_routed_by_the_number_it_dialled(store) -> None:
     assert (tc.tenant.id, tc.channel) == ("clinica-norte", "voice")
 
 
+async def test_a_phone_call_is_a_room_job_and_the_caller_is_found_in_the_room(store) -> None:
+    ctx = fake_job_context(room_participants={"sip.trunkPhoneNumber": "+34910000000"})
+
+    tc = await router.resolve(ctx, store)
+
+    assert (tc.tenant.id, tc.channel) == ("clinica-norte", "voice")
+
+
+async def test_the_sip_attributes_of_the_call_are_written_on_session_start(store) -> None:
+    dialled = {"sip.trunkPhoneNumber": "+34910000000", "sip.callID": "TW-1"}
+
+    tc = await router.resolve(fake_job_context(room_participants=dialled), store)
+
+    assert tc.log.events()[0].payload["sip"] == dialled
+
+
 async def test_a_number_without_a_route_is_unroutable(store) -> None:
     ctx = fake_job_context(participant_attributes={"sip.trunkPhoneNumber": "+34999999999"})
 
@@ -58,13 +74,15 @@ async def test_a_number_without_a_route_is_unroutable(store) -> None:
         await router.resolve(ctx, store)
 
 
-async def test_the_console_falls_back_to_the_environment(store, monkeypatch) -> None:
+async def test_the_console_falls_back_to_the_environment_as_a_voice_session(
+    store, monkeypatch
+) -> None:
     monkeypatch.setenv("TENANT", "clinica-norte")
     monkeypatch.setenv("PROJECT", "reagendamiento")
 
     tc = await router.resolve(fake_job_context(), store)
 
-    assert tc.tenant.id == "clinica-norte" and tc.channel == "chat"
+    assert tc.tenant.id == "clinica-norte" and tc.channel == "voice"
 
 
 async def test_an_unknown_tenant_is_refused_with_the_known_list(store) -> None:
