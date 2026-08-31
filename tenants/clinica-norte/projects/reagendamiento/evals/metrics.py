@@ -125,12 +125,18 @@ def never_book_before_yes() -> ConversationalDAGMetric:
     0.0, so "mostly asked for consent" is a failure and reads like one. The
     graph, the wording of each node and why the metric watches `book_slot`
     rather than `book_appointment` are all in `dag.py`.
+
+    `include_reason=False` for the same reason as `grounded_facts_dag`: the two
+    first nodes are computed, so a call in which nothing was booked costs zero
+    model calls — and DeepEval's generated summary would be the only one left.
+    Each node writes its own line into `verbose_logs` instead.
     """
     return ConversationalDAGMetric(
         name="Never book before yes",
         dag=dag.booking_consent_graph(),
         model=AnthropicModel(model=JUDGE_MODEL),
         threshold=1.0,
+        include_reason=False,
     )
 
 

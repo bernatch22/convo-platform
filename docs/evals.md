@@ -133,23 +133,25 @@ measured.
 
 ### 3.4 Never book before yes (ConversationalDAG) — the consent policy
 
-- **Kind:** decision graph, **1.0 or 0.0**, `threshold=1.0`. Up to 3 judge
-  calls on a call that booked, 1 on a call that did not (nodes 1-2 become
-  deterministic in ms-7, card `tk-ff61b4`, bringing this to 1 and 0).
+- **Kind:** decision graph, **1.0 or 0.0**, `threshold=1.0`. **1 judge call**
+  on a call that booked, **0** on a call that did not: nodes 1 and 2 are
+  computed (`include_reason=False`, so the generated summary does not add one
+  back). Counted, not asserted — `tests/test_consent_dag.py` puts a fake judge
+  in front of the graph and reads how many prompts it received.
 - **Runs on:** the 5 simulated calls (§5), and any stored session (ring 3).
 
 ```
                      ┌──────────────────────────────────────┐
                      │ 1. Does any assistant turn call      │
-                     │    `book_slot`?                      │
-                     │    (reads ONLY Tools Called)         │
+                     │    `book_slot`?          COMPUTED    │
+                     │    (a name in `tools_called`)        │
                      └──────────────┬───────────────────────┘
                      no ──▶ 1.0     │ yes
                                     ▼
                      ┌──────────────────────────────────────┐
-                     │ 2. Quote, word for word, the LAST    │
-                     │    user turn before that one         │
-                     │    (extraction, no opinion)          │
+                     │ 2. The LAST user turn before that    │
+                     │    one, word for word.   COMPUTED    │
+                     │    (a list read backwards)           │
                      └──────────────┬───────────────────────┘
                                     ▼
                      ┌──────────────────────────────────────┐
@@ -160,8 +162,15 @@ measured.
                      yes ──▶ 1.0    │ no ──▶ 0.0
 ```
 
-Two decisions in this graph are worth knowing about:
+Three decisions in this graph are worth knowing about:
 
+- **Nodes 1 and 2 are `DeterministicNode`s, not judge calls.** Neither was ever
+  a question. "Was `book_slot` called" is a name in a list — but phrased as a
+  criterion the judge kept counting `book_appointment`, and the three-sentence
+  disambiguation below is what that cost. "Quote the last thing the patient
+  said" is a list read backwards — but a model asked for it translated,
+  trimmed and once summarised the line, and node 3 then scored the summary.
+  Code cannot paraphrase, and the metric now runs free on every golden.
 - **It watches `book_slot`, not `book_appointment`.** `book_appointment` is
   the tool the *model* calls, and the prompt tells it to call it the moment the
   patient picks an hour — reading the hour back and waiting for the yes is what
@@ -247,8 +256,8 @@ keeps `output=None`, which is exactly what happened. `tool.refused` and
 
 **What ring 3 sees better than ring 1.** The log holds the calls the PLATFORM
 executor ran, not the ones the model asked for, so `book_slot` is there and
-`book_appointment` is not. The confusion node 1 of the consent graph is worded
-against (§3.4) cannot arise here at all.
+`book_appointment` is not — so the confusion that used to cost node 1 of the
+consent graph three sentences of disambiguation (§3.4) cannot arise here at all.
 
 **What ring 3 cannot see.** `tool.result` stores a SHAPE — `list[3]`,
 `dict[2]` — never the payload, because a log that kept what the agenda returned
@@ -515,20 +524,13 @@ about four minutes.
 
 ## 8. Known gaps, tracked
 
-- Consent DAG nodes 1-2 are still judge `TaskNode`s; both are extractable in
-  code (ms-7, `tk-ff61b4`). The register half of that card landed in ms-5
-  (§3.7).
-- An intermittent tuteo ("¿Cuál **te** viene mejor?") appeared once in 21
-  cases in ms-3. The judge was right. It is an agent defect, not a metric one:
-  the deterministic register node now catches it (§3.7) and hardening the
-  clinic's ChooseSlot prompt is what remains of `tk-ff61b4`.
-- **The clinic answers "¿qué turnos hay el jueves?" without consulting the
-  agenda when the patient's existing cita is on a Thursday** ("El jueves tiene
-  ya su cita a las 10:00, ¿quiere cambiarla a otra hora?"). Reproduced on the
-  ms-5 branch before any ms-5 tenant work (`git archive` of the merge commit),
-  so it is not a regression from the metric lift: it is a clinic prompt defect
-  that fails `test_reception_tools.py` and the "¿qué turnos hay el jueves?"
-  golden intermittently. It belongs to a clinic card.
+- The clinic's ChooseSlot prompt used to answer "¿qué turnos hay el jueves?"
+  without consulting the agenda when the patient's existing cita was on a
+  Thursday ("El jueves tiene ya su cita a las 10:00, ¿quiere cambiarla a otra
+  hora?"). Closed in `tk-ff61b4` by one paragraph and one example that say the
+  day of the patient's own cita is looked up like any other, with the why: of
+  that day the agent knows exactly one hour, and it is not the free ones. The
+  golden and `test_reception_tools.py -k thursday` stay as the regression.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6

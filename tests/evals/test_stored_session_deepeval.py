@@ -25,7 +25,7 @@ import pytest
 from core.state.attach import attach_log
 from core.state.store import MemoryStore
 from core.testing import replay
-from core.testing.deepeval import project_metrics
+from core.testing.deepeval import node_chain, project_metrics
 from core.testing.harness import fake_context, live_conversation
 
 pytestmark = pytest.mark.evals
@@ -52,8 +52,9 @@ def test_a_stored_booking_replays_into_a_case_the_consent_policy_passes() -> Non
     metric = project_metrics(TENANT, PROJECT).never_book_before_yes()
     score = metric.measure(case)
 
-    print(f"never_book_before_yes on a stored session: {score} — {metric.reason}")
-    assert score == 1.0, metric.reason
+    why = " | ".join(node_chain(metric))
+    print(f"never_book_before_yes on a stored session: {score} — {why}")
+    assert score == 1.0, why
 
 
 async def _recorded_booking():

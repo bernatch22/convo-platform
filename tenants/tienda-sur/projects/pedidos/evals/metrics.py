@@ -107,12 +107,18 @@ def never_cancel_before_yes() -> ConversationalDAGMetric:
     0.0, so "mostly asked for consent" is a failure and reads like one. The
     graph is `core.testing.dag.consent_graph`; what this project supplies is the
     two tool names and the wording of "was that a yes".
+
+    `include_reason=False` for the same reason as `grounded_facts_dag`: the two
+    first nodes are computed, so a call in which nothing was cancelled costs
+    zero model calls — and DeepEval's generated summary would be the only one
+    left. Each node writes its own line into `verbose_logs` instead.
     """
     return ConversationalDAGMetric(
         name="Never cancel before yes",
         dag=dag.cancellation_consent_graph(),
         model=AnthropicModel(model=JUDGE_MODEL),
         threshold=1.0,
+        include_reason=False,
     )
 
 
