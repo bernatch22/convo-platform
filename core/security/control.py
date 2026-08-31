@@ -43,8 +43,10 @@ from typing import Any
 
 from core.barge_in import holds_the_floor
 from core.history import sanitize_tool_pairing
-from core.security.supervisor import RELEASE, STEER, TAKEOVER, is_supervisor
+from core.security.supervisor import RELEASE, STEER, TAKEOVER, TRANSFER, is_supervisor
 from core.state.log import record
+from core.telephony.handover import Handover
+from core.telephony.transfer import COLD, WARM, TransferRefused
 
 log = logging.getLogger("platform.supervisor")
 
@@ -88,9 +90,10 @@ class UnknownVerb(LookupError):
 class SupervisorControl:
     """One live session's supervision state, and the three verbs that change it."""
 
-    def __init__(self, tc: Any, session: Any) -> None:
+    def __init__(self, tc: Any, session: Any, room: Any = None) -> None:
         self.tc = tc
         self.session = session
+        self.room = room
         self.muted = False
         self.held_by: str | None = None
         self.pending: list[str] = []
@@ -113,6 +116,10 @@ class SupervisorControl:
             return await self.takeover(identity, deaf=bool(body.get("deaf", False)))
         if verb == RELEASE:
             return await self.release(identity)
+        if verb == TRANSFER:
+            return await self.transfer(
+                identity, str(body.get("to", "")), str(body.get("mode", "")) or COLD
+            )
         raise UnknownVerb(f"unknown supervisor verb {verb!r}")
 
     async def steer(self, identity: str, text: str, mode: str = "") -> dict:
@@ -196,6 +203,35 @@ class SupervisorControl:
             "turns": len(interval),
             "already": False,
         }
+
+    async def transfer(self, identity: str, to: str, mode: str = COLD) -> dict:
+        """Hand the call to a human on a phone — blind (`cold`) or after a briefing (`warm`).
+
+        → `{"verb", "mode", "outcome", "to", "ok", …}`, the same payload the log
+        line carries. `ok=False` is an ANSWER, not an error: it means the
+        transfer did not happen and the caller is still here, being told so.
+        Only a refusal before anything was dialled raises, so a desk can tell
+        "your number was wrong" from "his phone was busy".
+
+        A warm transfer ends muted. Once the colleague and the caller can hear
+        each other the agent is a third voice in a two-person call, so the same
+        `release` that follows a takeover is what would bring it back.
+        """
+        if self.room is None:
+            raise TransferRefused("this session has no room: there is no call to transfer")
+        outcome = await Handover(self.tc, self.session, self.room).run(mode, to)
+        record(self.tc, TRANSFER, {"identity": identity, **outcome.as_payload()})
+        log.info(
+            "supervisor %s transferred %s to %s: %s (%s)",
+            identity,
+            self.tc.label(),
+            outcome.to,
+            outcome.outcome,
+            outcome.mode,
+        )
+        if outcome.ok and outcome.mode == WARM:
+            await self.takeover(identity)
+        return {"verb": TRANSFER, **outcome.as_payload()}
 
     async def flush(self, agent: Any = None) -> bool:
         """Write every queued note into the agent's own context; call it only at a turn boundary.

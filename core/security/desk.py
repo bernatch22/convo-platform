@@ -21,7 +21,7 @@ the API key — and the packet is how the fact reaches the process that owns the
 caller's log, where the `seq` is allocated. One writer, one sequence, one story.
 
 `command` is the same packet carrying an ORDER rather than a fact: a steer, a
-takeover or a release aimed at the room's agent, server-side. A browser does
+takeover, a release or a transfer aimed at the room's agent, server-side. A browser does
 not need it — it holds a `whisper` ticket and calls the agent's RPC directly —
 but a control plane does: an escalation rule, a compliance trigger or a
 `curl` from a terminal has no room connection to perform RPC over. Both roads
@@ -45,7 +45,7 @@ AGENT_KIND = rooms.AGENT_KIND
 DEFAULT_CAPABILITY = "listen"
 
 # The orders this door will forward. `join` is not one: it is a fact, and `entered` writes it.
-COMMANDS: tuple[str, ...] = ("steer", "takeover", "release")
+COMMANDS: tuple[str, ...] = ("steer", "takeover", "release", "transfer")
 
 
 class NotInRoom(LookupError):

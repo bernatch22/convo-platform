@@ -97,16 +97,21 @@ class VerbRequest(BaseModel):
     `identity` is the supervisor the SFU will be asked about; nothing here is
     trusted beyond "look at this room for this identity". The agent asks the
     same question again of the packet it receives.
+
+    `mode` is per-verb and deliberately one field: `inject` / `inject_and_speak`
+    for a steer, `cold` / `warm` for a transfer. Empty means "this verb's
+    default", which is the only value that is right for every verb.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     room: str
     identity: str
-    verb: Literal["steer", "takeover", "release"]
+    verb: Literal["steer", "takeover", "release", "transfer"]
     text: str = ""
-    mode: Literal["inject", "inject_and_speak"] = "inject"
+    mode: Literal["", "inject", "inject_and_speak", "cold", "warm"] = ""
     deaf: bool = False
+    to: str = ""
 
 
 class PipelineUpdate(BaseModel):
@@ -313,7 +318,7 @@ async def supervise_entered(req: EnteredRequest) -> dict[str, Any]:
 
 @app.post("/supervise/verb")
 async def supervise_verb(req: VerbRequest) -> dict[str, Any]:
-    """Whisper to a live agent, take its line, or hand the line back — server-side.
+    """Whisper to a live agent, take its line, hand it back, or move the call — server-side.
 
     → `{"verb": str, "identity": "sup:<uid>", "sent": true}`
 
@@ -326,6 +331,16 @@ async def supervise_verb(req: VerbRequest) -> dict[str, Any]:
         curl -XPOST localhost:8000/supervise/verb -H 'content-type: application/json' \
           -d '{"room":"...","identity":"sup:berna","verb":"steer","text":"ve al grano"}'
 
+    A transfer is the same door with a destination on it — `mode` is `cold`
+    (a SIP REFER: the caller leaves for that number and the call ends here) or
+    `warm` (the colleague is dialled INTO the room, briefed where the caller
+    cannot hear it, then bridged), and `to` is E.164, defaulting to the
+    deployment's `TRANSFER_TO`:
+
+        curl -XPOST localhost:8000/supervise/verb -H 'content-type: application/json' \
+          -d '{"room":"...","identity":"sup:berna","verb":"transfer","mode":"cold",
+               "to":"+34600111222"}'
+
     What happens next is the agent's decision, not this handler's: the packet
     reaches the job that owns the caller's log, `SupervisorControl` checks the
     identity again, applies the verb at a turn boundary and writes the line
@@ -333,7 +348,7 @@ async def supervise_verb(req: VerbRequest) -> dict[str, Any]:
     room, 422 for a verb this door does not forward, 503 when the SFU cannot
     be asked.
     """
-    body = {"text": req.text, "mode": req.mode, "deaf": req.deaf}
+    body = {"text": req.text, "mode": req.mode, "deaf": req.deaf, "to": req.to}
     try:
         return await desk.command(req.room, req.identity, req.verb, body)
     except desk.NotInRoom as error:

@@ -1,4 +1,4 @@
-/* The two verbs that change a live call: whisper to the agent, or take the line off it.
+/* The three verbs that change a live call: whisper to the agent, take the line, or move the call.
  *
  * Every verb here is an RPC to the agent's own participant, and the method
  * name is the audit kind — `supervisor.steer`, `supervisor.takeover`,
@@ -18,17 +18,27 @@
  * no microphone to publish without it), the microphone second, the verb last —
  * so by the time the agent goes quiet the human is already audible. `hand`
  * runs it backwards for the same reason.
+ *
+ * `transfer` is the one verb whose ANSWER matters on screen. The other two
+ * either happen or throw; a transfer can come back `ok: false` — busy, no
+ * answer, a trunk that refused the REFER — and that is not an error, it is the
+ * result: the caller is still on the line and the agent has already told them
+ * so. So the outcome is rendered as a badge either way, and only a refusal
+ * before anything was dialled (a number that is not E.164, no outbound trunk)
+ * arrives as a thrown `RpcError`.
  */
 
 import { useState, type FormEvent } from "react";
 
 import type { SupervisorCapability } from "../lib/api";
 import type { Live } from "../lib/useRoom";
-import { RELEASE, STEER, TAKEOVER } from "../lib/verbs";
+import { RELEASE, STEER, TAKEOVER, TRANSFER } from "../lib/verbs";
 
 /** The whisper box and the takeover switch, for one call this desk is already monitoring. */
 export function WhisperDesk({ live, me }: { live: Live; me: string }) {
   const [note, setNote] = useState("");
+  const [to, setTo] = useState("");
+  const [mode, setMode] = useState<"cold" | "warm">("cold");
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +82,20 @@ export function WhisperDesk({ live, me }: { live: Live; me: string }) {
       await live.verb(TAKEOVER, {});
     });
 
+  const move = (event: FormEvent) => {
+    event.preventDefault();
+    void run("transferring…", async () => {
+      await escalate(holding ? "takeover" : "whisper");
+      const answered = await live.verb(TRANSFER, { to: to.trim(), mode });
+      const outcome = String(answered.outcome ?? "");
+      setSaid(
+        answered.ok
+          ? `${outcome} — the call is with ${String(answered.to ?? "the colleague")}`
+          : `${outcome} — the caller is still on the line, and has been told`,
+      );
+    });
+  };
+
   const hand = () =>
     run("handed back — the agent resumes knowing what it missed", async () => {
       await live.verb(RELEASE, {});
@@ -101,6 +125,28 @@ export function WhisperDesk({ live, me }: { live: Live; me: string }) {
             take the line
           </button>
         )}
+      </form>
+
+      <form className="composer" onSubmit={move}>
+        <input
+          className="composer__input"
+          value={to}
+          onChange={(event) => setTo(event.target.value)}
+          placeholder="transfer to a phone — E.164, or blank for this deploy's TRANSFER_TO"
+          disabled={busy || live.phase !== "live"}
+        />
+        <select
+          className="button"
+          value={mode}
+          onChange={(event) => setMode(event.target.value === "warm" ? "warm" : "cold")}
+          disabled={busy}
+        >
+          <option value="cold">cold — REFER, the caller leaves</option>
+          <option value="warm">warm — brief a colleague, then bridge</option>
+        </select>
+        <button type="submit" className="button" disabled={busy || live.phase !== "live"}>
+          transfer
+        </button>
       </form>
 
       <p className="note">

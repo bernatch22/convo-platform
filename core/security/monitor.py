@@ -31,12 +31,12 @@ nothing a participant sends can look like that (measured too,
 `tmp/probe_channel.py`). A `{"verb": "join"}` from a browser arrives with an
 identity attached and is dropped.
 
-The other three verbs — `steer`, `takeover`, `release` — are the same idea
-pointed the other way: they DO change the conversation, so they reach
+The other four verbs — `steer`, `takeover`, `release`, `transfer` — are the
+same idea pointed the other way: they DO change the conversation, so they reach
 `core.security.control.SupervisorControl` and never touch the session from
 here. Two roads again, and on purpose:
 
-3. `supervisor.steer` / `.takeover` / `.release` as **RPC** on the agent's own
+3. `supervisor.steer` / `.takeover` / `.release` / `.transfer` as **RPC** on the agent's own
    participant. This is the road a supervisor's browser uses, and the reason
    the trust anchor works: the SFU puts `caller_identity` on the invocation
    off the JWT it verified, so `is_supervisor` is asking about a signature and
@@ -60,20 +60,26 @@ from typing import Any
 from livekit.rtc import RpcError
 
 from core.security.control import NotASupervisor, SupervisorControl, UnknownVerb
-from core.security.supervisor import JOIN, RELEASE, STEER, TAKEOVER, is_supervisor
+from core.security.supervisor import JOIN, RELEASE, STEER, TAKEOVER, TRANSFER, is_supervisor
 from core.state.log import record
+from core.telephony.transfer import TransferRefused
 
 log = logging.getLogger("platform.supervisor")
 
 # The topic the control plane announces a supervisor's verbs on, agent-only.
 TOPIC = "supervisor"
 
-# What a packet on that topic may say. `join` is a fact; the other three are orders.
+# What a packet on that topic may say. `join` is a fact; the other four are orders.
 JOIN_VERB = "join"
-CONTROL_VERBS: dict[str, str] = {"steer": STEER, "takeover": TAKEOVER, "release": RELEASE}
+CONTROL_VERBS: dict[str, str] = {
+    "steer": STEER,
+    "takeover": TAKEOVER,
+    "release": RELEASE,
+    "transfer": TRANSFER,
+}
 
 # The RPC methods this job answers — the audit kind is the method name, exactly.
-RPC_VERBS: tuple[str, ...] = (STEER, TAKEOVER, RELEASE)
+RPC_VERBS: tuple[str, ...] = (STEER, TAKEOVER, RELEASE, TRANSFER)
 
 # The code an RPC refusal comes back to the browser as; `message` says which refusal.
 REFUSED = RpcError.ErrorCode.APPLICATION_ERROR
@@ -168,7 +174,7 @@ class SupervisorWatch:
         """Apply a verb that arrived by packet: a bad one is a log line, never a dead job."""
         try:
             await self.control.apply(kind, identity, body)
-        except (NotASupervisor, UnknownVerb, ValueError) as refused:
+        except (NotASupervisor, UnknownVerb, ValueError, TransferRefused) as refused:
             log.warning("%s refused: %s", kind, refused)
         except Exception:  # noqa: BLE001 — a fire-and-forget task must not die silently
             log.exception("%s failed on %s", kind, self.tc.label())
@@ -228,7 +234,7 @@ def verb_handler(control: SupervisorControl, kind: str):
         except NotASupervisor as refused:
             log.warning("%s from %r refused: not a supervisor", kind, identity)
             raise RpcError(REFUSED, "not a supervisor") from refused
-        except (UnknownVerb, ValueError) as bad:
+        except (UnknownVerb, ValueError, TransferRefused) as bad:
             raise RpcError(REFUSED, str(bad)) from bad
 
     return handle
