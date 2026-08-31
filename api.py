@@ -26,7 +26,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict
 
 from core import control_plane, pipeline, rooms
-from core.auth import mint_observer, mint_session
+from core.auth import SupervisorCapability, mint_observer, mint_session, mint_supervisor
 from core.context import Project, Tenant
 from core.contracts import Channel, SessionMeta
 from core.registry import load_registry
@@ -64,6 +64,16 @@ class ObserveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     room: str
+
+
+class SuperviseRequest(BaseModel):
+    """A supervisor asking to be let into one live room, with one set of powers."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    room: str
+    capability: SupervisorCapability = "listen"
+    user_id: str = ""
 
 
 class PipelineUpdate(BaseModel):
@@ -218,6 +228,28 @@ def observe(req: ObserveRequest) -> dict[str, str]:
     appears in the room — the caller is not told anybody joined.
     """
     return mint_observer(req.room)
+
+
+@app.post("/supervise")
+def supervise(req: SuperviseRequest) -> dict[str, str]:
+    """Mint a role-scoped, short-lived ticket for a supervisor entering one live call.
+
+    → `{"url": str, "room": str, "identity": "sup:<uid>", "capability": str,
+         "token": "<jwt>"}`
+
+    `capability` is the whole of the difference: `listen` is hidden and
+    subscribe-only, `whisper` may also send data, `takeover` publishes audio
+    and appears in the room. The ticket expires in
+    `core.auth.SUPERVISOR_TTL`, so it is a ticket to this call and not a
+    standing key to the room.
+
+    This is where a deployment's own auth goes: the handler is deliberately
+    thin, and the human on the other side of it is authenticated by whatever
+    the control plane already authenticates humans with. Everything downstream
+    — the SFU and the agent both — trusts only the signed `sup:` identity in
+    the JWT this returns, never a role a client claims in a payload.
+    """
+    return mint_supervisor(req.room, req.capability, user_id=req.user_id)
 
 
 @app.get("/pipeline/{tenant}/{project}")

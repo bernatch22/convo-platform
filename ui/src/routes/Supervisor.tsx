@@ -1,6 +1,13 @@
-/* Supervisor — the human on the other side of a warm transfer. Empty until ms-15. */
+/* Supervisor — the desk: every call live on the fleet right now, in one strip.
+ *
+ * The strip is a readout today and nothing more. What turns a row into a seat
+ * is a ticket from POST /supervise, and the grants inside that ticket are what
+ * decide whether the human hears the call, whispers to the agent or takes the
+ * line — never a button on this page. So the shell lands first, and the verbs
+ * arrive on top of it card by card.
+ */
 
-import { EmptyState } from "../components/EmptyState";
+import { LiveCalls } from "../components/LiveCalls";
 
 export function Supervisor() {
   return (
@@ -9,29 +16,51 @@ export function Supervisor() {
         <div className="page__eyebrow">fleet</div>
         <h1 className="page__title">Supervisor</h1>
         <p className="page__lede">
-          Live calls across every tenant, the one an operator chooses to listen in on, and the
-          hand-off itself: the agent introduces the caller, the human takes the line, the log keeps
-          being written by the same session.
+          Every call in progress across every tenant, phone calls included. A supervisor enters one
+          of them with a short-lived ticket from <code className="mono">POST /supervise</code>: the
+          identity is always <code className="mono">sup:&lt;uid&gt;</code>, and the capability
+          inside the token — not a control on this screen — is what separates listening from taking
+          the line.
         </p>
       </header>
 
-      <EmptyState
-        title="There is nowhere to transfer to yet"
-        milestone="ms-15 — transfers and the supervisor desk"
-        card="not yet planned"
-        command="uv run python -m convo sessions list"
-      >
-        <p>
-          A warm transfer needs a destination that can accept one, so{" "}
-          <code className="mono">REFER</code> and <code className="mono">WarmTransferTask</code>{" "}
-          were deliberately deferred out of ms-11 to travel with this screen — a half-built desk
-          would only be a place for calls to be dropped.
+      <LiveCalls />
+
+      <section className="section">
+        <h2 className="section__title">What a ticket allows</h2>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>capability</th>
+                <th>in the room</th>
+                <th>logged as</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="mono">listen</td>
+                <td>hidden, subscribe-only — the caller is never told anybody joined</td>
+                <td className="mono">supervisor.join</td>
+              </tr>
+              <tr>
+                <td className="mono">whisper</td>
+                <td>still hidden and still silent, but may send the agent text</td>
+                <td className="mono">supervisor.steer</td>
+              </tr>
+              <tr>
+                <td className="mono">takeover</td>
+                <td>a real microphone, and a participant the caller can see</td>
+                <td className="mono">supervisor.takeover</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="note">
+          Each verb is appended to the caller&apos;s own session log with its own{" "}
+          <code className="mono">seq</code>, so one call stays one story.
         </p>
-        <p>
-          What already exists underneath: the SIP leg, the per-number dispatch, and a log that a
-          second participant can be appended to without breaking its ordering.
-        </p>
-      </EmptyState>
+      </section>
     </div>
   );
 }
