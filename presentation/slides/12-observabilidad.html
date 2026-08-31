@@ -58,35 +58,35 @@
           </thead>
           <tbody>
             <tr>
-              <td colspan="3" style="padding-bottom:2px"><b>clinica-norte / reagendamiento</b> — 12 goldens</td>
+              <td colspan="3" style="padding-bottom:2px"><b>clinica-norte / reagendamiento</b> — 17 goldens</td>
             </tr>
             <tr>
               <td>Grounded facts · Keeps the register <span class="note">[DAG]</span></td>
-              <td>12/12 · 1,00</td>
-              <td>12/12 · 1,00</td>
+              <td>17/17 · 1,00</td>
+              <td>17/17 · 1,00</td>
             </tr>
             <tr>
               <td>Reception line <span class="note">[GEval]</span></td>
-              <td>11/12 (92 %) · 0,84</td>
-              <td>9/12 (75 %) · 0,80</td>
+              <td>17/17 · 0,87</td>
+              <td>16/17 (94 %) · 0,87</td>
             </tr>
             <tr>
               <td>Tool Correctness</td>
-              <td>12/12 · 1,00</td>
-              <td>11/12 (92 %) · 0,92</td>
+              <td>17/17 · 1,00</td>
+              <td>16/17 (94 %) · 0,94</td>
             </tr>
             <tr>
               <td colspan="3" style="padding-bottom:2px"><b>tienda-sur / pedidos</b> — 11 goldens</td>
             </tr>
             <tr>
-              <td>Grounded facts <span class="note">[DAG]</span></td>
-              <td>10/11 (91 %) · 0,91</td>
+              <td>Grounded facts · Keeps the register <span class="note">[DAG]</span></td>
+              <td>11/11 · 1,00</td>
               <td>11/11 · 1,00</td>
             </tr>
             <tr>
               <td>Order desk line <span class="note">[GEval]</span></td>
-              <td>9/11 (82 %) · 0,85</td>
-              <td>9/11 (82 %) · 0,83</td>
+              <td>9/11 (82 %) · 0,86</td>
+              <td>10/11 (91 %) · 0,92</td>
             </tr>
             <tr>
               <td>Tool Correctness</td>
@@ -96,20 +96,22 @@
           </tbody>
         </table>
         <div class="note">
-          <em>Keeps the register</em> puntúa 11/11 · 1,00 en los dos modelos y por eso no ocupa fila. Ocho
-          divergencias sobre 23 goldens, en las dos direcciones: una golden que pasa en un modelo y falla en
-          el otro es un <b>hallazgo</b>, nunca una golden que ablandar.
+          Cinco divergencias sobre <b>28</b> goldens, ninguna en las métricas deterministas. Una golden
+          que pasa en un modelo y falla en el otro es un <b>hallazgo</b>, nunca una golden que ablandar:
+          la del sábado destapó que GPT lee mal su propia salida de agenda.
         </div>
       </div>
 
     </div>
 
     <div class="proof" data-anim="4">
-      <b>Validación.</b> Tabla del <span class="n">31-08-2026, 18:31 y 18:33</span> —
-      <b>python -m core.testing.report clinica-norte reagendamiento --model claude-haiku-4-5 --model gpt-5.4-mini</b>.
-      El billing va por la misma tubería: seis sesiones reales del 30 y 31-08 cuestan entre
-      <span class="n">0,0017 €</span> y <span class="n">0,0106 €</span> de LLM —medio céntimo a un céntimo por
-      llamada corta— escritos en el <code>session.end</code>, en la misma fila que el score.
+      <b>Validación.</b> Tabla medida el <span class="n">31-08-2026</span> (ms-18, tras
+      <span class="n">tk-18c659</span>) con <b>python -m core.testing.report &lt;tenant&gt; &lt;proyecto&gt;
+      --model claude-haiku-4-5 --model gpt-5.4-mini</b>; el detalle golden a golden, en
+      <b>docs/evals.md §10</b>. El anillo de consentimiento va aparte y más verde:
+      <span class="n">8 de 8</span> a <span class="n">1,00</span> en los dos modelos. Seis sesiones reales
+      cuestan entre <span class="n">0,0017 €</span> y <span class="n">0,0106 €</span> de LLM, en la misma
+      fila que el score.
     </div>
 
   </div>

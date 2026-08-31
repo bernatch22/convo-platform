@@ -6,10 +6,10 @@
       <h2 class="head" style="max-width:34ch">El LLM es un driver de interfaz; la plataforma es un runtime de procesos que habla</h2>
       <p class="lede">
         Todo lo que decide, cobra o deja rastro vive en el backend. El modelo elige <b>palabras</b>;
-        no elige si se ejecuta una escritura irreversible. Poner ese control en el prompt arranca
-        antes y no sabe fallar en voz alta: cuando el modelo se salta una instrucción no hay
-        excepción, hay una cita reservada que nadie pidió. Un contrato en código sí falla, y falla
-        donde se puede leer.
+        no elige si se ejecuta una escritura irreversible. Cambiarlo de proveedor, de tamaño o de
+        idioma no debería tocar una regla de negocio, y aquí no la toca: las reglas son contratos,
+        tokens y un log. Los cuatro criterios de abajo son con los que se juzgan las trece láminas
+        que siguen.
       </p>
     </div>
 
@@ -19,9 +19,9 @@
         <div class="row">
           <div class="idx">01</div>
           <div class="txt">Determinismo donde se mueve dinero
-            <span class="why">El consentimiento es un paso de la saga con token firmado, no una frase
-              del prompt: <code>guard.check</code> rechaza toda tool <code>irreversible</code> sin un
-              <code>confirmation_token</code> que sólo <code>ConfirmTask</code> puede acuñar.</span>
+            <span class="why"><code>guard.check</code> rechaza toda tool <code>irreversible</code> que
+              no traiga un <code>confirmation_token</code>, y ese token sólo lo acuña
+              <code>ConfirmTask</code>. La autorización es un paso de código con firma, no un tono.</span>
           </div>
         </div>
         <div class="row">

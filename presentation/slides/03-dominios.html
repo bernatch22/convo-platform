@@ -34,9 +34,10 @@
           </tbody>
         </table>
         <div class="note">
-          <b>Supervision es delgado a propósito.</b> Hoy existen el ticket firmado y la escucha
-          (<code>mint_observer</code>, <code>/observe</code>, <code>/live-calls</code>): ni susurro ni
-          toma de control. Esperó a tener a quién transferir; la lámina 10 dice qué falta.
+          <b>Tools &amp; Adapters es el contexto delgado a propósito.</b>
+          <code>ToolExecutor</code> es un <code>Protocol</code> y hoy tiene una sola implementación, la
+          local: el mismo contrato debería poder ejecutarse en el proceso del cliente. La frontera está
+          escrita; falta cruzarla, y la lámina 09 dice con qué protocolo.
         </div>
       </div>
 
@@ -87,10 +88,10 @@ tenants/&lt;t&gt;/projects/&lt;p&gt;/  project · agents · tools</pre>
 
     <div class="proof" data-anim="4">
       <b>Validación.</b> <b>pytest -m unit tests/test_core_isolation.py</b> recorre los
-      <span class="n">60</span> módulos de <code>core/</code> y falla si alguno importa
-      <code>tenants</code>; hoy pasa con cero infractores. El corolario se mide igual:
-      <code>core/registry.py</code> importa cada tenant en <code>try/except</code>, así que un
-      negocio roto queda <em>no enrutable</em> y el resto de la flota sigue atendiendo.
+      <span class="n">108</span> módulos de <code>core/</code> y falla si alguno importa
+      <code>tenants</code>; hoy pasa con cero infractores. La flecha contraria la ejercitan los dos
+      negocios del árbol: importan <code>core.agents</code>, ninguno importa al otro, y el runtime no
+      sabe que existen hasta que <code>core/registry.py</code> los lee del disco.
     </div>
 
   </div>

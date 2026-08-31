@@ -51,7 +51,7 @@
           un permiso general, y un valor que la plataforma no corre se rechaza dos veces: al
           guardarlo y al construirlo. <b>Radio de daño:</b> <code>core/registry.py</code> importa
           cada tenant en su propio <code>try/except</code> — un <code>tenant.py</code> que no
-          importa queda fuera del registro y sus llamadas son irrutables; las de los demás siguen
+          importa queda fuera del registro y sus llamadas no son enrutables; las de los demás siguen
           entrando.
         </div>
       </div>
