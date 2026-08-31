@@ -36,11 +36,22 @@ class TenantAgent(Agent):
         self.tc = tc
 
     async def on_enter(self) -> None:
-        """Inherit the previous stage's summary, announce the stage, let the model open the turn."""
+        """Inherit the previous stage's summary, announce the stage, let the model open the turn.
+
+        A project carrying a `greeting` opens the FIRST stage with those exact
+        words instead of a generated line: it is the one sentence a supervisor
+        edits from the console, and a model asked to paraphrase it would not be
+        editable at all. Later stages always generate — the greeting is the
+        start of a call, not of a stage.
+        """
         await self._inherit_summary()
         log.info("stage.enter %s agent=%s", self.tc.label(), self.stage_name())
         record(self.tc, "stage.enter", {"stage": self.stage_name()})
+        opens_the_call = self.tc.prev_agent is None
         self.tc.prev_agent = self
+        if opens_the_call and self.tc.project.greeting:
+            self.session.say(self.tc.project.greeting)
+            return
         self.session.generate_reply()
 
     async def transcription_node(
