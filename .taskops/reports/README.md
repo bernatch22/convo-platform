@@ -19,4 +19,4 @@ sheets) live under `tmp/reports/` and are not versioned.
 | ms-4 event log — append-only with seq, session report, `convo sessions` CLI | landed | [ms-4.md](ms-4.md) |
 | ms-5 tenants — one worker, two businesses | landed | [ms-5.md](ms-5.md) |
 | ms-6 local voice — talk to the agent with your microphone | landed | [ms-6.md](ms-6.md) |
-| ms-7 evals ring 1 complete — DeepEval suites per project in CI | next | — |
+| ms-7 evals ring 1 complete — judgment became cheap, then it caught things | landed | [ms-7.md](ms-7.md) |
