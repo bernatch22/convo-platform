@@ -107,6 +107,12 @@ def build_report(
     )
     if not judge:
         return report
+    if not turns:
+        # A caller who hung up before a word was said. The free checks above still
+        # stand; the judge's case CANNOT be built (DeepEval refuses empty turns),
+        # and before this guard the sweeper retried that TypeError forever — one
+        # silent call wedging the whole queue behind it. Found live on the box.
+        return report
     case = _case(turns, tenant, project)
     check, run = judge_module.judge(case, rules)
     return ScoreReport(

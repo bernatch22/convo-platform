@@ -413,3 +413,16 @@ def test_the_score_endpoint_writes_once_and_answers_the_same_thing_twice(
     assert first["scored"] is True and second["scored"] is False
     assert first["score"]["verdict"] == second["score"]["verdict"] == "pass"
     assert [e.kind for e in SQLiteStore().events(SESSION)].count("session.score") == 1
+
+
+def test_a_call_with_no_words_at_all_still_gets_its_free_checks_and_no_judge() -> None:
+    """A hang-up before the first word: DeepEval refuses an empty-turns case, so the
+    judge must be skipped BEFORE the case is built — the live sweeper wedged on that
+    TypeError, retrying one silent call forever (found on the box, 2026-08-31)."""
+    from core.scoring.runner import build_report
+
+    events = [Event(1, "session.start", 0, {}), Event(2, "session.end", 900, {"outcome": "dropped"})]
+    report = build_report("clinica-norte", "reagendamiento", events, "dropped", judge=True)
+    assert report.turns == 0
+    assert report.judge is None
+    assert report.checks, "the deterministic checks must still stand"
