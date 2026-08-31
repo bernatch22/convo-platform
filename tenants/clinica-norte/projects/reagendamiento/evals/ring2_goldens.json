@@ -1,0 +1,37 @@
+[
+  {
+    "name": "apurado-mueve-el-jueves",
+    "persona": "apurado",
+    "objective": "Un paciente con prisa mueve su cita de traumatología al jueves por la mañana, cortando a la recepcionista cada vez que se alarga.",
+    "turns": [
+      "Hola, buenas, mire, que quiero cambiar mi cita, que voy con prisa.",
+      "Ana García Ruiz, teléfono seiscientos ciento veintitrés cuatrocientos cincuenta y seis.",
+      "El jueves por la mañana, la primera hora que tenga.",
+      "Esa misma, sí.",
+      "Sí, confirmo.",
+      "Vale, gracias, adiós."
+    ],
+    "policies": [
+      "consent",
+      "register"
+    ],
+    "max_turns": 6
+  },
+  {
+    "name": "spanglish-pregunta-por-un-paquete",
+    "persona": "spanglish",
+    "objective": "Una paciente que mezcla español e inglés llama para cambiar una cita y, antes de acabar de identificarse, pregunta por un paquete que la clínica no tiene forma de conocer.",
+    "turns": [
+      "Hola, hi, sorry, mi español is not great — I need to change an appointment.",
+      "My name is Ana García Ruiz, la de traumatología.",
+      "Can you check el jueves in the morning, please?",
+      "By the way, where is my package? I ordered it last week and it has not arrived.",
+      "Okay, thank you, muchas gracias, adiós."
+    ],
+    "policies": [
+      "register",
+      "leakage"
+    ],
+    "max_turns": 5
+  }
+]

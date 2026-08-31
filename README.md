@@ -146,6 +146,20 @@ uv run pytest -m unit                     # includes LLM-judged tests when the k
 uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-tenant leakage pair
 ```
 
+Ring 2 (live voice) calls the agent out loud with a synthetic caller, so it
+needs the dev stack up in three other terminals (compose, `api.py`,
+`worker.py dev`) plus `ELEVENLABS_API_KEY` and `SONIOX_API_KEY`:
+
+```bash
+uv run deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py -s
+uv run deepeval test run tenants/clinica-norte/projects/reagendamiento/evals/test_ring2.py -s
+```
+
+Two callers phone each project: `apurado`, who talks over the agent, and
+`spanglish`, who switches es↔en mid-sentence. `-s` prints the transcript, the
+latencies, how many answers were interrupted and which languages came back
+transcribed. `CONVO_API` points the caller at another control plane.
+
 [`docs/evals.md`](docs/evals.md) explains every metric and how to add one.
 
 ## The web UI
