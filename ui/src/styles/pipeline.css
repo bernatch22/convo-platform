@@ -1,0 +1,314 @@
+/* The pipeline screen: three provider panels, the turn waterfall, the control form.
+ *
+ * Every colour, size and gap is a token from tokens.css — this file adds no
+ * palette of its own. The waterfall spends the one accent on the end-to-end
+ * rail, because that bar is the only one the caller actually experiences; the
+ * four stages are greys, so the eye compares lengths and not hues.
+ */
+
+/* ── project tabs ────────────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: var(--s1);
+  margin-top: var(--s5);
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs__tab {
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid transparent;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.tabs__tab:hover {
+  color: var(--text-dim);
+}
+
+.tabs__tab.is-active {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+/* ── a provider panel ────────────────────────────────────────────────────── */
+
+.leg__model {
+  padding-bottom: var(--s3);
+  border-bottom: 1px solid var(--line);
+  color: var(--accent);
+  font-size: var(--text-md);
+}
+
+.leg__rows {
+  margin: 0;
+}
+
+.leg__row {
+  padding: var(--s3) 0;
+}
+
+.leg__row + .leg__row {
+  border-top: 1px solid var(--line);
+}
+
+.leg__k {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.leg__v {
+  margin: var(--s1) 0 0;
+  color: var(--text);
+  font-size: var(--text-md);
+  overflow-wrap: anywhere;
+}
+
+.leg__note {
+  margin: var(--s1) 0 0;
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.leg__refused {
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+
+.leg__refused-title {
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.leg__refused-row {
+  margin: var(--s2) 0 0;
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.leg__refused-row s {
+  display: block;
+  color: var(--text-faint);
+  opacity: 0.75;
+}
+
+.leg__refused-why {
+  display: block;
+  margin-top: 2px;
+}
+
+/* ── the waterfall ───────────────────────────────────────────────────────── */
+
+.wf {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: var(--s5);
+}
+
+.wf__row {
+  display: grid;
+  grid-template-columns: 140px 1fr 90px;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) 0;
+}
+
+.wf__row + .wf__row {
+  border-top: 1px solid var(--line);
+}
+
+.wf__row--total {
+  margin-top: var(--s2);
+  border-top: 1px solid var(--line-strong);
+}
+
+.wf__label {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.wf__row--total .wf__label {
+  color: var(--text);
+}
+
+.wf__track {
+  position: relative;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--surface-2);
+}
+
+.wf__bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background: var(--text-faint);
+}
+
+.wf__row--total .wf__bar {
+  background: var(--accent);
+}
+
+.wf__unmeasured {
+  position: absolute;
+  left: var(--s2);
+  top: -2px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.wf__value {
+  color: var(--text);
+  font-size: var(--text-sm);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.wf__row--total .wf__value {
+  color: var(--accent);
+}
+
+.wf__note {
+  grid-column: 2 / 4;
+  margin: var(--s1) 0 0;
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.wf__caption {
+  margin: var(--s4) 0 0;
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+  max-width: 78ch;
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+/* ── the control form ────────────────────────────────────────────────────── */
+
+.ctl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--s5);
+  padding: var(--s5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.ctl__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+.ctl__field--wide {
+  grid-column: 1 / -1;
+}
+
+.ctl__label {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.ctl__input {
+  width: 100%;
+  padding: var(--s2) var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: var(--text-md);
+}
+
+.ctl__input:focus-visible {
+  border-color: var(--accent);
+}
+
+.ctl__textarea {
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.ctl__note {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.ctl__foot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s4);
+  padding-top: var(--s2);
+}
+
+.ctl__save {
+  padding: var(--s2) var(--s5);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.ctl__save:disabled {
+  border-color: var(--line-strong);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: default;
+}
+
+.ctl__banner {
+  color: var(--text-faint);
+  font-size: var(--text-sm);
+}
+
+.ctl__error {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--s3) var(--s4);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.ctl__ok {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+/* What the console has already changed, under the form that changes it. */
+.ctl + .table-wrap,
+.ctl + .note {
+  margin-top: var(--s4);
+}

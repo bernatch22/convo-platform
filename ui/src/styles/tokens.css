@@ -1,0 +1,115 @@
+/* The instrument's palette and scale. Every screen reads from here; nothing hardcodes a colour.
+ *
+ * Dark, quiet, and mostly monochrome: four layered near-blacks, hairline
+ * borders instead of shadows, and ONE accent — signal lime — spent in only
+ * four places, all of which mean "live, or here, or now". Prose is Inter and
+ * anything a machine wrote is mono. Density is earned: tables and logs are
+ * dense, everything else breathes.
+ */
+
+:root {
+  /* Grounds — four layers, each a few percent lighter than the last. No gradients anywhere. */
+  --bg: #0b0e12;
+  --surface: #0f1319;
+  --surface-2: #141922;
+  --surface-3: #1a212b;
+
+  /* Hairlines. 1px, never a shadow. */
+  --line: #1c232e;
+  --line-strong: #28323f;
+
+  /* Ink — three weights, and that is the whole vocabulary. */
+  --text: #e4ebf2;
+  --text-dim: #8794a4;
+  --text-faint: #56637a;
+
+  /* The one accent. Spend it on: the mark, the live dot, the phone line, a section's rule. */
+  --accent: #c8f24e;
+  --accent-soft: rgba(200, 242, 78, 0.1);
+
+  /* Two more colours exist, and only to say something is wrong. */
+  --warn: #d8a83c;
+  --danger: #e8695c;
+
+  /* Type */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-xl: 22px;
+
+  /* Spacing — a 4px scale, nothing off it. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+  --s9: 96px;
+
+  --radius: 3px;
+  --radius-lg: 4px;
+
+  --rail-w: 236px;
+  --header-h: 52px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Focus is visible everywhere — this is an operator's tool, it gets driven by keyboard. */
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Scrollbars belong to the instrument too. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-3);
+  border: 3px solid var(--bg);
+  border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--line-strong);
+}
