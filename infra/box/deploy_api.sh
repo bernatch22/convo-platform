@@ -39,3 +39,10 @@ echo "── health from the internet"
 sleep 4
 curl -s -o /dev/null -w "   https://$DOMAIN → %{http_code}\n" "https://$DOMAIN/" || true
 curl -s "https://$DOMAIN/tenants" -o /dev/null -w "   /tenants → %{http_code}\n" || true
+
+echo "── nightly ring-2 evals (timer, 04:00 Europe/Madrid)"
+scp -q "$HERE/convo-evals.service" "$HERE/convo-evals.timer" "$BOX:/tmp/"
+ssh "$BOX" 'sudo mv /tmp/convo-evals.service /tmp/convo-evals.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable -q --now convo-evals.timer'
+ssh "$BOX" 'systemctl list-timers convo-evals.timer --no-pager | head -3'
+echo "   one night by hand:  ssh $BOX 'sudo systemctl start convo-evals.service'"
+echo "   what it would spend: ssh $BOX 'cd $APP && ~/.local/bin/uv run python -m core.testing.nightly --dry-run'"

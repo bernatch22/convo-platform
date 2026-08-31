@@ -19,7 +19,10 @@ worker thread while an SSE generator runs in the event loop: one store per
 request, created and used in one place, is the whole of the concurrency story.
 """
 
+import asyncio
+import contextlib
 import time
+from collections.abc import AsyncIterator
 from typing import Annotated, Any, Literal
 
 from fastapi import Depends, FastAPI, HTTPException, Query
@@ -42,14 +45,45 @@ from core.evals import suites as eval_suites
 from core.evals.runner import EvalRunBusy, EvalRunner
 from core.registry import load_registry
 from core.rooms import RoomsUnreachable
+from core.scoring import sweeper
+from core.scoring.runner import score_session
 from core.security import desk
 from core.state import overrides
 from core.state.store import EvalRun, MetricScore, PipelineOverride, SQLiteStore, Store
+from core.telephony import lines as phone_lines
 from core.webui import mount_ui
 
-app = FastAPI(title="convo control plane")
-
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Seed the phone routes this deploy owns, then run the post-call scorer beside the API.
+
+    The seed runs once, at startup, and only writes a number the store does not
+    already carry (`core.telephony.lines.seed`): the control plane owns the
+    number → project table, so a fresh database must not answer "no line" for a
+    number that has been ringing for weeks.
+
+    The sweeper is a task of this process and not a cron entry because it must
+    stop when the control plane stops: a sweeper still judging calls against a
+    database whose owner has gone is spending money nobody is watching.
+    `SCORING_SWEEP=0` starts nothing at all.
+    """
+    phone_lines.seed(SQLiteStore())
+    if not sweeper.enabled():
+        yield
+        return
+    task = asyncio.create_task(sweeper.run())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="convo control plane", lifespan=lifespan)
 
 
 async def open_store() -> Store:
@@ -189,9 +223,17 @@ async def sessions(
     → `[{"id": str, "tenant": str, "project": str, "channel": "voice"|"chat",
          "started_at": float, "ended_at": float|null, "outcome": str|null,
          "events": int, "turns": int, "cost_eur": float|null,
-         "phone": str|null}]`
+         "phone": str|null, "score": object|null}]`
 
     `cost_eur` and `outcome` are null while the call is still running.
+
+    `score` is the payload of this session's `session.score` event, or null —
+    which means one of three different things and the console must not read it
+    as "bad": the call has not been scored yet, it was too short, or its
+    project has scoring switched off. Its shape is
+    `{"version", "score": 0-1, "verdict": "pass"|"fail", "failed": [str],
+      "turns": int, "checks": [{"name", "kind", "passed", "score"?, "reason"}],
+      "judge": {"ran", "skipped", "model", "threshold", "cap_eur", "cost_eur"}}`.
 
     `phone` is the caller's `sip.phoneNumber` (or the trunk's, when the caller
     withheld it) read off `session.start`, and null when the session never came
@@ -211,13 +253,36 @@ async def session(session_id: str, store: Reader) -> dict[str, Any]:
 
     `kind` is the log's own vocabulary (`session.start`, `stt.final`,
     `turn.user`, `turn.agent`, `state`, `tool.call`, `tool.result`,
-    `stage.enter`, `tts.word`, `session.end`); a turn's latencies live in
-    `payload.metrics`.
+    `stage.enter`, `tts.word`, `session.end`, `session.score`); a turn's
+    latencies live in `payload.metrics`, and the score's breakdown in the
+    `session.score` payload — which is also lifted onto the `score` field of
+    the list line above, so a screen never has to walk the log to draw a chip.
     """
     view = control_plane.session(store, session_id)
     if view is None:
         raise HTTPException(404, f"no session {session_id!r}")
     return view
+
+
+@app.post("/sessions/{session_id}/score")
+async def score(session_id: str) -> dict[str, Any]:
+    """Score one finished session now, and write the verdict into its log. Idempotent.
+
+    → `{"session": str, "scored": bool, "score": object|null, "skipped": str|null}`
+
+    `scored` is true only when THIS call wrote the event. A session that was
+    already scored comes back with `scored: false` and the score it already
+    has; one that cannot be scored yet comes back with `skipped` saying why in
+    a sentence ("the call is still going", "clinica-norte/x has scoring
+    switched off"). None of those is an error and none of them is a 4xx: asking
+    twice is the normal way to use this door, and the sweeper asks constantly.
+
+    The work runs in a worker thread, with its own store opened inside it: the
+    judge is a blocking HTTP call and a SQLite connection belongs to the thread
+    that created it. The store is therefore NOT the injected `Reader` — this is
+    the one route in the file that opens its own.
+    """
+    return await asyncio.to_thread(score_session, session_id)
 
 
 @app.get("/sessions/{session_id}/live")
@@ -420,6 +485,8 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
                 "caching", "max_tokens", "cache_minimum_tokens", "cache_note"},
         "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
                 "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
+        "phone": {"fleet": str, "note": str,
+                  "lines": [{"number", "fleet", "channel", "serving": bool}]},
         "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
         "latency": {"sessions": int, "turns": int,
                     "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",
@@ -428,6 +495,11 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
     Every value is what the NEXT session will use: the overrides are already
     applied to `greeting`, `tts.model` and `tts.voice`. A median is null when
     no stored voice session measured it.
+
+    `phone` is the store's `routes` table read for THIS project, never for the
+    fleet: `lines` is empty for a project nobody can call, and `note` says so
+    in the words the screen prints. `serving` is false for a number registered
+    against another fleet — it exists, and no call on it arrives here.
     """
     known, effective = _effective(tenant, project, store)
     return pipeline.snapshot(known, effective, store)
