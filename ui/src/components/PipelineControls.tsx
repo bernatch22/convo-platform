@@ -1,4 +1,4 @@
-/* The three fields a supervisor may change between two calls, without a deploy.
+/* The fields a supervisor may change between two calls, without a deploy.
  *
  * PUT /pipeline answers with the whole new snapshot, so a save renders the
  * server's own answer instead of a local guess and there is no refetch. A
@@ -29,6 +29,7 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
   const [voice, setVoice] = useState(snapshot.tts.voice);
   const [model, setModel] = useState(runningModel);
   const [greeting, setGreeting] = useState(snapshot.greeting);
+  const [sttProvider, setSttProvider] = useState(snapshot.stt.requested_provider);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -43,6 +44,7 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
     if (voice !== snapshot.tts.voice) update.voice = voice;
     if (model !== runningModel) update.tts_model = model;
     if (greeting !== snapshot.greeting) update.greeting = greeting;
+    if (sttProvider !== snapshot.stt.requested_provider) update.stt_provider = sttProvider;
 
     if (Object.keys(update).length === 0) {
       setSaved(false);
@@ -65,6 +67,26 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
 
   return (
     <form className="ctl" onSubmit={save}>
+      <label className="ctl__field">
+        <span className="ctl__label">stt_provider</span>
+        <select
+          className="ctl__input mono"
+          value={sttProvider}
+          onChange={(event) => setSttProvider(event.target.value)}
+        >
+          {snapshot.stt.providers.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <p className="ctl__note">
+          which ear hears the caller — Soniox <code className="mono">stt-rt-v5</code> or Deepgram
+          Flux <code className="mono">flux-general-multi</code>. Anything else is a 422 from the
+          control plane; the panel above re-renders with the chosen provider&apos;s own knobs.
+        </p>
+      </label>
+
       <label className="ctl__field">
         <span className="ctl__label">voice</span>
         <select

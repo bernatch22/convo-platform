@@ -18,7 +18,7 @@ cards = briefs). Each milestone lands with a learning report under
 
 ```bash
 uv sync --extra dev
-cp .env.example .env            # add your keys (Anthropic, Soniox, ElevenLabs)
+cp .env.example .env            # keys: Anthropic, Soniox (or Deepgram), ElevenLabs
 pytest -m unit                  # fast tests, no keys needed
 python worker.py --help         # the LiveKit Agents CLI (console/dev/start)
 ```
@@ -34,7 +34,9 @@ TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --te
 ### Talking to it out loud
 
 Drop `--text` and the console runs in **audio mode**: it opens the laptop
-microphone and speaks back through the speakers. Soniox transcribes, ElevenLabs
+microphone and speaks back through the speakers. The project's STT provider
+transcribes (Soniox `stt-rt-v5` by default, Deepgram Flux when the console
+switches it — see `core/providers/stt.py`), ElevenLabs
 answers in the project's voice, and a local turn detector decides when you have
 finished — no LiveKit server, no GPU, nothing to deploy.
 

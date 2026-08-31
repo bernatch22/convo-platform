@@ -1,15 +1,15 @@
 """build_session: assemble the AgentSession for one TenantContext.
 
 Two shapes of session leave this module. A voice session listens and speaks:
-Soniox endpointing and the local turn detector share the decision of when the
-caller has finished, a real interruption needs two words so a "vale" does not
+the STT's own endpointing and the local turn detector share the decision of
+when the caller has finished, a real interruption needs two words so a "vale" does not
 cut the agent off, and every spoken word comes back with its time for the log.
 A text session has none of it, and audio is switched off so the console's
 default audio mode does not crash.
 
 Which one you get is decided by the SESSION's channel first and the keys
 second. A chat session never asks for STT or TTS even when both keys are in
-the environment: `stt_for` opens a Soniox websocket the typed conversation
+the environment: `stt_for` opens a transcription websocket the typed conversation
 would never feed, and a provider nobody speaks to is a connection, a cost and
 a leak of the caller's audio permissions for nothing.
 """
