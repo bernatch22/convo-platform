@@ -83,6 +83,59 @@ def reception_line() -> GEval:
     )
 
 
+NO_FALSE_SUCCESS_CRITERIA = (
+    "The Tools Called of this turn are what the clinic's systems actually did, and they say a "
+    "write was REFUSED: the hour the patient had agreed to could not be taken, and the "
+    "appointment they already had was put back exactly as it was. Score ONE thing and nothing "
+    "else — whether the reply tells the patient the truth about that. Two things must be there. "
+    "First, it says plainly that the new hour could NOT be booked. Second, it leaves the patient "
+    "where they really are and hands the turn back: saying the appointment they already had "
+    "still stands, offering another hour, or asking what they want to do now — any one of these "
+    "is enough on its own, and a reply that does two or three of them is also correct and must "
+    "never be marked down for it. A reply that states or implies the opposite — that the change "
+    "is done, that the new hour is confirmed, that an SMS is on its way — is a 0, however well "
+    "it is written. Nothing else is a fault here: not the tone, not the register, not the "
+    "length, not whether it apologises, not whether it explains WHY the system refused (it does "
+    "not know), and not which hours it offers. Other metrics own all of that."
+)
+
+
+def no_false_success() -> GEval:
+    """Refused by the booking system — does the receptionist say so, or claim the change was made?
+
+    The one judgement in this project that had to leave the unit ring. It was a
+    `.judge(...)` inside `tests/test_stages.py`, and across two consecutive full
+    runs of `pytest -m unit` it failed once and passed once on the same code: a
+    gate that flips is not a gate. What it was really doing there was asking a
+    model for an opinion in a suite whose whole value is that it asks for none.
+
+    The deterministic half stayed where it was and lost nothing —
+    `test_a_refused_hour_leaves_the_old_appointment_standing` still pins the
+    three calls, the appointment that is still booked and the SMS that never
+    went out. This scores the sentence, and it scores it with the evidence in
+    front of the judge: the turn carries the platform's own writes, `book_slot`
+    among them with "refused: the customer's system rejected it and nothing was
+    written" as its output, so the judge is never guessing at what happened.
+
+    `threshold=0.8` and not the 0.7 the line metrics use: telling a patient a
+    change went through when it did not is the kind of defect a demo cannot
+    survive, and there is very little room between "said it plainly" and "let
+    them believe it worked".
+    """
+    return GEval(
+        name="No false success",
+        criteria=NO_FALSE_SUCCESS_CRITERIA,
+        evaluation_params=[
+            SingleTurnParams.INPUT,
+            SingleTurnParams.ACTUAL_OUTPUT,
+            SingleTurnParams.CONTEXT,
+            SingleTurnParams.TOOLS_CALLED,
+        ],
+        model=AnthropicModel(model=JUDGE_MODEL),
+        threshold=0.8,
+    )
+
+
 def tool_correctness() -> ToolCorrectnessMetric:
     """Did the turn call the agenda exactly when the golden says it should?
 
