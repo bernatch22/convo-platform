@@ -450,3 +450,88 @@
 .table--calls td:last-child {
   padding-right: var(--s5);
 }
+
+/* ── the post-call score: a chip in the list, a breakdown on the detail ───── */
+
+.score {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+}
+
+.score--pass {
+  color: var(--accent);
+}
+
+.score--fail {
+  color: var(--warn);
+}
+
+/* A dash is "no opinion", not a bad call: it must never read louder than a
+ * real score sitting in the row above it. */
+.score--none {
+  color: var(--text-faint);
+}
+
+.score__failed {
+  margin-left: var(--s2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.score-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.score-row {
+  display: grid;
+  grid-template-columns: 16px 128px 92px 1fr auto;
+  gap: var(--s3);
+  align-items: baseline;
+  padding: var(--s2) 0;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+.score-row:last-child {
+  border-bottom: none;
+}
+
+.score-row__mark {
+  color: var(--text-faint);
+}
+
+.score-row--pass .score-row__mark {
+  color: var(--accent);
+}
+
+.score-row--fail .score-row__mark {
+  color: var(--warn);
+}
+
+.score-row__name {
+  color: var(--text);
+}
+
+.score-row__kind {
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.score-row__reason {
+  color: var(--text-dim);
+}
+
+.score-row--na .score-row__name,
+.score-row--na .score-row__reason {
+  color: var(--text-faint);
+}
+
+.score-row__value {
+  color: var(--text);
+}

@@ -13,12 +13,23 @@
  * The LLM select is built from `llm.allowed_models`, the server's own list, so
  * the day a third model is priced the console offers it without a redeploy of
  * this file.
+ *
+ * The one refusal this form makes on its own is the empty voice: picking the
+ * free-text escape hatch clears the field, and saving there used to store `""`,
+ * which no layer below refused — `tts_for` reads it as "no voice configured"
+ * and the next call is silent. The control plane refuses it now too; this check
+ * only means the supervisor hears about it without a round trip.
  */
 
 import { useState, type FormEvent } from "react";
 
 import { ApiError, putPipeline, type PipelineSnapshot, type PipelineUpdate } from "../lib/api";
 import { KNOWN_VOICES } from "../lib/voices";
+
+/** What the control plane answers a blank voice with — said here before the round trip. */
+const NO_VOICE =
+  "a voice id cannot be empty — an empty one builds no TTS at all and the next call " +
+  "comes up mute. Pick one of the named voices, or paste an ElevenLabs voice id.";
 
 /** The select value that swaps the dropdown for a free-text ElevenLabs voice id. */
 const OTHER = "__other__";
@@ -47,11 +58,18 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
   async function save(event: FormEvent) {
     event.preventDefault();
     const update: PipelineUpdate = {};
-    if (voice !== snapshot.tts.voice) update.voice = voice;
+    const wanted = voice.trim();
+    if (wanted !== snapshot.tts.voice) update.voice = wanted;
     if (model !== runningModel) update.tts_model = model;
     if (llmModel !== runningLlm) update.llm_model = llmModel;
     if (greeting !== snapshot.greeting) update.greeting = greeting;
     if (sttProvider !== snapshot.stt.requested_provider) update.stt_provider = sttProvider;
+
+    if (update.voice === "") {
+      setSaved(false);
+      setError(NO_VOICE);
+      return;
+    }
 
     if (Object.keys(update).length === 0) {
       setSaved(false);
@@ -120,7 +138,7 @@ export function PipelineControls({ snapshot, onSaved }: ControlsProps) {
         <p className="ctl__note">
           {chosen ? (
             <>
-              <span className="mono">{chosen.id}</span> — {chosen.note}
+              <b>{chosen.name}</b> · <span className="mono">{chosen.id}</span> — {chosen.note}
             </>
           ) : (
             "any voice id is accepted; the three named ones are what this account is known to own."

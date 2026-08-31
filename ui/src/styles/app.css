@@ -118,6 +118,27 @@
   color: var(--text-dim);
 }
 
+/* One hairline glyph, the weight of the meta beside it — a switch, not a button. */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s1);
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  stroke-width: 1.5;
+}
+
 /* ── connection dot ──────────────────────────────────────────────────────── */
 
 .probe {
@@ -699,6 +720,16 @@ tr.is-watched td {
   border: 1px solid var(--accent);
   border-radius: var(--radius);
   color: var(--accent);
+  letter-spacing: 0.06em;
+}
+
+/* The same edge as badge--live, for the fact a supervisor most needs to see go wrong:
+ * "the caller CAN see you". A monitor that is not hidden is not a monitor. */
+.badge--warn {
+  padding: 1px var(--s2);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  color: var(--warn);
   letter-spacing: 0.06em;
 }
 

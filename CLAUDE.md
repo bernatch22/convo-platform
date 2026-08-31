@@ -32,7 +32,8 @@ and, when a decision was made, a short essay in its thread.
   single `TenantContext` (`core/context.py`) — the only definition of that object.
   The channel (voice|chat) belongs to the **session**, not the project.
 - Every tool has a `ToolSpec` (`side_effect: read|write|irreversible`,
-  `idempotency_key`, `pii_scope`, `timeout_s`, `compensation`). `guard.check`
+  `idempotency_key`, `pii_scope`, `timeout_s`, `compensation`,
+  `result_summary`). `guard.check`
   refuses `irreversible` without a `confirmation_token` minted by `ConfirmTask`.
   Tools raise `ToolError(msg)` for user-facing failures (the LLM sees it); any
   other exception is hidden by the framework.
@@ -55,6 +56,14 @@ and, when a decision was made, a short essay in its thread.
   measured alternative in evals, not a default.
 - Call `sanitize_tool_pairing(chat_ctx)` before every generation (orphan
   `tool_use` bricks the conversation with Anthropic 400s).
+- **A `system` message added to a live chat context is not a system message.**
+  `convert_mid_conversation_instructions` keeps only the FIRST system item as
+  one and rewrites every later one as a **user** message wrapped in
+  `<instructions>` — the agent's prompt is that first item, so anything added
+  afterwards arrives as the caller speaking. Haiku answers it (`tk-097125`: the
+  session date opened 5 of 6 calls). Context the model must READ but nobody
+  said goes in as a paired tool call + result (`core.dates_note.clock_reading`);
+  a `tool_use.id` must match `^[a-zA-Z0-9_-]+$` or the request 400s.
 - STT: Soniox `stt-rt-v5`, `language_hints=["es","en"]`, endpointing
   `level=2 / sensitivity=0.3 / max_endpoint_delay_ms≈1000`, `context=` (Soniox
   silently ignores `keyterms`). Keep `sample_rate=16000` even on PSTN.
@@ -82,6 +91,12 @@ and, when a decision was made, a short essay in its thread.
   voice test cases `flaky=True`; hard policies use `ConversationalDAGMetric`,
   not `GEval`; eval rooms are created by `api.py` with dispatch metadata (the
   `LiveKitConnector` cannot pass metadata).
+- Ring 4 (`core/scoring/`) scores every finished call from `api.py`, never from
+  the job process: four checks decided by code, then AT MOST one Haiku call,
+  whose worst case is priced against `SCORING_CAP_EUR` BEFORE it is made and
+  skipped under three turns. The verdict is `session.score`, one more
+  append-only log line at `max(seq)+1`. `Project.scoring=False` opts a project
+  out; `SCORING_SWEEP=0` opts a deploy out.
 - Secrets only from env. Never commit `.env*` except `.env.example`.
 
 ## Layout

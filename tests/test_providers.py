@@ -1,6 +1,8 @@
 """Providers are data before they are connections: every option is asserted without a network."""
 
 import dataclasses
+import logging
+import os
 
 import pytest
 from livekit.plugins import deepgram
@@ -95,15 +97,42 @@ def test_choosing_deepgram_builds_flux_and_never_touches_soniox(
     assert built._opts.eot_threshold == 0.7
 
 
-def test_without_a_deepgram_key_the_chosen_provider_still_yields_no_stt(
-    project: Project, monkeypatch
+def test_an_ear_this_host_has_no_key_for_falls_back_to_the_default_one(
+    project: Project, monkeypatch, caplog
 ) -> None:
+    """A stored override must never leave a project deaf: Soniox hears while Flux cannot."""
     monkeypatch.delenv(stt.DEEPGRAM_KEY_ENV, raising=False)
     monkeypatch.setenv(stt.KEY_ENV, "sx-test")
     project.stt_provider = "deepgram"
     tc = fake_context("clinica-norte", "reagendamiento")
 
-    assert stt.stt_for(tc.tenant, project) is None, "a key it does not have is not a fallback"
+    with caplog.at_level(logging.WARNING, logger="platform.stt"):
+        built = stt.stt_for(tc.tenant, project)
+
+    assert stt.provider_for(project) == "soniox"
+    assert built is not None and built.model == "stt-rt-v5"
+    assert len(caplog.records) == 1, "one line, not one per turn"
+    assert stt.DEEPGRAM_KEY_ENV in caplog.text and "sx-test" not in caplog.text
+
+
+def test_with_neither_key_the_session_is_text_only_as_it_has_always_been(
+    project: Project, monkeypatch
+) -> None:
+    monkeypatch.delenv(stt.DEEPGRAM_KEY_ENV, raising=False)
+    monkeypatch.delenv(stt.KEY_ENV, raising=False)
+    project.stt_provider = "deepgram"
+    tc = fake_context("clinica-norte", "reagendamiento")
+
+    assert stt.stt_for(tc.tenant, project) is None
+
+
+def test_each_ear_names_the_variable_its_key_must_live_in(monkeypatch) -> None:
+    monkeypatch.setenv(stt.DEEPGRAM_KEY_ENV, "dg-test")
+    monkeypatch.delenv(stt.KEY_ENV, raising=False)
+
+    assert stt.key_env("deepgram") == "DEEPGRAM_API_KEY"
+    assert stt.key_env("soniox") == "SONIOX_API_KEY"
+    assert stt.runnable("deepgram") and not stt.runnable("soniox")
 
 
 @pytest.mark.parametrize("named", ["whisper", "", "SONIOX"])
@@ -222,6 +251,50 @@ def test_claude_is_built_with_ephemeral_caching(project: Project, monkeypatch) -
 
     assert built.model == "claude-haiku-4-5"
     assert built._opts.caching == "ephemeral"
+
+
+def test_a_model_this_host_has_no_key_for_never_reaches_a_connection(
+    project: Project, monkeypatch
+) -> None:
+    """The KeyError of 2026-08-31: a legal, priced model on a box without that vendor's key."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    project.llm_model = "gpt-5.4-mini"
+
+    assert llm.llm_model(project) == llm.DEFAULT_MODEL
+    assert not llm.runnable("gpt-5.4-mini")
+    assert llm.key_env("gpt-5.4-mini") == "OPENAI_API_KEY"
+    assert llm.key_env("claude-haiku-4-5") == "ANTHROPIC_API_KEY"
+
+
+def test_the_swapped_model_is_logged_once_by_its_variable_and_never_by_its_value(
+    project: Project, monkeypatch, caplog
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-test")
+    monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID", raising=False)
+    project.llm_model = "gpt-5.4-mini"
+    tc = fake_context("clinica-norte", "reagendamiento")
+
+    with caplog.at_level(logging.WARNING, logger="platform.llm"):
+        built = llm.llm_for(tc.tenant, project)
+
+    assert built.model == llm.DEFAULT_MODEL, "the call happens, on the model the box can run"
+    assert len(caplog.records) == 1, "one line per session, not one per turn"
+    assert "OPENAI_API_KEY" in caplog.text
+    assert os.environ["ANTHROPIC_API_KEY"] not in caplog.text, "names travel, values never do"
+
+
+def test_a_box_without_the_default_key_says_which_variable_is_missing(
+    project: Project, monkeypatch
+) -> None:
+    """Nothing to fall back to is a clear sentence, not a KeyError three frames down."""
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    project.llm_model = None
+    tc = fake_context("clinica-norte", "reagendamiento")
+
+    with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
+        llm.llm_for(tc.tenant, project)
 
 
 def test_gpt_is_built_with_the_openai_plugin_and_one_cache_key_per_project(

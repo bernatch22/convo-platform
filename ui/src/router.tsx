@@ -8,7 +8,7 @@
 import { createBrowserRouter } from "react-router";
 
 import { Crash } from "./routes/Crash";
-import { Evals } from "./routes/Evals";
+import { Evals, evalsLoader } from "./routes/Evals";
 import { Home } from "./routes/Home";
 import { Pipeline, pipelineLoader } from "./routes/Pipeline";
 import { SessionDetail, sessionDetailLoader } from "./routes/SessionDetail";
@@ -34,7 +34,7 @@ export const router = createBrowserRouter([
         path: "t/:tenant/:project",
         lazy: async () => ({ Component: (await import("./routes/Talk")).Talk }),
       },
-      { path: "evals", element: <Evals /> },
+      { path: "evals", element: <Evals />, loader: evalsLoader },
       { path: "supervisor", element: <Supervisor /> },
     ],
   },

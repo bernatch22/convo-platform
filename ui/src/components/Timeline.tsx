@@ -113,6 +113,8 @@ function describe(event: SessionEvent): string {
       return `${text(payload["tenant"])} / ${text(payload["project"])} · ${text(payload["channel"])}`;
     case "session.end":
       return text(payload["outcome"]);
+    case "supervisor.join":
+      return `${text(payload["identity"])} is on the line · ${text(payload["capability"])}`;
     case "error":
       return text(payload["error"]);
     default:

@@ -76,6 +76,85 @@ is what re-syncs the production file once the key is rotated.
 Termination (our side dialling out through Twilio) needs a `domain_name` on
 the trunk and credentials; this card is inbound only, so neither exists yet.
 
+## Call transfer — the toggles that decide whether a REFER is carried
+
+A **cold transfer** is `livekit-sip` sending a SIP REFER on the caller's own
+leg. Whether that REFER is honoured is entirely the carrier's decision, and on
+an Elastic SIP Trunk it is two properties on the Trunk resource. Neither is set
+by anything in this repo — `scripts/twilio_trunk.py` **reads and reports** them
+and prints the command below, because switching them on costs money on every
+transfer and a script that mutates a trunk's call settings is exactly the shape
+of the 2026 fraud incident.
+
+| what | property | values | default |
+|---|---|---|---|
+| carry a REFER at all, and to the PSTN | `transfer_mode` | `disable-all` · `sip-only` · `enable-all` | undocumented; every doc example shows `disable-all` |
+| whose number the transferee sees | `transfer_caller_id` | `from-transferee` · `from-transferor` | `from-transferee` (documented) |
+
+`sip-only` is not enough for us: the destination is a mobile, so it must be
+`enable-all`. (Twilio never writes down which enum value corresponds to the
+console's PSTN checkbox — this is the only reading consistent with both, and
+it is the value LiveKit's own docs tell you to set.)
+
+```bash
+# read — this is what the script prints for you on every run
+twilio api trunking v1 trunks fetch --sid TKxxxxxxxx
+curl -s -u $TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN \
+  https://trunking.twilio.com/v1/Trunks/TKxxxxxxxx | jq '.transfer_mode, .transfer_caller_id'
+
+# write — a human runs this, deliberately, once
+twilio api trunking v1 trunks update --sid TKxxxxxxxx \
+  --transfer-mode enable-all --transfer-caller-id from-transferee
+curl -X POST https://trunking.twilio.com/v1/Trunks/TKxxxxxxxx \
+  --data-urlencode "TransferMode=enable-all" \
+  --data-urlencode "TransferCallerId=from-transferee" \
+  -u $TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN
+```
+
+The same thing in the console: **Elastic SIP Trunking → Manage → Trunks →**
+*the trunk* **→ Features → Call Transfer (SIP REFER) → Enabled**, then the
+**Caller ID for Transfer Target** dropdown, then **Enable PSTN Transfer**, then
+save. (Twilio's own docs describe the PSTN checkbox in prose without naming it;
+those labels are LiveKit's, and they match the console as it stands.)
+
+What Twilio documents about the SIP conversation, and what it does not:
+
+- **Accepted:** *"Upon receiving the SIP REFER, Twilio returns a `202 Accepted`
+  response"*, then `NOTIFY`s carrying `100 Trying` / `200 OK`. The transferor
+  hangs up the original leg once the new one answers.
+- **Refused: no documented response code.** The whole `call-transfer` page
+  contains exactly two status codes and both are `202`. That a refused REFER
+  comes back `603 Declined` is field evidence (livekit/sip#234 — same Twilio
+  elastic trunk, closed with no published diagnosis), which is why
+  `core/telephony/transfer.py` maps 603 to `rejected` and attaches a hint
+  pointing here rather than asserting a cause.
+- **Refer-To:** `tel:+34600111222` or `sip:+34600111222@<trunk>.pstn.twilio.com`
+  — for PSTN the `sip:` form *must* use your Termination domain. We send the
+  `tel:` form.
+- **Not supported:** early media, and transfers to emergency numbers (911/933).
+- **Billing:** the transferred leg is a **child call**. For an inbound
+  (Origination) call transferred to the PSTN you are billed
+  `Origination (A→B) × child duration` **plus** `Termination (B→C) × child
+  duration` — i.e. double, for as long as the transferred call lasts.
+- **Termination is very probably a requirement**, not just for warm. Twilio
+  never says so outright, but the child leg is billed as Termination and the
+  `sip:` Refer-To form needs the Termination domain. Treat a trunk with only
+  Origination as untested for cold transfer, and read the SIP status the box
+  reports rather than assuming.
+
+**Warm transfer needs more than this.** It dials the colleague INTO the room
+with `CreateSIPParticipant`, which is an *outbound* call and therefore needs a
+Termination domain, credentials and a LiveKit `SIPOutboundTrunk` whose id goes
+in `SIP_OUTBOUND_TRUNK_ID`. None of those exist on this box, so the warm verb
+is refused at the door with a message naming the variable — never halfway
+through a live call. Cold needs none of it.
+
+```
+TRANSFER_TO=+34600111222        # where a transfer goes when the desk names no number
+TRANSFER_RINGING_S=25           # how long the far end rings (LiveKit's own default is 30)
+SIP_OUTBOUND_TRUNK_ID=ST_…      # warm only; unset means warm is refused
+```
+
 ## Verifying without a phone
 
 Every layer can be checked from the laptop, and only the last one needs a human:
@@ -130,6 +209,21 @@ atiende recepción."* — €0.008 per probe.
   rather than shipped untested into a self-hosted media path, and it cannot be
   turned off with `update_inbound_trunk_fields`: the trunk has to be deleted
   and recreated, which changes its id and orphans the dispatch rule.
+- **A server-side unsubscribe is invisible to the client that was cut off.**
+  The warm transfer needs the caller not to hear the briefing, and both ways of
+  arranging that — `RoomService.UpdateSubscriptions(subscribe=False)` and the
+  publisher's own `set_track_subscription_permissions` — **work** on
+  livekit-server v1.9.1, even against a subscriber that joined with
+  `autoSubscribe`. The first probe said neither worked, because it watched
+  `track_subscribed` / `track_unsubscribed` on the cut-off participant: the
+  Python SDK fires neither for a server-side revocation, the `AudioStream` just
+  goes quiet, and the SFU logged `revoking subscription` the whole time.
+  `scripts/isolation_probe.py` counts received audio frames instead, which is
+  the only measurement that answers the question — run it against the dev
+  compose and read the table. It also measures what the events could never
+  have told you: **the cut takes about 220 ms per stream to bite**, which is
+  the warm transfer's one remaining leak and is documented as such in
+  `core/telephony/transfer.py`.
 - **The routes table is a file.** `CONVO_DB` (default `tmp/convo.db`) is
   relative to the working directory: add the route and run the worker from
   the same directory, or the number has no route.

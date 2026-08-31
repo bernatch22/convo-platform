@@ -12,7 +12,10 @@ LIST_HEADER = (
 )
 SHOW_HEADER = f"{'seq':>4} {'t_ms':>7}  {'kind':<18} payload"
 METRIC_KEYS = ("llm_node_ttft", "e2e_latency", "transcription_delay", "end_of_turn_delay")
-USAGE = "usage: python -m convo sessions list | show <id> | tail [<id>] | eval <id> [--voice]"
+USAGE = (
+    "usage: python -m convo sessions list | show <id> | tail [<id>] | "
+    "eval <id> [--voice] | score <id> [--free]"
+)
 NODE_LINES = ("Label:", "Verdict:", "Reason:")
 WIDTH = 160
 
@@ -23,15 +26,15 @@ SILENT_CALLER = (
 )
 
 BLIND_SPOT = (
-    "ring 3 note: the log records the shape of a tool result, never its contents, so nothing "
-    "{tools} returned counts as evidence here. An hour read off the agenda cannot be matched "
-    "and reaches the judge anyway — read a 0.0 as 'not verifiable from the log', not as an "
-    "invention. docs/evals.md §3.6."
+    "ring 3 note: {tools} declares no result summary on its ToolSpec, so the log kept the "
+    "shape of what it returned and not its contents. A fact the agent read off one of them "
+    "reaches the judge with evidence that could not contain it — read a 0.0 on such a claim "
+    "as 'not verifiable from the log', not as an invention. docs/evals.md §3.6."
 )
 
 
 def main(argv: list[str], store: Store | None = None) -> int:
-    """`list` prints every session newest first; `show`/`eval <id>` read or score one."""
+    """`list` prints every session newest first; `show`/`eval`/`score <id>` read or judge one."""
     store = store or SQLiteStore()
     if argv[:1] == ["list"]:
         return list_sessions(store)
@@ -41,6 +44,8 @@ def main(argv: list[str], store: Store | None = None) -> int:
         return tail_session(store, argv[1] if len(argv) == 2 else None)
     if argv[:1] == ["eval"] and len(argv) in (2, 3):
         return eval_session(store, argv[1], voice="--voice" in argv[2:])
+    if argv[:1] == ["score"] and len(argv) in (2, 3):
+        return score_session(store, argv[1], judge="--free" not in argv[2:])
     print(USAGE)
     return 2
 
@@ -67,6 +72,8 @@ def show_session(store: Store, session_id: str) -> int:
     print(SHOW_HEADER)
     for event in store.events(session_id):
         print(f"{event.seq:>4} {event.t_ms:>7}  {event.kind:<18} {render(event)}")
+        for line in breakdown(event):
+            print(f"{'':>13}  {line}")
     return 0
 
 
@@ -187,8 +194,57 @@ def score(metric: Any, case: Any, note: str | None = None) -> float:
     return value
 
 
+def score_session(store: Store, session_id: str, judge: bool = True) -> int:
+    """Score one finished session now (ring 4) and print the breakdown it wrote into the log.
+
+    The same function the control plane's sweeper runs, called by hand: the
+    four deterministic checks, then at most one judged metric under its cap.
+    `--free` runs the deterministic half alone and spends nothing. Asking twice
+    is safe — the second call prints the score the first one wrote, because
+    `session.score` is a log line and the log is append-only.
+    """
+    from core.scoring.runner import score_session as run
+
+    result = run(session_id, store, judge=judge)
+    if result["skipped"]:
+        print(f"{session_id}: {result['skipped']}")
+        return 1
+    payload = result["score"] or {}
+    written = "scored now" if result["scored"] else "already scored"
+    print(f"{session_id}  {payload.get('score')} {payload.get('verdict')}  ({written})")
+    for line in _checks(payload):
+        print(f"  {line}")
+    return 0
+
+
+def breakdown(event: Event) -> list[str]:
+    """The indented lines that go under one log row; only a score has any today."""
+    return _checks(event.payload) if event.kind == "session.score" else []
+
+
+def _checks(payload: dict[str, Any]) -> list[str]:
+    """One line per check — mark, name, and the reason it wrote — then the judge's bill."""
+    lines = []
+    for check in payload.get("checks") or []:
+        reason = _short(str(check.get("reason", "")))
+        lines.append(f"{_mark(check.get('passed'))} {check.get('name', '?'):<14} {reason}")
+    judge = payload.get("judge") or {}
+    if judge.get("ran"):
+        lines.append(f"· judge          {judge.get('model')} · {judge.get('cost_eur')} €")
+    elif judge.get("skipped"):
+        lines.append(f"· judge          skipped: {judge['skipped']}")
+    return lines
+
+
+def _mark(passed: bool | None) -> str:
+    """`✓` passed, `✗` failed, `–` nothing in this call to check."""
+    return {True: "✓", False: "✗"}.get(passed, "–") if passed is not None else "–"
+
+
 def render(event: Event) -> str:
     """The payload on one line: timed words as `word@t`, latencies as `ttft=…`, rest as JSON."""
+    if event.kind == "session.score":
+        return _score_line(event.payload)
     payload = dict(event.payload)
     words: list[dict[str, Any]] = payload.pop("words", None) or []
     metrics: dict[str, Any] = payload.pop("metrics", None) or {}
@@ -201,6 +257,16 @@ def render(event: Event) -> str:
     if payload:
         parts.append(json.dumps(payload, ensure_ascii=False, default=str))
     return " ".join(parts)
+
+
+def _score_line(payload: dict[str, Any]) -> str:
+    """`0.83 pass · 4 checks · failed: register` — the verdict, on the row itself."""
+    parts = [f"{payload.get('score')} {payload.get('verdict')}"]
+    parts.append(f"{len(payload.get('checks') or [])} checks")
+    failed = payload.get("failed") or []
+    if failed:
+        parts.append("failed: " + ", ".join(failed))
+    return " · ".join(parts)
 
 
 def _explanation(metric: Any) -> list[str]:
