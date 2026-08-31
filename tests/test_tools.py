@@ -14,7 +14,12 @@ from livekit.agents.llm import ToolError
 
 from core import confirm
 from core.context import Project, Tenant, TenantContext
-from core.tools.catalog import ToolCatalog, platform_specs
+from core.tools.catalog import (
+    ToolCatalog,
+    infrastructure_names,
+    infrastructure_specs,
+    platform_specs,
+)
 from core.tools.contract import SideEffect, ToolSpec
 from core.tools.executor import SUMMARY_CHARS, LocalExecutor
 from core.tools.guard import ToolRefused, mask
@@ -171,6 +176,35 @@ def test_the_platform_catalog_declares_find_availability_as_a_read_with_a_five_s
     assert spec.side_effect is SideEffect.READ
     assert spec.timeout_s == 5.0
     assert spec.needs_confirmation() is False
+
+
+def test_the_clock_is_declared_infrastructure_and_no_project_catalog_holds_it() -> None:
+    """The marker an eval reads, and the reason it is not merged into a project's tools.
+
+    `expected_tools` in a golden names the BUSINESS's tools; the clock every
+    agent inherits is not one, and the eval bridge has to learn that from a
+    declaration rather than from a name it recognises. It stays out of
+    `platform_specs()` because a project's catalog is the list the executor
+    accepts, and the clock never reaches the executor.
+    """
+    clock = infrastructure_specs().get("fecha_y_hora_actual")
+
+    assert clock is not None
+    assert clock.infrastructure is True
+    assert clock.is_business_tool() is False
+    assert infrastructure_names() == frozenset({"fecha_y_hora_actual"})
+    assert platform_specs().get("fecha_y_hora_actual") is None
+    assert platform_specs().get("find_availability").is_business_tool() is True
+
+
+def test_a_project_can_declare_plumbing_of_its_own_without_touching_core() -> None:
+    """The marker is a flag on a spec, so the answer grows with whoever declares one."""
+    own = ToolCatalog.of(
+        ToolSpec(name="ping_crm", side_effect=SideEffect.READ, infrastructure=True),
+        ToolSpec(name="find_order", side_effect=SideEffect.READ),
+    )
+
+    assert infrastructure_names(own) == frozenset({"fecha_y_hora_actual", "ping_crm"})
 
 
 async def test_a_project_speaks_its_own_register_when_a_tool_fails() -> None:
