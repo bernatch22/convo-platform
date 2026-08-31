@@ -7,9 +7,11 @@ greeting, and the latencies its last calls actually measured — into one dict
 the console renders and a test can assert on.
 
 It is a READ of the platform's own configuration: every value here is either a
-constant from `core.providers`, project data, or a median over stored events.
-Nothing is invented and nothing is defaulted silently — a project that has
-never run answers with `null` medians, never with a zero.
+constant from `core.providers`, project data, a row of the store, or a median
+over stored events. Nothing is invented and nothing is defaulted silently — a
+project that has never run answers with `null` medians, never with a zero, and
+a project nobody can phone says so instead of borrowing the fleet's number
+(`core.telephony.lines`).
 
 The write half is `overridable`: the fields the console may set, and the rules
 that refuse a value the platform will not run.
@@ -23,6 +25,7 @@ from core.observability.observers import TURN_METRICS
 from core.providers import llm, stt, tts
 from core.state.overrides import OVERRIDABLE
 from core.state.store import Store
+from core.telephony import lines
 
 # How many of a project's stored voice sessions the medians are measured over.
 LATENCY_SESSIONS = 20
@@ -59,6 +62,7 @@ def snapshot(tenant: Tenant, project: Project, store: Store) -> dict[str, Any]:
         "stt": stt_view(project),
         "llm": llm_view(project),
         "tts": tts_view(project),
+        "phone": lines.view(store, tenant.id, project.id),
         "overrides": [
             {"field": o.field, "value": o.value, "updated_at": o.updated_at}
             for o in store.pipeline_overrides(tenant.id, project.id)

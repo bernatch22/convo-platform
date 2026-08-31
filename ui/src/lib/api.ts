@@ -244,6 +244,23 @@ export interface TtsSnapshot {
   sync_alignment: boolean;
 }
 
+/** One phone line that reaches this project; `serving` is false on another fleet's number. */
+export interface PhoneLine {
+  number: string;
+  fleet: string;
+  channel: string;
+  serving: boolean;
+}
+
+/** The project's own telephony: its lines, and the sentence the screen prints under them. */
+export interface PhoneSnapshot {
+  /** The agent_name this deploy dispatches to — the fleet a line has to be on to be answered. */
+  fleet: string;
+  /** Empty for a project nobody can call: a number is a route, not a property of a project. */
+  lines: PhoneLine[];
+  note: string;
+}
+
 /** One field the console changed, and when. */
 export interface PipelineOverrideRow {
   field: string;
@@ -270,6 +287,7 @@ export interface PipelineSnapshot {
   stt: SttSnapshot;
   llm: LlmSnapshot;
   tts: TtsSnapshot;
+  phone: PhoneSnapshot;
   overrides: PipelineOverrideRow[];
   overridable: string[];
   latency: {

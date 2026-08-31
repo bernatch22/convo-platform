@@ -69,9 +69,12 @@ export function Rail({ tenants }: RailProps) {
         ))}
       </div>
 
+      {/* No number here: a phone line belongs to ONE project's route, and printing
+          the fleet's only number under every tenant made them all look reachable.
+          The Pipeline screen names each project's line, or says it has none. */}
       <div className="rail__foot">
         <div>voice · chat · phone</div>
-        <div>+1 417 674 3169</div>
+        <div>numbers per project · Pipeline</div>
       </div>
     </>
   );

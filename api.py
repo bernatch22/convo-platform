@@ -50,6 +50,7 @@ from core.scoring.runner import score_session
 from core.security import desk
 from core.state import overrides
 from core.state.store import EvalRun, MetricScore, PipelineOverride, SQLiteStore, Store
+from core.telephony import lines as phone_lines
 from core.webui import mount_ui
 
 SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
@@ -57,13 +58,19 @@ SSE_HEADERS = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Run the post-call scorer beside the API for as long as the API is up.
+    """Seed the phone routes this deploy owns, then run the post-call scorer beside the API.
 
-    It is a task of this process and not a cron entry because it must stop when
-    the control plane stops: a sweeper still judging calls against a database
-    whose owner has gone is spending money nobody is watching. `SCORING_SWEEP=0`
-    starts nothing at all.
+    The seed runs once, at startup, and only writes a number the store does not
+    already carry (`core.telephony.lines.seed`): the control plane owns the
+    number → project table, so a fresh database must not answer "no line" for a
+    number that has been ringing for weeks.
+
+    The sweeper is a task of this process and not a cron entry because it must
+    stop when the control plane stops: a sweeper still judging calls against a
+    database whose owner has gone is spending money nobody is watching.
+    `SCORING_SWEEP=0` starts nothing at all.
     """
+    phone_lines.seed(SQLiteStore())
     if not sweeper.enabled():
         yield
         return
@@ -478,6 +485,8 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
                 "caching", "max_tokens", "cache_minimum_tokens", "cache_note"},
         "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
                 "forbidden_models", "forbidden_reasons", "voice", "sync_alignment"},
+        "phone": {"fleet": str, "note": str,
+                  "lines": [{"number", "fleet", "channel", "serving": bool}]},
         "overrides": [{"field", "value", "updated_at"}], "overridable": [str],
         "latency": {"sessions": int, "turns": int,
                     "medians": {"transcription_delay", "end_of_turn_delay", "llm_node_ttft",
@@ -486,6 +495,11 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
     Every value is what the NEXT session will use: the overrides are already
     applied to `greeting`, `tts.model` and `tts.voice`. A median is null when
     no stored voice session measured it.
+
+    `phone` is the store's `routes` table read for THIS project, never for the
+    fleet: `lines` is empty for a project nobody can call, and `note` says so
+    in the words the screen prints. `serving` is false for a number registered
+    against another fleet — it exists, and no call on it arrives here.
     """
     known, effective = _effective(tenant, project, store)
     return pipeline.snapshot(known, effective, store)

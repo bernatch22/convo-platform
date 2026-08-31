@@ -209,10 +209,17 @@ a project declares the suites the console can run (§8); §9 is the model matrix
 ## The web UI
 
 `ui/` is the operator console: the tenant/project switcher, Talk (the three
-channels — WebRTC voice, web chat, and the phone line on **+1 417 674 3169**),
-Sessions, Pipeline, Evals (every stored run with its per-metric diff, and the
-button that launches another on the box) and the Supervisor desk. Vite + React +
+channels — WebRTC voice, web chat, and the SIP trunk), Sessions, Pipeline (the
+three providers, plus the phone line this project answers on, or the fact that
+it has none), Evals (every stored run with its per-metric diff, and the button
+that launches another on the box) and the Supervisor desk. Vite + React +
 TypeScript + react-router; no state library, no CSS framework.
+
+A number belongs to a project, never to the fleet: it is one row of the control
+plane's `routes` table (`python -m convo routes list | seed | add`), the same
+row `core/router.py` reads to decide who answers an inbound call. Today exactly
+one number is registered — **+1 417 674 3169**, clinica-norte/reagendamiento —
+and the console says so per project instead of printing it fleet-wide.
 
 **The Supervisor desk** (`/supervisor`) lists every call live on the fleet,
 phone calls included. Clicking one joins that room with a short-lived,

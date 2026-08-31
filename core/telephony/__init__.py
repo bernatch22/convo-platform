@@ -1,4 +1,8 @@
-"""The phone as a destination, not just an origin: moving a live call to a human.
+"""The phone: the number a call arrives on, and the human a live call can be moved to.
+
+`lines` is the origin side — which number reaches which project, read from the
+same `routes` table `core/router.py` resolves an inbound call with, so the
+console can never claim a line a caller would not actually land on.
 
 `transfer` holds the two LiveKit SIP moves — a cold REFER that hands the
 caller's leg to the carrier, and a warm leg that dials a human INTO the room —
