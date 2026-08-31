@@ -51,6 +51,12 @@ class Project:
     The fields named in `core.state.overrides.OVERRIDABLE` are the ones a
     supervisor may change from the console without a deploy: `core.state.overrides`
     replaces them on the way out of the router (`core.state.store.PipelineOverride`).
+
+    `scoring` is the post-call score's opt-out (ms-13). A project that sets it
+    to False is never judged after a call ends and its sessions show a dash
+    where the others show a chip — which is a business decision (a queue whose
+    calls are two sentences long, a tenant that has not agreed to it), so it
+    lives with the project's data and not in an environment variable.
     """
 
     id: str
@@ -67,6 +73,7 @@ class Project:
     tools: ToolCatalog = field(default_factory=ToolCatalog)
     messages: dict[str, str] = field(default_factory=dict)
     knowledge_seed: str = ""
+    scoring: bool = True  # False = this project's finished calls are never scored (ms-13)
 
     def knowledge(self, tc: "TenantContext") -> str:
         """The stable knowledge block a prompt opens with: the pinned override, else git's seed.

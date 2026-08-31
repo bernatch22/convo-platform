@@ -129,7 +129,8 @@ async def test_a_word_with_no_alignment_is_forwarded_but_not_given_a_time() -> N
 
 
 def test_convo_sessions_show_renders_timed_words_as_word_at_time() -> None:
-    event = SimpleNamespace(payload={"words": [{"w": "Su", "t1": 0.31}, {"w": "cita", "t1": 0.62}]})
+    words = [{"w": "Su", "t1": 0.31}, {"w": "cita", "t1": 0.62}]
+    event = SimpleNamespace(kind="tts.word", payload={"words": words})
 
     assert sessions.render(event) == "Su@0.31 cita@0.62"
 

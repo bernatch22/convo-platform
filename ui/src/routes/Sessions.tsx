@@ -7,6 +7,7 @@
 import { Link, useLoaderData, type LoaderFunctionArgs } from "react-router";
 
 import { EmptyState } from "../components/EmptyState";
+import { ScoreChip } from "../components/ScoreChip";
 import { listSessions, type SessionLine } from "../lib/api";
 import { euros, mediumOf, startedAt } from "../lib/sessions";
 
@@ -41,7 +42,9 @@ export function Sessions() {
           Every conversation this tenant has had, newest first — phone calls included. A row opens
           the session&apos;s append-only log: one line per fact, numbered by{" "}
           <code className="mono">seq</code>, with the per-turn STT / LLM / TTS breakdown and the
-          consent proof beside it.
+          consent proof beside it. The <strong>score</strong> column is the call judging itself:
+          four checks decided by code and at most one Haiku call, written into the same log as{" "}
+          <code className="mono">session.score</code> within a minute of the caller hanging up.
         </p>
       </header>
 
@@ -56,6 +59,7 @@ export function Sessions() {
                   <th>channel</th>
                   <th>started</th>
                   <th>outcome</th>
+                  <th>score</th>
                   <th className="num">turns</th>
                   <th className="num">events</th>
                   <th className="num">cost</th>
@@ -128,6 +132,9 @@ function Row({ tenant, row }: { tenant: string; row: SessionLine }) {
         ) : (
           <span className={`outcome outcome--${row.outcome ?? "none"}`}>{row.outcome ?? "—"}</span>
         )}
+      </td>
+      <td>
+        <ScoreChip score={row.score} running={live} />
       </td>
       <td className="num dim">{row.turns}</td>
       <td className="num faint">{row.events}</td>
