@@ -758,3 +758,24 @@ async def test_nothing_is_written_when_the_caller_backs_out_of_the_new_number(ch
     assert agenda.calls == [], "it changed a number without a yes"
     assert agenda.book[ANA]["phone"] == "600123456"
     assert "689 000 111" in conversation.reply(1), "the platform reads the number back itself"
+
+
+@needs_llm
+async def test_the_contact_prompt_is_served_from_the_cache_on_its_second_turn(changing, tc) -> None:
+    """The third stage pays for its prefix once too, and neither turn here writes anything."""
+    conversation = await run_conversation(
+        tc,
+        ["¿y cuál es el número que tenéis apuntado?", "¿y si me paso por recepción?"],
+        changing,
+    )
+
+    assert text_of(conversation.results[1])
+    assert conversation.cached_prompt_tokens() > 0, (
+        "Haiku 4.5 caches prefixes of 4096+ tokens: a cache read of 0 means this stage's "
+        "prefix shrank below the floor or something in it changes between turns"
+    )
+    assert conversation.cached_prompt_tokens() > 0, (
+        "Haiku 4.5 caches prefixes of 4096+ tokens: a cache read of 0 means this stage's "
+        "prefix shrank below the floor or something in it changes between turns"
+    )
+    assert tc.adapters["agenda"].calls == [], "neither turn asks for anything to be written"
