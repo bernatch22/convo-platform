@@ -8,7 +8,9 @@ decided once, at the door, and travels with the room.
 
 `mint_observer` is the second ticket this module signs: the same fence, with
 the publish rights removed, so a supervisor can listen to a call in progress
-without the caller ever learning that somebody joined.
+without the caller ever learning that somebody joined. `mint_caller` is the
+third: full publish rights into a room that already dispatches its own agent,
+which is how a synthetic caller (ring 2) gets in.
 
 Open source note: `mint_session` is a generic recipe for explicit agent
 dispatch on livekit-agents 1.7 — a JWT from plain args, no server round-trip.
@@ -62,6 +64,40 @@ def mint_observer(room: str) -> dict[str, str]:
         api.AccessToken(os.getenv("LIVEKIT_API_KEY", "devkey"), _secret())
         .with_identity(identity)
         .with_attributes({"role": "observer"})
+        .with_grants(grants)
+        .to_jwt()
+    )
+    return {
+        "url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
+        "room": room,
+        "identity": identity,
+        "token": token,
+    }
+
+
+def mint_caller(room: str, tenant: str, identity: str = "caller") -> dict[str, str]:
+    """A speaking ticket into ONE room that ALREADY has its agent dispatched.
+
+    The third ticket, and the one an eval harness needs. `mint_session` puts
+    the dispatch inside the JWT, which only works for a client that joins with
+    the token we minted; DeepEval's `LiveKitConnector` signs its own token and
+    cannot carry metadata, so an eval room is dispatched server-side
+    (`core.rooms.create_eval_room`) and the caller is handed this instead.
+
+    It therefore carries NO `RoomConfiguration`: the room already dispatches,
+    and a second dispatch would put two agents in one room, both greeting.
+    """
+    grants = api.VideoGrants(
+        room_join=True,
+        room=room,
+        can_publish=True,
+        can_publish_data=True,
+        can_subscribe=True,
+    )
+    token = (
+        api.AccessToken(os.getenv("LIVEKIT_API_KEY", "devkey"), _secret())
+        .with_identity(identity)
+        .with_attributes({"tenant": tenant, "role": "caller"})
         .with_grants(grants)
         .to_jwt()
     )
