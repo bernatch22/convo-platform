@@ -5,6 +5,13 @@ and gives it the right to write: `book_slot` is irreversible and unreachable
 without a confirmation token, and the three writes that make up a rebooking run
 as a saga so a failure halfway leaves the patient's old appointment standing.
 
+ms-20 adds the third, and it is the first one that is not an appointment:
+`update_contact` changes the number the clinic rings the patient on. The verb is
+only reachable once the caller has been found on the book — an unidentified
+caller cannot change anybody's data — and it goes through the same door as the
+other two, which is the point: a new irreversible verb is a ToolSpec, a stage
+and a consent graph name, not a new mechanism.
+
 ms-18 adds the second errand and, with it, the second irreversible door.
 `Identify` now has two exits and `create_appointment` opens a cita for somebody
 the book had never held — through the same guard, the same `ConfirmTask` and a
@@ -31,7 +38,12 @@ from core.tools.catalog import ToolCatalog, platform_specs
 from core.tools.contract import SideEffect, ToolSpec
 from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
-from ...adapters.agenda import summarise_availability, summarise_change, summarise_patient
+from ...adapters.agenda import (
+    summarise_availability,
+    summarise_change,
+    summarise_contact,
+    summarise_patient,
+)
 from ...adapters.sms import summarise_message
 from . import knowledge
 
@@ -82,6 +94,20 @@ CREATE_APPOINTMENT = ToolSpec(
     timeout_s=8.0,
     result_summary=summarise_change,
 )
+# The third irreversible door, and the one that is not about an hour at all (ms-20).
+# Changing the number the clinic reaches a patient on is not compensable by us: nobody
+# keeps the number it replaced, and a patient we can no longer ring is a patient who
+# misses the appointment we were ringing about. So it declares no compensation — an
+# irreversible write with an undo would be a `write` — and the guard demands a token for
+# it exactly as it does for the two bookings.
+UPDATE_CONTACT = ToolSpec(
+    name="update_contact",
+    side_effect=SideEffect.IRREVERSIBLE,
+    idempotency_key="appointment_id",
+    pii_scope=frozenset({"phone"}),
+    timeout_s=5.0,
+    result_summary=summarise_contact,
+)
 # The undo of a cancel is a write, never an irreversible: the platform is putting
 # things back the way the patient left them, and asking for a second yes to do
 # that is not a conversation anybody wants.
@@ -124,9 +150,9 @@ class ReagendamientoProject(Project):
 
     def stages(self, tc: TenantContext) -> list:
         """Every stage of the call, in order — the project's whole tool surface for evals."""
-        from .stages import ChooseSlot, Farewell, Identify, NewBooking
+        from .stages import ChooseSlot, Farewell, Identify, NewBooking, UpdateContact
 
-        return [Identify(tc), ChooseSlot(tc), NewBooking(tc), Farewell(tc)]
+        return [Identify(tc), ChooseSlot(tc), NewBooking(tc), UpdateContact(tc), Farewell(tc)]
 
 
 PROJECT = ReagendamientoProject(
@@ -143,6 +169,7 @@ PROJECT = ReagendamientoProject(
             CANCEL_SLOT,
             BOOK_SLOT,
             CREATE_APPOINTMENT,
+            UPDATE_CONTACT,
             REBOOK_SLOT,
             SEND_SMS,
         )

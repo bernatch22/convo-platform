@@ -3,8 +3,14 @@
 It stands where the clinic's real booking system will stand and answers the same
 shape: a capability name, a dict of arguments, a plain result. Reading is
 `find_availability` and `find_patient`; writing is `cancel_slot`, `book_slot`,
-`create_appointment` and `rebook_slot`, the inverse of the cancel that the saga
-runs when a booking falls over halfway.
+`create_appointment`, `update_contact` and `rebook_slot`, the inverse of the
+cancel that the saga runs when a booking falls over halfway.
+
+`update_contact` is the odd one out and says something about the taxonomy: it
+touches no hour at all. It changes the number the clinic calls the patient on,
+which is the patient's data rather than the agenda's, and it is the one write
+here with no inverse — nobody keeps the number it replaced, so its spec declares
+`irreversible` and lists no compensation.
 
 `book_slot` and `create_appointment` write the same row and are deliberately two
 capabilities. One takes an hour for a patient the book already holds — a
@@ -47,6 +53,7 @@ BOOKED = "booked"
 CREATED = "created"
 MOVED = "moved"
 CANCELLED = "cancelled"
+RECONTACTED = "phone updated"
 
 SHAPE = "appointments"
 LABELS = {
@@ -63,6 +70,7 @@ BOOK_SLOT = "book_slot"
 CREATE_APPOINTMENT = "create_appointment"
 CANCEL_SLOT = "cancel_slot"
 REBOOK_SLOT = "rebook_slot"
+UPDATE_CONTACT = "update_contact"
 
 REJECTED_HOUR = "-1300-"  # the demo's deterministic failure: the system refuses 13:00
 ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -70,6 +78,7 @@ ISO_DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 NO_SLOTS = "no free slots that day"
 NO_PATIENT = "no appointment on the book for that caller"
 NOTHING_WRITTEN = "the booking system returned nothing"
+NO_CONTACT = "the booking system changed no contact detail"
 
 __all__ = [
     "DOCTORS",
@@ -78,6 +87,7 @@ __all__ = [
     "specialty_key",
     "summarise_availability",
     "summarise_change",
+    "summarise_contact",
     "summarise_patient",
 ]
 
@@ -101,6 +111,7 @@ class FakeAgenda(Adapter):
             CREATE_APPOINTMENT,
             CANCEL_SLOT,
             REBOOK_SLOT,
+            UPDATE_CONTACT,
             LIST_RECORDS,
         ]
 
@@ -114,6 +125,7 @@ class FakeAgenda(Adapter):
             CREATE_APPOINTMENT: self._create_appointment,
             CANCEL_SLOT: self._cancel_slot,
             REBOOK_SLOT: self._rebook_slot,
+            UPDATE_CONTACT: self._update_contact,
             LIST_RECORDS: self._list_records,
         }.get(capability)
         if runner is None:
@@ -181,6 +193,25 @@ class FakeAgenda(Adapter):
     def _rebook_slot(self, args: dict[str, Any]) -> dict[str, str]:
         """Undo a cancel: the appointment the saga released goes back on the book as it was."""
         return self._set_status(args, "booked")
+
+    def _update_contact(self, args: dict[str, Any]) -> dict[str, str]:
+        """Write the caller's new number onto their record, and file the change for the console.
+
+        The write the clinic cannot undo for you: from the moment it lands, the
+        number the centre rings is the new one, and the old one is not kept
+        anywhere for a compensation to put back. That is why its spec declares
+        `irreversible` and why nothing reaches this method without a token.
+
+        An unknown appointment is a `ValueError` and never a new row
+        (`patients.update_phone`): the identifier is the caller's identity here,
+        so writing into a record the book does not hold would be updating a
+        stranger.
+        """
+        change = patients.update_phone(
+            self.book, str(args.get("appointment_id", "")), str(args.get("phone", ""))
+        )
+        self._file(change["appointment_id"], RECONTACTED, CHANGED)
+        return change
 
     def _set_status(self, args: dict[str, Any], status: str) -> dict[str, str]:
         appointment_id = str(args.get("appointment_id", ""))
@@ -265,6 +296,26 @@ def summarise_patient(appointment: dict[str, str] | None) -> str:
         f"appointment {appointment.get('appointment_id', '?')} "
         f"for {appointment.get('patient', '?')} "
         f"on {appointment.get('when', '?')} with {appointment.get('doctor', '?')}"
+    )
+
+
+def summarise_contact(change: dict[str, str] | None) -> str:
+    """What `update_contact` may leave in the log: whose record moved, and to which tail.
+
+    The one summary in this project written already masked. The others render
+    what the adapter returned and let the platform's mask blank it, which works
+    because the value being protected is a value some ToolSpec declared — and
+    here that is exactly the field the line is ABOUT. A summary that rendered
+    the number whole and relied on the mask would read `68*******` and tell an
+    auditor nothing; the clinic's own idiom (`patients.last_digits`) says which
+    number the record now holds, in the same three digits the caller heard read
+    back, and no more.
+    """
+    if not change:
+        return NO_CONTACT
+    return (
+        f"appointment {change.get('appointment_id', '?')} "
+        f"now reachable on a number ending {patients.last_digits(change.get('phone'))}"
     )
 
 

@@ -31,7 +31,7 @@ TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --te
 TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
 ```
 
-The clinic takes both errands. Say you want to change the cita you already have
+The clinic takes three errands. Say you want to change the cita you already have
 and reception finds it by name or phone; say you have none —
 
 > «hola, quería pedir cita, no tengo ninguna» · «Pedro Ramos Gil, teléfono
@@ -42,6 +42,21 @@ and reception finds it by name or phone; say you have none —
 agenda, reads the hour back to you and waits for a yes before writing anything.
 Either way `uv run python -m convo sessions show <id>` prints the log: the yes
 before the write, and one line for the cita the booking system created.
+
+The third errand is not an hour at all: the number the clinic rings you on. Say
+it is wrong and reception validates the one on file the way a bank does — by its
+last digits, never whole — takes the new one and reads it back digit by digit
+before writing anything:
+
+> «quiero cambiar mi teléfono, el que tenéis está mal» · «Ana García Ruiz» →
+> «El teléfono que me consta acaba en 456. ¿Es ese el que quiere cambiar?» ·
+> «sí, el nuevo es el 689 000 111» → «Su nuevo teléfono de contacto sería el
+> 689 000 111. ¿Se lo cambio?» · «sí, cámbiemelo»
+
+Ask it for the old number whole and it will not say it. The log of that call has
+a `confirm.granted` for `update_contact` before the write, and the line the write
+left behind names the record and three digits — «now reachable on a number ending
+111» — which is what an auditor needs and all a leak would get.
 
 The shop takes three. Ask where an order is («mi pedido es el TS-10432, ¿por
 dónde va?»), ask to cancel it and it reads the order and the amount back and
