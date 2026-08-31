@@ -1,70 +1,96 @@
-<section class="slide" data-title="Infraestructura, roadmap y trade-offs" data-entregable="11">
+<section class="slide" data-title="Infraestructura, despliegue y roadmap" data-entregable="11">
   <style>
-    .f15-col h3 { font: 600 15.5px var(--sans); color: var(--ink); margin: 0 0 8px; }
-    .f15-now p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 8px; }
-    .f15-now p strong { color: var(--ink); font-weight: 600; }
-    .f15-tbl { width: 100%; border-collapse: collapse; }
-    .f15-tbl th { font: 500 10.5px var(--mono); letter-spacing: .07em; text-transform: uppercase;
-                  color: var(--muted); text-align: left; padding: 0 10px 7px 0; border-bottom: 1px solid var(--rule); }
-    .f15-tbl td { font: 400 12.5px/1.45 var(--sans); color: var(--ink-2); padding: 7px 10px 7px 0;
-                  border-bottom: 1px solid var(--line); vertical-align: top; }
-    .f15-tbl td strong { color: var(--ink); font-weight: 600; }
     .f15-sec { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
                color: var(--accent); margin: 0 0 8px; }
-    .f15-gap { margin-top: 18px; }
+    .f15-gap { margin-top: 16px; }
+    .f15-stack { border: 1.5px solid var(--accent); border-radius: 10px; background: var(--accent-soft);
+                 padding: 15px 20px; }
+    .f15-stack p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 8px; }
+    .f15-stack p:last-child { margin-bottom: 0; }
+    .f15-stack p strong { color: var(--ink); font-weight: 600; }
+    .f15-dep { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 14px 20px; }
+    .f15-dep p { font: 400 13px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 6px; }
+    .f15-dep p:last-child { margin-bottom: 0; }
+    .f15-dep p strong { color: var(--ink); font-weight: 600; }
+    .f15-road { border: 1.5px solid var(--accent); border-radius: 10px; overflow: hidden; }
+    .f15-road .hd { background: var(--accent-soft); padding: 11px 18px; }
+    .f15-road .hd .ph { font: 500 10px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                        color: var(--accent); display: block; margin-bottom: 3px; }
+    .f15-road .hd .th { font: 600 15.5px/1.35 var(--sans); color: var(--ink); }
+    .f15-road .rw { padding: 8px 18px; border-top: 1px solid var(--line);
+                    font: 400 13px/1.45 var(--sans); color: var(--ink-2); }
+    .f15-road .rw strong { color: var(--ink); font-weight: 600; }
+    .f15-tof { margin-top: 0; }
+    .f15-tof .r { padding: 7px 0; border-bottom: 1px solid var(--line);
+                  font: 400 12.5px/1.45 var(--sans); color: var(--ink-2); }
+    .f15-tof .r:last-child { border-bottom: none; }
+    .f15-tof .r strong { color: var(--ink); font-weight: 600; }
   </style>
   <div class="slide-body">
 
     <div class="head-block" data-anim="1">
       <div class="eyebrow">15 <span class="sep">·</span> Infraestructura, despliegue — roadmap y trade-offs</div>
-      <h2 class="head" style="max-width:56ch">Un nodo hoy, y cada palanca de escalado con su disparador escrito</h2>
+      <h2 class="head" style="max-width:58ch">LiveKit resuelve el tiempo real; nosotros, la garantía transaccional encima</h2>
     </div>
 
     <div class="grid2 fill" data-anim="2">
-      <div class="f15-col">
-        <p class="f15-sec">Hoy — en producción</p>
-        <div class="f15-now">
-          <p><strong>Un nodo cloud</strong> concentra el servidor de medios, el puente telefónico,
-          los workers de conversación y el plano de control, tras un único dominio con TLS.
-          Sin GPU: todo el tiempo real corre en CPU.</p>
-          <p><strong>Desplegar es un comando</strong>, idéntico e idempotente; la configuración de
-          los negocios no se toca al desplegar — es estado vivo, no artefacto.</p>
-          <p><strong>El gate de calidad es la evaluación</strong>: la batería de conversaciones
-          corre en integración continua y la nocturna vigila lo desplegado. El rollback es
-          redeclarar la versión anterior — el despliegue es idempotente y la configuración
-          de negocio no viaja con él.</p>
+      <div>
+        <p class="f15-sec">El stack, con nombres</p>
+        <div class="f15-stack">
+          <p><strong>LiveKit autoalojado</strong> resuelve la capa de tiempo real completa:
+          servidor de medios WebRTC, puente telefónico SIP, un proceso aislado por llamada y
+          los permisos firmados por identidad. Sin él, nada de esto existiría en el plazo de
+          una prueba.</p>
+          <p><strong>Encima construimos lo que LiveKit no da</strong> — y esa es la tesis del
+          documento: el control transaccional con consentimiento, el historial inmutable, la
+          máscara por valor, los cuatro niveles de evaluación y la consola de operación.</p>
+          <p>Proveedores por contrato: Soniox / Deepgram (voz a texto), ElevenLabs (texto a voz),
+          Claude / GPT (modelo). Runtime Python, base embebida — y su paso a Postgres tiene el
+          disparador escrito: el día que un segundo proceso escriba.</p>
         </div>
-        <p class="f15-sec f15-gap">Escalado — el disparador es un hecho, no un adjetivo</p>
-        <table class="f15-tbl">
-          <tr><th>Cuando ocurra…</th><th>…se mueve esta palanca</th></tr>
-          <tr><td>las llamadas simultáneas se acercan a los procesos precalentados</td>
-              <td>segundo nodo de workers — son procesos sin estado, el dispatch ya los reparte</td></tr>
-          <tr><td>un segundo proceso necesita escribir el estado</td>
-              <td>la base embebida pasa a Postgres — el disparador está documentado desde el diseño</td></tr>
-          <tr><td>una red corporativa bloquea el audio saliente</td>
-              <td>relé TURN en el puerto 443 — hoy diferido porque la prueba móvil real no lo necesitó</td></tr>
-          <tr><td>clientes en otra región</td>
-              <td>segundo servidor de medios federado; el plano de control no se duplica</td></tr>
-        </table>
+        <p class="f15-sec f15-gap">Despliegue y operación</p>
+        <div class="f15-dep">
+          <p><strong>Desplegar es un comando idempotente</strong>; la configuración de los
+          negocios es estado vivo y no viaja con el deploy. El rollback es redeclarar la
+          versión anterior.</p>
+          <p><strong>El gate de calidad es la evaluación</strong>: la batería conversacional en
+          integración continua, y la nocturna vigilando lo desplegado. Sin GPU en todo el
+          sistema.</p>
+          <p><strong>Escalar tiene disparadores, no adjetivos</strong>: concurrencia al límite →
+          segundo nodo de workers (sin estado, el dispatch ya reparte) · segundo escritor →
+          Postgres · otra región → servidor de medios federado.</p>
+        </div>
       </div>
 
-      <div class="f15-col">
+      <div>
         <p class="f15-sec">Roadmap por fases</p>
-        <table class="f15-tbl">
-          <tr><td><strong>1 · Verticales instanciables</strong> — el segundo negocio de un rubro sin copiar código; alta de cliente 100% configuración</td></tr>
-          <tr><td><strong>2 · Tools remotos</strong> — el protocolo WebSocket de la lámina 12: el código del cliente en su infraestructura</td></tr>
-          <tr><td><strong>3 · Re-enganche automático</strong> — la llamada que se corta retoma contexto al volver a llamar</td></tr>
-          <tr><td><strong>4 · Escala multi-nodo</strong> — según los disparadores de la izquierda, no antes</td></tr>
-        </table>
+        <div class="f15-road">
+          <div class="hd">
+            <span class="ph">Fase 1 — la tesis, industrializada</span>
+            <span class="th">«Los verticales son código; los negocios, configuración»</span>
+          </div>
+          <div class="rw">El segundo negocio de un rubro se da de alta <strong>sin copiar una
+          línea</strong>: el código de «clínicas» sirve a todas las clínicas; cada una trae su
+          voz, su número, sus credenciales y sus horarios.</div>
+          <div class="rw"><strong>2 · Tools remotos</strong> — el protocolo de la lámina 12: el
+          código del cliente corre en su infraestructura, la autoridad se queda aquí.</div>
+          <div class="rw"><strong>3 · Re-enganche automático</strong> — la llamada que se corta
+          retoma contexto al volver a llamar.</div>
+          <div class="rw"><strong>4 · Escala multi-nodo</strong> — según los disparadores de la
+          izquierda, no antes.</div>
+        </div>
         <p class="f15-sec f15-gap">Trade-offs principales — decididos con medición</p>
-        <table class="f15-tbl">
-          <tr><td><strong>Generación anticipada apagada</strong> — se midió: con fin-de-turno semántico en ~0,4 s, especular no ocultaba latencia y solo gastaba llamadas al modelo</td></tr>
-          <tr><td><strong>Base embebida antes que Postgres</strong> — un solo escritor hoy; migrar antes de necesitarlo sería ceremonia, y el disparador está escrito</td></tr>
-          <tr><td><strong>Grabación en el propio worker</strong> — cero latencia añadida y simplicidad, a cambio de no captar la voz del supervisor en toma de línea; documentado, con la alternativa nombrada</td></tr>
-          <tr><td><strong>LiveKit antes que stack propio de medios</strong> — SIP, WebRTC, aislamiento por llamada y tokens firmados resueltos desde el día uno; se asume la dependencia del servidor de medios, y la migración futura es un coste conocido</td></tr>
-          <tr><td><strong>Motor conversacional propio</strong> — un motor SaaS dejaría la autorización y la auditoría fuera del bucle; el control transaccional exige poseerlo</td></tr>
-          <tr><td><strong>Modelo económico por defecto</strong> — Haiku con caché de prompt; el premium se decide por la matriz de evaluación, no por marketing</td></tr>
-        </table>
+        <div class="f15-tof">
+          <div class="r"><strong>LiveKit antes que stack propio de medios</strong> — SIP, WebRTC,
+          aislamiento y tokens resueltos el día uno; se asume la dependencia, con la migración
+          como coste conocido.</div>
+          <div class="r"><strong>Motor conversacional propio</strong> — un motor SaaS dejaría la
+          autorización y la auditoría fuera del bucle; el control transaccional exige poseerlo.</div>
+          <div class="r"><strong>Generación anticipada apagada</strong> — medida: con fin de turno
+          en ~0,4 s, especular no ocultaba latencia y solo gastaba modelo.</div>
+          <div class="r"><strong>Base embebida antes que Postgres</strong> — un solo escritor hoy;
+          migrar antes del disparador sería ceremonia.</div>
+        </div>
       </div>
     </div>
 
