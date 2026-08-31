@@ -133,3 +133,50 @@ atiende recepción."* — €0.008 per probe.
 - **The routes table is a file.** `CONVO_DB` (default `tmp/convo.db`) is
   relative to the working directory: add the route and run the worker from
   the same directory, or the number has no route.
+
+## The nightly: ring 2 as a habit
+
+The box calls its own fleet every night at **04:00 Europe/Madrid** and writes
+down what it heard. Nothing in it touches Twilio, a trunk or a phone number: an
+eval room is minted at `POST /evals/rooms` and lives entirely inside the SFU,
+which is the carrier-quiet-hours lesson applied to something that is not a
+carrier.
+
+```
+convo-evals.timer     OnCalendar=*-*-* 04:00:00 Europe/Madrid   (the box runs UTC;
+                      the zone is spelled out so DST cannot move the run)
+   └─ convo-evals.service   Type=oneshot, WorkingDirectory=/home/berna/convo-app
+        └─ uv run python -m core.testing.nightly
+             ├─ discovers every tenants/*/projects/*/evals/test_ring2.py
+             ├─ counts its goldens = the number of LIVE CALLS = the bill
+             ├─ takes whole suites while they fit the 8-call budget
+             ├─ deepeval test run <suite>, killed at 20 minutes
+             └─ leaves tmp/evals/<date>.log · <date>/index.html · index.tsv
+                and POSTs each suite to /evals/runs, so it lands on the console
+```
+
+Both units are installed by `deploy_api.sh`; the run needs `uv sync --extra dev`
+(deepeval), which that script already does.
+
+```bash
+ssh convo-box 'systemctl list-timers convo-evals.timer --no-pager'      # armed?
+ssh convo-box 'sudo systemctl start convo-evals.service'               # one night, by hand
+ssh convo-box 'cd convo-app && ~/.local/bin/uv run python -m core.testing.nightly --dry-run'
+ssh convo-box 'column -t -s"\t" convo-app/tmp/evals/index.tsv'          # the whole history
+ssh convo-box 'journalctl -u convo-evals -n 40 --no-pager'              # last night, narrated
+```
+
+`/etc/default/convo-evals` is read last and optionally, so one night can be
+retargeted (`CONVO_API=…`) without editing the unit.
+
+### Gotchas paid for once, here
+
+- **`Persistent=` is off on purpose.** This unit spends provider money. A box
+  that reboots at noon must not decide by itself to spend it at noon; a missed
+  night is missed, and `systemctl start` is how a person asks for the catch-up.
+- **`deepeval test run` exits 0 over a failed metric.** A ring-2 wire case is
+  `flaky=True` by design, and DeepEval will not let a flaky metric fail a case.
+  The runner therefore reads the scores, not the exit code — see
+  `core.testing.nightly.status_of`. Measured on this box on 2026-08-31: a tuteo
+  greeting scored `Keeps the register` 0.00 and pytest passed the suite.
+- **Port 8091 is `livekit-sip`**, not a free port. Anything ad hoc goes higher.

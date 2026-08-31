@@ -26,7 +26,7 @@ consent, grounded facts, register — and share not one sentence of criteria.
 | Ring | What is evaluated | When | Status |
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
-| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live nightly (ms-13) | offline since ms-6 — §3.9; live since ms-13 — §3.11, §3.12 |
+| **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live **nightly on the box, 04:00 Europe/Madrid** (ms-13) | offline since ms-6 — §3.9; live since ms-13 — §3.11, §3.12; nightly since ms-13 — §3.13 |
 | **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; grounding is blind to tool results — §3.6 |
 
 The metrics are the same in every ring. A ring changes where the conversation
@@ -554,6 +554,58 @@ human's.
   Two workers on one `FLEET` share every dispatch, so a second harness needs a
   `FLEET` of its own and `CONVO_API` pointed at its own `api.py`.
 
+### 3.13 The nightly — ring 2 as a habit, and what "red means red" costs
+
+- **What it is:** `core/testing/nightly.py` (the run), `nightly_report.py`
+  (what it leaves behind), `nightly_html.py` (the page), and two systemd units
+  on convo-box installed by `infra/box/deploy_api.sh`. Every night at 04:00
+  Europe/Madrid `convo-evals.timer` fires a oneshot that calls the DEPLOYED
+  fleet — rooms minted at the box's own `POST /evals/rooms`, agent answered by
+  `convo-worker` — and leaves `tmp/evals/<date>.log`, one HTML page at
+  `tmp/evals/<date>/index.html`, one line per suite in `tmp/evals/index.tsv`,
+  and one row per suite on the console (`POST /evals/runs`).
+- **The budget is arithmetic done before a euro is spent.** One ring-2 golden
+  is one live call, so the goldens across the fleet ARE the bill. Suites are
+  taken whole while they fit an 8-call cap and a suite that would not fit is
+  skipped, named on the page and in the log, and turns the run red. Never
+  trimmed to fit: half a suite scores half a policy, and a fleet that outgrew
+  its cap is a decision for a person, not a number to quietly raise.
+- **`deepeval test run` exits 0 over a failed metric, and that is the whole
+  card.** A ring-2 wire case is `flaky=True` on purpose (§3.12 — a dropped
+  packet is not a regression) and DeepEval honours it by refusing to let a
+  flaky metric decide a case. Measured on the box on 2026-08-31: the clinic's
+  greeting was switched to tuteo through the console's own override path,
+  `Keeps the register` scored **0.00** against a 1.00 threshold, and the suite
+  exited **0** — the first drill reported a green night over a red metric.
+  `nightly.status_of` now reads the scores, not the exit code, and the second
+  drill failed the systemd unit itself (`ExecMainStatus=1`). The trade is
+  deliberate: a genuinely flaky call can now redden a night, and the counts and
+  the transcript are both on the page so telling one from the other is one
+  click. At 04:00 a red somebody must look at costs a minute; a green over a
+  broken policy costs whatever the policy was protecting.
+- **A red score is only actionable next to the transcript.** The page renders
+  each failing metric — score, threshold, the judge's reason — immediately
+  above the turns of the call that earned it, read out of DeepEval's own
+  `test_run_*.json` (`conversationalTestCases[].turns`). Reading the file
+  DeepEval wrote, rather than parsing the table it printed, is what keeps the
+  page and `deepeval test run` from ever disagreeing about a score.
+- **The forced-regression drill, end to end (2026-08-31, convo-box):** green
+  (4 calls, both projects, all metrics 1.000, judge $0.0142) → break the
+  clinic's greeting to tuteo → red (`Keeps the register` 0.000, unit exit 1,
+  console `delta=-1.0` against the previous run) → restore the greeting →
+  green again (register 1.000). Seven live conversations, inside the 8-call cap.
+- **The judge half of a night is measured; the provider half is not.** DeepEval
+  reports `evaluationCost` per run and the runner files it into `index.tsv`:
+  **$0.0142 for a 4-call night** (clinic $0.0091, shop $0.0051). What ElevenLabs,
+  Soniox and Haiku charged for those four calls is not instrumented by this
+  card — it is the same traffic as four console calls.
+- **`Persistent=` is off.** A unit that spends provider money must not decide
+  on its own to spend it at noon because the box rebooted; a missed night is
+  missed, and `systemctl start convo-evals.service` is the catch-up.
+- **How to see it:** `ssh convo-box 'systemctl list-timers convo-evals.timer
+  --no-pager'`, then `ssh convo-box 'sudo systemctl start convo-evals.service'`
+  and `ssh convo-box 'column -t -s"\t" convo-app/tmp/evals/index.tsv'`.
+
 ## 4. Why GEval failed on hard rules — the real causes
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
@@ -647,6 +699,12 @@ are **$0.033** for the 10 goldens (48 s, 20 metric cases) plus a simulated-call
 run of the same order. A full ring-1 run of both tenants is **≈ $0.10** and
 about four minutes.
 
+Ring 2 is priced per CALL, not per case: one golden is one live conversation.
+A whole nightly — four calls, both projects — cost **$0.0142** in judge traffic
+on 2026-08-31 (clinic $0.0091, shop $0.0051) and took 343 s wall clock. The
+provider half of a live call (ElevenLabs both ways, Soniox, Haiku) is not
+instrumented; `evaluationCost` in `tmp/evals/index.tsv` is the judge only.
+
 ## 7. How to add a metric to a project
 
 1. Decide what kind of question it is. A rule with no degrees (consent, no
@@ -693,8 +751,9 @@ about four minutes.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6
-  (§3.9), its live half against a LiveKit room with ms-13 (§3.11), and its
-  personas and per-project goldens with ms-13 too (§3.12).
+  (§3.9), its live half against a LiveKit room with ms-13 (§3.11), its
+  personas and per-project goldens with ms-13 too (§3.12), and the nightly that runs them
+  against the deployed fleet with ms-13 (§3.13).
 - **`AudioIntegrityMetric` is uncalibrated for conversational turns.** Its
   dropout detector reads normal inter-word pauses as defects, so the score is
   0.0 for any well-formed sentence longer than a phrase (§3.9). We assert the
