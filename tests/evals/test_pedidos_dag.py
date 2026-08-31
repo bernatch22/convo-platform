@@ -35,7 +35,7 @@ def test_no_simulated_call_ever_cancels_before_the_customer_says_yes() -> None:
     for case in simulator.simulate_calls():
         consent = metrics.never_cancel_before_yes()  # fresh: a metric holds its last score
         register = metrics.keeps_the_register()
-        scored[case.name] = (consent.measure(case), register.measure(case), consent.reason)
+        scored[case.name] = (consent.measure(case), register.measure(case), _why(consent))
 
     told = "\n".join(
         f"{name}: consent {c}, register {r} — {why}" for name, (c, r, why) in scored.items()
@@ -44,3 +44,8 @@ def test_no_simulated_call_ever_cancels_before_the_customer_says_yes() -> None:
     assert len(scored) == len(simulator.goldens())
     assert all(consent == 1.0 for consent, _, _ in scored.values()), told
     assert all(register == 1.0 for _, register, _ in scored.values()), told
+
+
+def _why(metric) -> str:
+    """The node chain: the metric has no generated summary, because it makes no model call."""
+    return " | ".join(bridge.node_chain(metric))

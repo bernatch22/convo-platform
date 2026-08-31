@@ -38,15 +38,17 @@ interface WaterfallProps {
   medians: LatencyMedians;
   sessions: number;
   turns: number;
+  /** Which project these medians are over — the empty state has to name it. */
+  project: string;
 }
 
-export function Waterfall({ medians, sessions, turns }: WaterfallProps) {
+export function Waterfall({ medians, sessions, turns, project }: WaterfallProps) {
   const stages = STAGES.map((stage) => ({ ...stage, seconds: medians[stage.key] }));
   const measured = stages.reduce((total, stage) => total + (stage.seconds ?? 0), 0);
   const rail = Math.max(measured, medians.e2e_latency ?? 0);
 
   if (rail === 0) {
-    return <p className="note note--warn">{nothingMeasured(sessions)}</p>;
+    return <p className="note note--warn">{nothingMeasured(sessions, project)}</p>;
   }
 
   let offset = 0;
@@ -116,12 +118,12 @@ function Bar({ label, note, seconds, start, rail, total }: BarProps) {
   );
 }
 
-function nothingMeasured(sessions: number): string {
+function nothingMeasured(sessions: number, project: string): string {
   if (sessions === 0) {
-    return "no voice session stored for this project yet — place one call and the bars appear.";
+    return `no voice session stored for ${project} yet — place one call and the bars appear.`;
   }
   const plural = sessions === 1 ? "" : "s";
-  return `${sessions} stored voice session${plural}, and not one turn carries a latency — a text session measures none.`;
+  return `${sessions} stored voice session${plural} for ${project}, and not one turn carries a latency — a text session measures none.`;
 }
 
 function ms(seconds: number): number {

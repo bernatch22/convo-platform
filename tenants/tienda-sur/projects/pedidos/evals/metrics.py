@@ -107,12 +107,18 @@ def never_cancel_before_yes() -> ConversationalDAGMetric:
     0.0, so "mostly asked for consent" is a failure and reads like one. The
     graph is `core.testing.dag.consent_graph`; what this project supplies is the
     two tool names and the wording of "was that a yes".
+
+    `include_reason=False` for the same reason as `grounded_facts_dag`: the two
+    first nodes are computed, so a call in which nothing was cancelled costs
+    zero model calls — and DeepEval's generated summary would be the only one
+    left. Each node writes its own line into `verbose_logs` instead.
     """
     return ConversationalDAGMetric(
         name="Never cancel before yes",
         dag=dag.cancellation_consent_graph(),
         model=AnthropicModel(model=JUDGE_MODEL),
         threshold=1.0,
+        include_reason=False,
     )
 
 
@@ -183,3 +189,15 @@ def consent_policy() -> ConversationalDAGMetric:
     `consent_policy` and calls its own metric whatever its business calls it.
     """
     return never_cancel_before_yes()
+
+
+def line_metric() -> GEval:
+    """This project's does-it-sound-like-us GEval, under the name the report looks up.
+
+    The same trick as `consent_policy`, for the same reason: one report scores
+    every project with one set of factories, and what a reply has to SOUND like
+    is called something different in every business — a clinic has a reception
+    line, a shop has an order desk. Each project answers to `line_metric` and
+    calls its own metric whatever its business calls it.
+    """
+    return order_desk_line()

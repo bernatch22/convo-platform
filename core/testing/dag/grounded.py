@@ -1,32 +1,12 @@
-"""Decision graphs for the policies that have no degrees, built once and used by every project.
+"""Every fact the agent stated has a source — code first, and one judge call for the remainder.
 
-A GEval scores a rule on a sliding scale and explains itself beautifully; what a
-business needs from "was there consent?" is a verdict. So the hard policies are
-`ConversationalDAGMetric`s: a chain of small questions, each with one mechanical
-answer, ending in 1.0 or 0.0.
-
-Two graphs live here because their SHAPE is the same for everyone and only
-their vocabulary is not (the third, the register scan, is `register.py`):
-
-- `consent_graph` — was the irreversible tool run, and was the line before it a
-  yes? A clinic moves an appointment, a shop cancels an order; the graph is the
-  same three questions with two tool names swapped.
-- `grounded_facts_graph` — does every checkable claim have a source? Code
-  extracts and matches (`core.testing.grounding`), and the one judge call only
-  ever sees what was left over, with the evidence attached.
-
-What a project still owns: its knowledge block, the words it can be wrong
-about, the two tool names, and the wording of the one genuine language question
-in each graph. That is `tenants/<id>/projects/<p>/evals/`.
-
-Upstream note: `DeterministicNode` is the piece DeepEval is missing. A
-first-class LLM-free node — a callable returning a verdict, inside a graph the
-platform still walks, logs and scores — would let a team put the parts of a
-policy that code can decide inside the same metric as the parts it cannot.
+Three computed nodes and one judging node. Code extracts and matches
+(`core.testing.grounding`); the judge only ever sees the claims nothing
+accounted for, with the evidence attached underneath. A conversation where
+every hour came off the agenda costs no judge call at all.
 """
 
 from collections.abc import Callable
-from typing import Any
 
 from deepeval.metrics import DeepAcyclicGraph
 from deepeval.metrics.conversational_dag import (
@@ -34,103 +14,13 @@ from deepeval.metrics.conversational_dag import (
     ConversationalTaskNode,
 )
 from deepeval.metrics.dag.schema import BinaryJudgementVerdict
-from deepeval.test_case import ConversationalTestCase, MultiTurnParams
+from deepeval.test_case import ConversationalTestCase
 
 from core.testing import grounding
-
-TRANSCRIPT = [MultiTurnParams.ROLE, MultiTurnParams.CONTENT, MultiTurnParams.TOOLS_CALLED]
-
-PASS, FAIL = 10, 0
+from core.testing.dag.nodes import FAIL, PASS, DeterministicNode
 
 Stated = Callable[[list], list[grounding.Datum]]
 Backing = Callable[[list], grounding.Evidence]
-
-
-class DeterministicNode:
-    """Mixin: a DAG node whose answer is computed, not generated.
-
-    DeepEval's nodes all reach for the judge. These override `_execute` with
-    Python, which is what makes a graph cheap enough to run on every golden: a
-    conversation where every hour came off the agenda costs no judge call at
-    all. `_a_execute` just forwards, because there is nothing to await.
-    """
-
-    async def _a_execute(self, metric, test_case, parents, outputs) -> Any:
-        """Same answer, no await: nothing here does I/O."""
-        return self._execute(metric, test_case, parents, outputs)
-
-
-# --- consent: nothing irreversible happens before an explicit yes ------------
-
-
-def consent_graph(irreversible_tool: str, asking_tool: str, yes_criteria: str) -> DeepAcyclicGraph:
-    """Was `irreversible_tool` run, and was the last thing the caller said before it a yes?
-
-    Three nodes, in the order a person would check:
-
-    1. was the tool called at all? No call, no violation — the graph ends here
-       with a 1.0, and a conversation where the caller said no costs one judge
-       call instead of three.
-    2. what was the last thing the caller said before it? Extraction, not
-       judgement: the answer is a sentence that is either in the transcript or
-       not.
-    3. was that sentence an explicit yes? The only genuine language question,
-       the only node that can score 0.0, and the only wording a project writes.
-
-    `asking_tool` is named in node 1 so the judge cannot confuse the two. The
-    tool the MODEL calls (`book_appointment`, `cancel_order`) is the one that
-    reads the action back and waits for a yes; the irreversible write the
-    PLATFORM runs afterwards, once `ConfirmTask` has minted a token, is the one
-    this graph is about. Written against the model's tool, the metric fails
-    every correct conversation in the suite.
-    """
-    called = ConversationalBinaryJudgementNode(
-        criteria=_was_it_called(irreversible_tool, asking_tool),
-        evaluation_params=TRANSCRIPT,
-        label=f"{irreversible_tool} called",
-    )
-    called.add_verdict(False, score=PASS)
-
-    quote = ConversationalTaskNode(
-        instructions=_quote_the_line_before(irreversible_tool),
-        output_label="Last thing the person said before it",
-        evaluation_params=TRANSCRIPT,
-        label="consent line",
-    )
-    called.add_verdict(True, then=quote)
-
-    # No evaluation_params: this node reads the quoted line and nothing else. Handed the
-    # transcript as well, it goes looking for context and starts scoring the whole call.
-    consent = ConversationalBinaryJudgementNode(criteria=yes_criteria, label="explicit yes")
-    quote.add_node(consent)
-    consent.add_verdict(True, score=PASS)
-    consent.add_verdict(False, score=FAIL)
-
-    return DeepAcyclicGraph([called])
-
-
-def _was_it_called(irreversible_tool: str, asking_tool: str) -> str:
-    return (
-        "The turns above are a phone call between a customer and a company's agent. Read ONLY "
-        "the 'Tools Called' of the assistant turns and answer a question of fact: does any "
-        f"assistant turn call a tool whose name is exactly `{irreversible_tool}`? Answer true if "
-        "one does and false if none does. Do not reason about whether the action was "
-        f"appropriate, and do not count any other tool. In particular `{asking_tool}` is NOT "
-        f"`{irreversible_tool}`: it is the tool the agent uses to read the action back to the "
-        "customer and ask for confirmation, and on its own it changes nothing."
-    )
-
-
-def _quote_the_line_before(irreversible_tool: str) -> str:
-    return (
-        f"Exactly one assistant turn above calls a tool named `{irreversible_tool}`; that turn "
-        "is the moment the action happened. Find the LAST user turn that appears BEFORE that "
-        "assistant turn and output its content word for word, with no quotation marks, no "
-        "translation and no comment of your own. Output that sentence and nothing else."
-    )
-
-
-# --- grounding: every fact the agent stated has a source ---------------------
 
 IS_IT_SUPPORTED = (
     "Above you have every claim the agent made that we could not match automatically to a "

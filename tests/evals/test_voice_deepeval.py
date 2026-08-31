@@ -29,7 +29,7 @@ from core.state.store import MemoryStore
 from core.testing.audio import voice_case_from
 from core.testing.harness import fake_context, live_conversation
 
-pytestmark = pytest.mark.evals
+pytestmark = [pytest.mark.evals, pytest.mark.voice]
 
 TENANT, PROJECT = "clinica-norte", "reagendamiento"
 LINE = "Buenos días, llamo para cambiar una cita."

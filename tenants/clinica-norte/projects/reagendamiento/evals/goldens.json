@@ -11,6 +11,11 @@
     "expected_tools": []
   },
   {
+    "input": "hola, ¿qué día es hoy?",
+    "expected_behaviour": "Dice que hoy es martes 1 de septiembre de 2026, sin inventar otro día ni otra fecha, y sigue atendiendo la llamada.",
+    "expected_tools": []
+  },
+  {
     "input": "¿qué turnos hay el jueves?",
     "before": [
       "Soy Ana García Ruiz, mi teléfono es el 600123456"

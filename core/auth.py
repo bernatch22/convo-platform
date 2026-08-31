@@ -12,16 +12,69 @@ without the caller ever learning that somebody joined. `mint_caller` is the
 third: full publish rights into a room that already dispatches its own agent,
 which is how a synthetic caller (ring 2) gets in.
 
+`mint_supervisor` is that idea with a role on it. One human, one identity
+(`sup:<uid>`), three capabilities, and one grant shape per capability — so
+what a supervisor may do in a room is decided here, by the signature on a
+token, and not by anything the browser sends afterwards. The tokens are
+short-lived by design: a supervisor's ticket outliving the call it was minted
+for is a standing key to a room.
+
 Open source note: `mint_session` is a generic recipe for explicit agent
-dispatch on livekit-agents 1.7 — a JWT from plain args, no server round-trip.
+dispatch on livekit-agents 1.7 — a JWT from plain args, no server round-trip;
+`mint_supervisor` is the same recipe for role-scoped humans.
 """
 
+import datetime
 import os
 import uuid
+from typing import Literal
 
 from livekit import api
 
 from core.contracts import SessionMeta
+from core.security.supervisor import SUPERVISOR_PREFIX
+
+# What a supervisor asked to be allowed to do. The grants below are the answer.
+SupervisorCapability = Literal["listen", "whisper", "takeover"]
+
+# Short-lived on purpose: long enough to walk into a call, too short to keep.
+SUPERVISOR_TTL = datetime.timedelta(minutes=15)
+
+# One row per capability — the whole difference between listening and taking the line.
+_SUPERVISOR_GRANTS: dict[str, dict[str, bool]] = {
+    # Hears the room and reads its transcription; no microphone, no data, not in the list.
+    "listen": {
+        "can_publish": False,
+        "can_publish_data": False,
+        "can_subscribe": True,
+        "hidden": True,
+    },
+    # Still silent and still hidden, but may send data — the channel a whisper travels on.
+    "whisper": {
+        "can_publish": False,
+        "can_publish_data": True,
+        "can_subscribe": True,
+        "hidden": True,
+    },
+    # The human takes the line: a real microphone, and a participant the caller can see.
+    "takeover": {
+        "can_publish": True,
+        "can_publish_data": True,
+        "can_subscribe": True,
+        "hidden": False,
+    },
+}
+
+
+def public_url() -> str:
+    """The LiveKit URL a BROWSER connects to — public and TLS behind Caddy.
+
+    The worker joins over `LIVEKIT_URL` (loopback on the box, `ws://127.0.0.1:7880`);
+    a browser cannot use that, so a session token carries `LIVEKIT_PUBLIC_URL`
+    (`wss://lk.bernardocastro.dev`) when set, and falls back to `LIVEKIT_URL`
+    for the laptop stack where the two are the same.
+    """
+    return os.getenv("LIVEKIT_PUBLIC_URL") or os.getenv("LIVEKIT_URL", "ws://localhost:7880")
 
 
 def mint_session(meta: SessionMeta, user_id: str = "anonymous") -> dict[str, str]:
@@ -37,7 +90,7 @@ def mint_session(meta: SessionMeta, user_id: str = "anonymous") -> dict[str, str
         .with_room_config(api.RoomConfiguration(agents=[dispatch]))
         .to_jwt()
     )
-    return {"url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"), "room": room, "token": token}
+    return {"url": public_url(), "room": room, "token": token}
 
 
 def mint_observer(room: str) -> dict[str, str]:
@@ -68,7 +121,7 @@ def mint_observer(room: str) -> dict[str, str]:
         .to_jwt()
     )
     return {
-        "url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
+        "url": public_url(),
         "room": room,
         "identity": identity,
         "token": token,
@@ -105,6 +158,47 @@ def mint_caller(room: str, tenant: str, identity: str = "caller") -> dict[str, s
         "url": os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
         "room": room,
         "identity": identity,
+        "token": token,
+    }
+
+
+def mint_supervisor(
+    room: str, capability: SupervisorCapability = "listen", user_id: str = ""
+) -> dict[str, str]:
+    """Mint one supervisor's short-lived ticket into ONE live room, scoped to one capability.
+
+    → `{url, room, identity: "sup:<uid>", capability, token}`
+
+    The identity is the trust anchor: the SFU puts it on every packet and RPC
+    the supervisor sends, the agent gates on it with
+    `core.security.supervisor.is_supervisor`, and nothing in a payload can
+    forge it. A signed `{"role": "supervisor", "cap": …}` attribute rides
+    along so a reader that already trusts the identity can also see which
+    powers were handed out, without decoding the grants.
+
+    The same human keeps the same identity across capabilities on purpose:
+    LiveKit admits one connection per identity, so swapping a `listen` ticket
+    for a `takeover` one upgrades the participant already in the room instead
+    of adding a second ghost of the same person.
+    """
+    grants = _SUPERVISOR_GRANTS.get(capability)
+    if grants is None:
+        known = sorted(_SUPERVISOR_GRANTS)
+        raise ValueError(f"unknown supervisor capability {capability!r}; known: {known}")
+    identity = f"{SUPERVISOR_PREFIX}{user_id or uuid.uuid4().hex[:8]}"
+    token = (
+        api.AccessToken(os.getenv("LIVEKIT_API_KEY", "devkey"), _secret())
+        .with_identity(identity)
+        .with_attributes({"role": "supervisor", "cap": capability})
+        .with_ttl(SUPERVISOR_TTL)
+        .with_grants(api.VideoGrants(room_join=True, room=room, **grants))
+        .to_jwt()
+    )
+    return {
+        "url": public_url(),
+        "room": room,
+        "identity": identity,
+        "capability": capability,
         "token": token,
     }
 

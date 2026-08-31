@@ -6,6 +6,11 @@ without a yes" is actually proved, because a refusal that depends on a model
 changing its mind is not a guarantee. The tests at the bottom put a real Claude
 Haiku in front of the prompts and walk the whole call; they are skipped without
 a key.
+
+They assert facts and never opinions: which tools ran, in what order, what the
+agenda holds afterwards, whether an SMS went out. Nothing in this file asks a
+judge whether a sentence was good enough — that question belongs to the evals
+ring, where a flip costs a re-run and not a red build.
 """
 
 import importlib
@@ -13,7 +18,7 @@ import importlib
 import pytest
 
 from core import confirm
-from core.testing import fake_context, final_message, run_conversation, text_of
+from core.testing import fake_context, run_conversation, text_of
 from core.tools.contract import SideEffect
 from core.tools.guard import ToolRefused
 from core.tools.saga import SagaFailed
@@ -242,11 +247,22 @@ async def test_a_yes_books_the_hour_and_writes_to_the_patient(tc) -> None:
 
 
 @needs_llm
-async def test_a_refused_hour_leaves_the_old_appointment_standing(tc, judge_llm) -> None:
-    """The 13:00 slot of 2026-09-08 is always refused; the caller must be told the truth."""
+async def test_a_refused_hour_leaves_the_old_appointment_standing(tc) -> None:
+    """The 13:00 slot of 2026-09-08 is always refused: the saga compensates and nobody is told.
+
+    What this test owns is the STATE after the refusal — the three calls in
+    order, the appointment still standing, no SMS — and all three are facts a
+    reader can check without asking anybody's opinion. What the receptionist
+    then SAYS to the patient is the other half of the same defect, and it used
+    to be judged right here; it failed once and passed once across two
+    consecutive full runs, which is what a coin flip in a gate looks like. It
+    now lives in `tests/evals/test_refused_booking_deepeval.py`, scored by the
+    project's `no_false_success` metric with the refused write in front of the
+    judge as evidence.
+    """
     agenda, sms = tc.adapters["agenda"], tc.adapters["sms"]
 
-    conversation = await run_conversation(
+    await run_conversation(
         tc,
         ["¿qué huecos hay el martes con traumatología?", "la primera que me ha dicho", "sí"],
         choosing(tc),
@@ -255,11 +271,6 @@ async def test_a_refused_hour_leaves_the_old_appointment_standing(tc, judge_llm)
     assert [c[0] for c in agenda.calls][-3:] == ["cancel_slot", "book_slot", "rebook_slot"]
     assert agenda.book[ANA]["status"] == "booked"
     assert sms.sent == []
-    await final_message(conversation.results[2]).judge(
-        judge_llm,
-        intent="dice que no ha podido reservarse esa hora y que la cita anterior del paciente "
-        "sigue en pie, y le ofrece otra hora; no dice en ningún caso que el cambio esté hecho",
-    )
 
 
 @needs_llm

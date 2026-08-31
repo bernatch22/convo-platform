@@ -14,6 +14,7 @@ import { PipelineControls } from "../components/PipelineControls";
 import { LlmLeg, SttLeg, TtsLeg } from "../components/PipelineLegs";
 import { Waterfall } from "../components/Waterfall";
 import { ApiError, getPipeline, listTenants, type PipelineSnapshot } from "../lib/api";
+import { voiceName } from "../lib/voices";
 
 import { useShellData } from "./Shell";
 
@@ -111,6 +112,7 @@ function Loaded({ snapshot }: { snapshot: PipelineSnapshot }) {
           medians={shown.latency.medians}
           sessions={shown.latency.sessions}
           turns={shown.latency.turns}
+          project={`${shown.tenant}/${shown.project}`}
         />
       </section>
 
@@ -121,6 +123,13 @@ function Loaded({ snapshot }: { snapshot: PipelineSnapshot }) {
       </section>
     </>
   );
+}
+
+/** A stored value as a human reads it: a voice id leads with the account name it belongs to. */
+function overrideValue(field: string, value: string): string {
+  if (!value) return "(empty)";
+  const named = field === "voice" ? voiceName(value) : null;
+  return named ? `${named} · ${value}` : value;
 }
 
 function Overrides({ snapshot }: { snapshot: PipelineSnapshot }) {
@@ -147,7 +156,7 @@ function Overrides({ snapshot }: { snapshot: PipelineSnapshot }) {
           {snapshot.overrides.map((row) => (
             <tr key={row.field}>
               <td className="mono">{row.field}</td>
-              <td className="mono">{row.value || "(empty)"}</td>
+              <td className="mono">{overrideValue(row.field, row.value)}</td>
               <td className="mono dim">{new Date(row.updated_at * 1000).toLocaleString()}</td>
             </tr>
           ))}

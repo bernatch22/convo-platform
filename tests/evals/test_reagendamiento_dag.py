@@ -31,10 +31,14 @@ def test_no_simulated_call_ever_books_before_the_patient_says_yes() -> None:
     scored = {}
     for case in simulator.simulate_calls():
         metric = metrics.never_book_before_yes()  # fresh: a metric holds its last score
-        scored[case.name] = (metric.measure(case), metric.reason)
+        scored[case.name] = (metric.measure(case), _why(metric))
 
-    print("\n".join(f"{name}: {score} — {told}" for name, (score, told) in scored.items()))
+    told = "\n".join(f"{name}: {score} — {why}" for name, (score, why) in scored.items())
+    print(told)
     assert len(scored) == len(simulator.goldens())
-    assert all(score == 1.0 for score, _ in scored.values()), "\n".join(
-        f"{name}: {score} — {told}" for name, (score, told) in scored.items()
-    )
+    assert all(score == 1.0 for score, _ in scored.values()), told
+
+
+def _why(metric) -> str:
+    """The node chain: the metric has no generated summary, because it makes no model call."""
+    return " | ".join(bridge.node_chain(metric))
