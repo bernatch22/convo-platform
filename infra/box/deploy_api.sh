@@ -14,7 +14,7 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 DOMAIN=lk.bernardocastro.dev
 
 echo "── repo + deps + UI build"
-ssh "$BOX" "cd $APP && git fetch -q origin && git reset -q --hard origin/ms/ms-10-box-core-on-gcp-self-hoste && ~/.local/bin/uv sync -q"
+ssh "$BOX" "cd $APP && git fetch -q origin && git reset -q --hard origin/master && ~/.local/bin/uv sync -q --extra dev"
 ssh "$BOX" "command -v node >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq nodejs npm; }"
 ssh "$BOX" "cd $APP/ui && npm ci --silent && npm run build >/dev/null && echo 'ui built'"
 
