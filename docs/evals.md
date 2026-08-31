@@ -857,6 +857,43 @@ position so a run filed late by CI never diffs against a future.
   context through the real Anthropic formatter and asserts no message says the
   date and no system block carries it — keyless. Every golden stayed exactly as
   it was; one was ADDED («hola, ¿qué día es hoy?»).
+- ~~A supervisor's whisper does not bend Haiku: only the refusal is pinned,
+  the positive claim is not.~~ **Closed in `tk-bc0122`**, and the delivery was
+  never the problem. Three cells decide it, each measured 3 runs on Haiku 4.5
+  in BOTH demo projects:
+
+  | what the steer asks for | mode | obeyed |
+  |---|---|---|
+  | change how you do the step you are on («no le pidas el teléfono») | `inject` | 3/3 (0/3 with no steer) |
+  | the same, against a script that names the order («búscalo por el móvil») | `inject` | 0/3 → **3/3 with the protocol in the prefix** |
+  | say something the caller did not ask for («avísale del retraso») | `inject` | 0/3, and not deferred |
+  | the same note | `inject_and_speak` | 3/3 |
+
+  Two findings, and the first one is the opposite of `tk-097125`'s. **A steer
+  must be obeyed, and Haiku obeys a speaker, not a document**: delivered as the
+  paired tool call + result that carries the session date so well, the same
+  note lands 1/3 where the mid-conversation instruction lands 3/3. A tool
+  result is evidence; an instruction is somebody telling you to do something.
+  So `NOTE_ROLE` stays `"system"` — which livekit renders as a `role="user"`
+  `<instructions>` turn, in position, never in the `system` param, so the
+  cached prefix survives a whisper byte for byte (pinned keyless in
+  `tests/test_supervisor_note.py`).
+
+  The second: what actually beat the whisper was the **stage prompt**, and the
+  fix is a paragraph in the cached prefix — `core.security.protocol.SUPERVISOR_PROTOCOL`,
+  appended by every project's `stage_prompt` — that tells the persona these
+  instructions exist and outrank its own script. Fixed text, so it rides inside
+  the ≥4096-token prefix and costs nothing per turn.
+
+  Also measured, and a trap for the next person: a tool pair whose tool is not
+  DECLARED on the agent is silently dropped by `update_chat_ctx`
+  (`exclude_invalid_function_calls=True` by default, and forcing it `False`
+  only survives until the next update). Two of the probe's cells measured an
+  empty context before that was noticed.
+
+  Goldens: `tests/evals/test_supervisor_steer_deepeval.py` — the positive steer,
+  the note the supervisor wants said, and the refusal that was already there.
+  Four consecutive green runs.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6

@@ -10,8 +10,14 @@ tool call loses its result and the next request comes back 400. So a steer is
 QUEUED and flushed at a turn boundary — either immediately, when the floor is
 free, or from `TenantAgent.on_user_turn_completed`, which is the framework's
 own boundary and runs before the reply is generated. The swap itself mirrors
-`_enqueue_reply`: copy the context, add a system message, `sanitize_tool_pairing`,
-hand the whole thing to `update_chat_ctx`.
+`_enqueue_reply`: copy the context, add the note as a mid-conversation
+instruction, `sanitize_tool_pairing`, hand the whole thing to `update_chat_ctx`.
+
+**Whether the model then obeys it is not a matter of delivery.** That was
+measured, cell by cell, in `core.security.protocol` — read it before changing
+`NOTE_ROLE` or moving the note into a tool result, because the answer is the
+opposite of the one `core.dates_note` reached for the session date, and the
+lever that actually decides it is a paragraph in the project's cached prefix.
 
 **Takeover is a mute, not a pause.** There is no `session.pause()` in
 livekit-agents 1.7.1 (grepped; absent). What exists is the recipe below:
@@ -43,6 +49,11 @@ from typing import Any
 
 from core.barge_in import holds_the_floor
 from core.history import sanitize_tool_pairing
+from core.security.protocol import (
+    RESUME_INSTRUCTIONS,
+    SPEAK_INSTRUCTIONS,
+    STEER_PREFACE,
+)
 from core.security.supervisor import RELEASE, STEER, TAKEOVER, TRANSFER, is_supervisor
 from core.state.log import record
 from core.telephony.handover import Handover
@@ -50,24 +61,22 @@ from core.telephony.transfer import COLD, WARM, TransferRefused
 
 log = logging.getLogger("platform.supervisor")
 
-# What a steer may ask for. `inject` waits for the agent's own next turn;
-# `inject_and_speak` asks for one as soon as the floor is free.
+# What a steer may ask for, and they are NOT interchangeable (measured, tk-bc0122):
+# `inject` waits for the agent's own next turn, where the stage script owns what is
+# said — it changes HOW the agent does what it is doing, and it cannot add a sentence
+# the caller did not ask for (0/3). `inject_and_speak` asks for a turn whose only
+# content is the note, which is how "tell him about the delay" gets said (3/3).
 STEER_MODES = ("inject", "inject_and_speak")
 
-# A whisper is a system message, never a user one: it is not something the caller said.
+# The framework's mid-conversation instruction channel. It is NOT a system message on
+# the wire: livekit-agents keeps only the first system item as one and renders every
+# later one as a `role="user"` turn wrapped in `<instructions>`. That is exactly why a
+# whisper binds — a steer has to be OBEYED, and Haiku obeys a speaker, not a document
+# (the same tool-result shape that carries the session date lands 1/3 here). It also
+# keeps the note out of the top-level `system` param, so the cached prefix survives it.
+# The paragraph that makes the model rank it above the stage script lives in
+# `core.security.protocol.SUPERVISOR_PROTOCOL`, inside that cached prefix.
 NOTE_ROLE = "system"
-
-STEER_PREFACE = "Nota interna del supervisor (el cliente no la ha oído): "
-
-SPEAK_INSTRUCTIONS = (
-    "Actúa ahora sobre la última nota interna del supervisor. "
-    "No menciones que existe ni que hay otra persona escuchando."
-)
-
-RESUME_INSTRUCTIONS = (
-    "Vuelves a llevar tú la conversación. Retoma donde se quedó, "
-    "sin repetir lo que la persona que intervino ya dijo."
-)
 
 _HANDED_BACK = "Un supervisor humano tomó la línea y habló con el cliente. "
 
@@ -127,6 +136,13 @@ class SupervisorControl:
 
         → `{"verb", "queued": bool, "spoke": bool}` — `queued` is True when the
         agent was mid-sentence and the note is waiting for the boundary.
+
+        `mode` is the honest half of the API. `inject` bends the agent's next
+        answer — «no le pidas el teléfono», «búscalo por el móvil» — and it
+        cannot make the agent volunteer something the caller did not ask for,
+        because the stage prompt owns that turn. A note the supervisor wants
+        SAID («avísale de que hoy vamos con retraso») needs `inject_and_speak`,
+        which buys a turn of its own for it.
         """
         note = text.strip()
         mode = mode or "inject"

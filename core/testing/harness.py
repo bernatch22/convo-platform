@@ -180,6 +180,31 @@ class LiveCall:
         )
         return result
 
+    def lines_said(self) -> list[str]:
+        """Everything the agent has said so far, greeting included, in order."""
+        return [
+            item.text_content or ""
+            for item in self.session.history.items
+            if getattr(item, "role", None) == "assistant" and (item.text_content or "").strip()
+        ]
+
+    async def next_line(self, after: int, timeout: float = 25.0) -> str:
+        """Wait for a line the agent speaks on its OWN — nobody said anything to it.
+
+        `after` is `len(call.lines_said())` from before whatever triggered it: a
+        supervisor's `inject_and_speak`, a release, a timeout prompt. Those lines
+        never come back through `say`, because there is no turn to attach them
+        to. Empty string when the agent stayed silent for `timeout` seconds,
+        which is an answer too — the assertion belongs to the test.
+        """
+        deadline = asyncio.get_event_loop().time() + timeout
+        while asyncio.get_event_loop().time() < deadline:
+            if len(self.lines_said()) > after:
+                await asyncio.sleep(1.0)  # let the rest of the turn land
+                return " ".join(self.lines_said()[after:])
+            await asyncio.sleep(0.25)
+        return ""
+
 
 class RecordingExecutor:
     """A `ToolExecutor` that also writes down every platform tool the current turn ran.
