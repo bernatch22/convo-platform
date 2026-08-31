@@ -53,7 +53,7 @@ class FakeDispatch:
 def sfu(monkeypatch) -> FakeDispatch:
     """A LiveKit API client that records the dispatch instead of making one."""
     fake = FakeDispatch()
-    monkeypatch.setattr(rooms, "_client", lambda: fake)
+    monkeypatch.setattr(rooms, "client", lambda: fake)
     return fake
 
 

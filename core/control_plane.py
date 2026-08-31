@@ -20,6 +20,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from core.rooms import EVAL_PREFIX
+from core.scoring.report import already_scored
 from core.state.events import Event
 from core.state.store import SessionRow, Store
 
@@ -165,6 +166,7 @@ def _row_view(store: Store, row: SessionRow, events: list[Event] | None = None) 
         "turns": sum(1 for e in events if e.kind.startswith("turn.")),
         "cost_eur": _cost(events),
         "phone": _phone_of(events),
+        "score": already_scored(events),
     }
 
 
