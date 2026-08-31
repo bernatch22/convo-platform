@@ -3,23 +3,79 @@
 
     <div class="head-block" data-anim="1">
       <div class="eyebrow">09 <span class="sep">·</span> Entregable 8 — integración con sistemas externos</div>
-      <h2 class="head">Integraciones y el protocolo remote-tenant</h2>
+      <h2 class="head" style="max-width:44ch">Su agente vive en su proyecto; nuestro core le da vida a todos</h2>
+      <p class="lede">
+        Integrar no es abrirnos un puerto en su red: es que su proceso salga hacia nosotros. El
+        cliente se queda con su código y sus datos; nosotros, con el runtime, el guard, el log y
+        el consentimiento. La autoridad no se muda.
+      </p>
     </div>
 
-    <div class="todo" data-anim="2">
-      <div class="who">Sin escribir <span class="sep">·</span> card tk-f0aadc <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
-      <ul>
-        <li>Hoy: el tenant es un paquete en nuestro árbol. Puertos de adapter, el registry, el adapter REST genérico. Honestos sobre lo que eso le cuesta al cliente.</li>
-        <li>Mañana: el agente del cliente corre en SU proceso, conectado por un WebSocket SALIENTE — ni agujero de firewall entrante ni webhook que asegurar.</li>
-        <li>Core pasa a ser el runtime que le da vida.</li>
-        <li>Las tramas, escritas: hello / register(manifest) / invoke / result, y qué ocurre si se cae la conexión a mitad de un invoke.</li>
-        <li>Por qué saliente y no webhooks, en una línea sobre quién tiene que abrir un puerto. Los specs de las cards dropeadas de ms-12 son el insumo.</li>
-      </ul>
-      <div class="note"><b>Figura:</b> El bloque .compare: hoy a la izquierda, mañana a la derecha, con las mismas etiquetas de fila. Lámina profunda.</div>
-      <div class="note">
-        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
-        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+    <div class="compare fill" data-anim="2">
+
+      <div style="padding:20px 26px">
+        <div class="when">Hoy <span class="tag ok">en producción</span></div>
+        <dl class="kv">
+          <dt>dónde corre</dt>
+          <dd>El tenant es un paquete en nuestro árbol: <code>tenants/&lt;t&gt;/</code>, un
+            <code>Adapter</code> por sistema suyo y las tools declaradas en su proyecto.</dd>
+          <dt>quién abre</dt>
+          <dd>Nadie: salimos nosotros hacia su API. Mientras no la haya, el adapter es un doble
+            con la misma firma y todo lo de arriba ya funciona.</dd>
+          <dt>qué cuesta</dt>
+          <dd>El cliente depende de nuestro ciclo de release: cambiar una tool suya es un
+            despliegue nuestro y una revisión nuestra.</dd>
+          <dt>no cambia</dt>
+          <dd><b>guard</b> · <b>log</b> · <b>consentimiento</b> · <b>máscara PII</b></dd>
+        </dl>
       </div>
+
+      <div style="padding:20px 26px">
+        <div class="when">Mañana <span class="tag warn">diseñado, no implementado</span></div>
+        <dl class="kv">
+          <dt>dónde corre</dt>
+          <dd>El tenant vive en el proceso del cliente: sus etapas, sus tools y sus prompts,
+            hablando con nosotros a través del SDK.</dd>
+          <dt>quién abre</dt>
+          <dd>Él, y hacia fuera: un WebSocket <b>saliente</b> contra el plano de control. Ni
+            agujero de firewall entrante ni webhook que firmar y rotar.</dd>
+          <dt>qué cuesta</dt>
+          <dd>Un protocolo versionado que mantener y una conexión viva por tenant: la segunda
+            sustituye a la primera, cerrada con motivo.</dd>
+          <dt>no cambia</dt>
+          <dd><b>guard</b> · <b>log</b> · <b>consentimiento</b> · <b>máscara PII</b></dd>
+        </dl>
+      </div>
+
+    </div>
+
+    <div class="grid-7-5" data-anim="3">
+      <pre class="code">→  <b>hello</b>          {tenant, sdk, proto}
+→  <b>register</b>       {manifest: stages · tools[{name, schema, ToolSpec}] · prompts_hash}
+⇄  <b>ping / pong</b>    la conexión ES el registro: sin latido, el tenant no es enrutable
+←  <b>session.start</b>  {session_id, project, channel}
+←  <b>invoke</b>         {invocation_id, tool, args, deadline}
+→  <b>result</b>         {invocation_id, payload}
+→  <b>fail</b>           {invocation_id, message, retriable}</pre>
+      <div class="note">
+        <b>→</b> del cliente a core · <b>←</b> de core al cliente. Caída a mitad de un
+        <code>invoke</code>: el <code>deadline</code> es el <code>timeout_s</code> del
+        <code>ToolSpec</code>; vencido, <code>ToolError</code> y la etapa ofrece un humano.
+        <b>Lo que no viaja:</b> <code>guard.check</code> rechaza una tool
+        <code>irreversible</code> sin <code>confirmation_token</code> antes de que salga un byte;
+        el log append-only sigue siendo nuestro y un argumento en <code>pii_scope</code> nunca
+        llega entero a él.
+      </div>
+    </div>
+
+    <div class="proof" data-anim="4">
+      <b>Validación.</b> El hueco ya existe en el código: <b>ToolExecutor</b> es un
+      <span class="n">Protocol</span> en <b>core/tools/executor.py</b> y <b>LocalExecutor</b> es
+      hoy su única implementación — un ejecutor remoto es una segunda clase y nada por encima de
+      esa línea cambia. El protocolo está especificado en las cards
+      <span class="n">tk-1265f0</span> · <span class="n">tk-061906</span> ·
+      <span class="n">tk-8289fb</span> del hito ms-12, hoy sin implementar: es la fase siguiente
+      del roadmap (lámina 14).
     </div>
 
   </div>
