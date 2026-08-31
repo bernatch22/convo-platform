@@ -1578,6 +1578,60 @@ right; the shop's to say that «you are already speaking to support» is exactly
 right for a shop with nobody to transfer to. A criterion that lists a remit is
 a scope test, and a scope test rots the day the business grows a verb.
 
+### What a new tool costs a stage that never calls it (2026-09-01, `tk-8ee108`)
+
+`transfer_to_human` made one existing test flaky —
+`test_a_caller_with_no_cita_is_handed_over_to_the_stage_that_creates_one`, which
+asks `Identify` to hand a caller with no appointment to `NewBooking`. The
+failure is never a wrong transfer: the model simply does not call
+`start_new_booking`, and answers the "no appointment" tool result conversationally
+instead.
+
+The prime suspect was the prompt paragraph the card added — its wording, and its
+position in the last, most-recent slot of every stage prompt. 154 runs on
+claude-haiku-4-5 say both were innocent:
+
+| cell | pass/valid | fail |
+|---|---:|---:|
+| card reverted — no tool, no paragraph | 38/40 | 5% |
+| v1: nine sentences of prohibitions, last slot | 15/20 | 25% |
+| v2: tool named in the clause, moved off the last slot | 31/40 | 22% |
+| **no paragraph at all, tool still offered** | 16/20 | 20% |
+| v3: short, positive, trigger moved into the docstring | 28/34 | 18% |
+
+Every tool-present cell sits at 18-25% and none is distinguishable from another
+(v1 vs v2 p=1.0, v1 vs v3 p=0.73, paragraph vs no paragraph p=1.0). Pooled,
+tool-present is 90/114 against the floor's 38/40 — **p=0.025**. **The cost is the
+tool on the stage's surface, not any sentence in the prompt.** It is the
+published effect that every tool an agent carries is one more distraction it has
+to actively ignore, and `Identify` now chooses among one more verb.
+
+Three things follow, and they generalise past this card:
+
+- **A prompt paragraph is the wrong place for a tool's trigger rules.** A tool
+  description is loaded into the system prompt already, so a paragraph repeating
+  "call it when…" pays for the same sentence twice on every stage — including
+  the stages that will never use it. Anthropic's current guidance also says to
+  remove over-prompting outright ("instructions like 'If in doubt, use [tool]'
+  will cause overtriggering") and to dial "CRITICAL: you MUST use this tool
+  when…" back to plain "use this tool when…". v3 moved the trigger and the
+  outcome handling into the docstring and kept only what a description cannot
+  carry: that the announcement is a spoken turn.
+- **Measure the suspect against no-suspect-at-all.** The cell that settled this
+  was "no paragraph, tool still offered" — without it, three plausible rewrites
+  would each have looked like a candidate fix and the real cause would still be
+  loose.
+- **Adding a verb to a project is not free for its other verbs.** Budget it. The
+  honest fix here is not a shorter paragraph, it is `Identify`'s own
+  instructions — a separate change with its own goldens.
+
+**A note on the numbers.** Two cells were dropped, not massaged: a 20-run cell
+and 6 runs of another died on `400 invalid_request_error: credit balance is too
+low`, which fails a `needs_llm` test exactly like an assertion does. Every run
+above was re-classified by failure type first — an API failure is not evidence
+about a prompt, and a cell that ends in a wall of them will read as a dramatic
+regression if nobody looks.
+
 ### What it measured earlier (2026-08-31, ms-7 branch)
 
 **clinica-norte / reagendamiento**, 11 goldens:

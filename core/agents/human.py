@@ -11,7 +11,17 @@ It is a thin door on purpose. The decision of what a transfer costs and where
 it goes is `core.telephony.human`; the run is `core.adapters.human`, reached
 through the executor like every other write, so the guard, the timeout and the
 project's own failure sentence all apply. What is left here is the docstring —
-which is the schema Claude reads before it decides — and the waiting.
+and the waiting.
+
+**The docstring is where the trigger rules live, and that is not an accident.**
+A tool's description is loaded into the system prompt anyway, so a project
+paragraph repeating "call it when…" pays for the same sentence twice on every
+stage, including the stages that will never transfer anybody. It is written in
+the register Anthropic's current guidance asks for — «úsala cuando…», not
+«CRITICAL: DEBES llamarla» — because aggressive triggering language makes a
+modern model overtrigger, and it says what to DO rather than listing what not
+to. `core.telephony.human.PROTOCOL` keeps only the half a description cannot
+carry: that the announcement is a spoken turn.
 
 **The waiting is the load-bearing line.** A model that announces «le paso con
 un compañero, un momento» and calls the tool in the same turn has queued that
@@ -32,15 +42,16 @@ from core.telephony import human
 async def transfer_to_human(ctx: RunContext[TenantContext]) -> str:
     """Pasa esta llamada a una persona del centro, que sigue la conversación en tu lugar.
 
-    Llámala cuando quien llama pida hablar con una persona, o cuando lo que necesita no
-    sea algo que puedas resolver tú desde aquí. Antes de llamarla anúnciaselo en una frase
-    corta —«le paso con un compañero, un momento»— y que esa frase sea tu turno entero: no
-    te despidas ni des el traspaso por hecho, porque hasta que esta herramienta no responda
-    no ha ocurrido nada.
+    Úsala cuando quien llama pida hablar con una persona, o cuando lo que necesita no sea
+    algo que puedas resolver con tus otras herramientas.
 
-    Devuelve lo que ha pasado de verdad: que la llamada está pasando a un compañero, o que
-    no ha podido pasarse y quien llama sigue contigo en la línea. Cuenta eso y solo eso; si
-    no ha podido hacerse, sigue tú atendiéndole.
+    Antes de llamarla, anuncia el traspaso en una frase corta —«le paso con un compañero,
+    un momento»— y que esa frase sea tu turno entero.
+
+    Devuelve lo que ha pasado de verdad. Si la llamada está pasando a un compañero, quien
+    llamaba deja de estar contigo. Si no ha podido hacerse, sigue en la línea contigo y
+    esperando: cuéntaselo con naturalidad, ofrécele lo que sí puedas hacer y sigue
+    atendiéndole tú.
     """
     tc = ctx.userdata
     # The announcement is queued, not spoken, when the model calls a tool in the

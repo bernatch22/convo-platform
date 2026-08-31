@@ -144,20 +144,45 @@ def view(project: Project) -> dict:
 
 # --- what the model is told --------------------------------------------------
 
+# The prompt half of the verb, and it is deliberately SMALL. Anthropic's current
+# guidance is to remove over-prompting — "instructions like 'If in doubt, use
+# [tool]' will cause overtriggering", and aggressive "you MUST use this tool
+# when…" language should be dialled back to plain "use this tool when…" — and a
+# tool's own description is already loaded into the system prompt, so a
+# paragraph that repeats the docstring's trigger rules is pure noise on every
+# stage, including the stages that will never transfer anybody. So the trigger
+# ("úsala cuando…") and the outcome handling live in the DOCSTRING
+# (`core.agents.human.transfer_to_human`), where the model reads them at the
+# moment it is deciding, and what stays here is the one thing a tool
+# description cannot express: the announcement is a spoken TURN, and it has to
+# happen before the line moves. Positive, with its motivation attached, because
+# "tell Claude what to do instead of what not to do".
+#
+# The first version was nine sentences of prohibitions in the LAST slot of every
+# stage prompt. It was suspected of a flake and it was innocent — see `protocol`
+# for the 154 runs. This version is a third the size and follows the guidance;
+# it did not move the flake either, because the flake was never about the words.
 PROTOCOL = """\
 <derivacion>
-Puedes pasar la llamada a una persona del centro con la herramienta transfer_to_human. La
-usas cuando quien llama pide hablar con una persona, o cuando lo que necesita no es algo
-que puedas resolver tú desde aquí; si puedes resolverlo, lo resuelves y no la llamas.
-Antes de llamarla lo anuncias en una sola frase corta, con el mismo trato que llevas
-usando en la llamada —«le paso con un compañero, un momento»—, y esa frase es tu turno
-entero: no te despidas ni des el traspaso por hecho, porque todavía no ha ocurrido. Lo que
-la herramienta devuelve es lo que ha pasado de verdad. Si dice que la llamada está pasando
-a un compañero, ya no dices nada más. Si dice que no ha podido hacerse, quien llama sigue
-contigo: se lo cuentas con naturalidad y sin tecnicismos, le ofreces lo que sí puedas
-hacer, y sigues atendiéndole tú.
+Cuando vayas a pasar la llamada a un compañero, anúncialo primero en una frase corta y con
+el mismo trato que lleves usando en la llamada —«le paso con un compañero, un momento»— y
+deja que esa frase sea tu turno entero. Quien llama necesita oír que va a esperar antes de
+que la línea se mueva: un traspaso hecho en silencio se oye como una llamada que se corta.
 </derivacion>
 """
+
+# The same shape for a business with nobody on the other end. It names the
+# situation and never the tool: a rule about a verb the model does not have is
+# the surest way to have it reach for one.
+ALONE = """\
+<derivacion>
+Si quien llama pide hablar con una persona, esa persona eres tú: se lo dices con
+naturalidad, le ofreces resolverlo tú o los otros canales del negocio que tengas en tu
+información, y sigues con lo que necesitaba. En esta línea no hay ningún compañero a quien
+pasarle la llamada, y un «ahora mismo te paso» la deja esperando una voz que no va a llegar.
+</derivacion>
+"""
+
 
 # What the tool answers with. Three sentences, one per thing that can happen, and
 # each one written as an instruction to the model rather than as a line to read
@@ -215,6 +240,33 @@ def protocol(project: Project) -> str:
     Spanish, like `core.security.protocol.SUPERVISOR_PROTOCOL` and for the same
     reason: both demo tenants are. A project in another language writes its own
     paragraph and appends that instead.
+
+    **What this paragraph costs, measured (2026-09-01, 154 runs of
+    `test_a_caller_with_no_cita_is_handed_over_to_the_stage_that_creates_one`,
+    claude-haiku-4-5).** The test went flaky when this card landed and the
+    paragraph was the prime suspect — its wording, and its position in the last,
+    most-recent slot of the prompt. Both were innocent:
+
+    | cell                                          | pass/valid | fail |
+    |-----------------------------------------------|-----------:|-----:|
+    | card reverted — no tool, no paragraph          |      38/40 |   5% |
+    | v1: nine sentences of prohibitions, last slot  |      15/20 |  25% |
+    | v2: tool named in the clause, moved off last   |      31/40 |  22% |
+    | **no paragraph at all, tool still offered**    |      16/20 |  20% |
+    | v3: this one — short, positive, docstring-led  |      28/34 |  18% |
+
+    Every cell with the TOOL is 18-25% and they are indistinguishable from each
+    other (v1 vs v2 p=1.0, v1 vs v3 p=0.73, paragraph vs no paragraph p=1.0).
+    Pooled, tool-present is 90/114 against the floor's 38/40 — **p=0.025**. The
+    cost is the TOOL on the stage's surface, not any sentence in the prompt:
+    `Identify` now chooses among one more verb, and it is the published effect
+    that every tool an agent carries is one more distraction it must ignore.
+
+    That is a real price for a real feature and it is written down rather than
+    softened. The verb has to be reachable in the first ten seconds of a call —
+    that is when somebody asks for a person — so taking it off the entry stage
+    would cost more than it saves. If it has to be bought back, the lead is
+    `Identify`'s own instructions, not this paragraph.
     """
     if not declared(project):
         return ""
