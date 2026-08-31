@@ -148,6 +148,8 @@ export interface TtsSnapshot {
   default_model: string;
   latency_model: string;
   forbidden_models: string[];
+  /** model id -> the sentence the control plane refuses it with, verbatim. */
+  forbidden_reasons: Record<string, string>;
   voice: string;
   sync_alignment: boolean;
 }
@@ -159,7 +161,7 @@ export interface PipelineOverrideRow {
   updated_at: number;
 }
 
-/** Medians in ms over stored voice sessions; a never-measured one is null, never 0. */
+/** Medians in SECONDS over stored voice sessions; a never-measured one is null, never 0. */
 export interface LatencyMedians {
   transcription_delay: number | null;
   end_of_turn_delay: number | null;

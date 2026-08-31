@@ -5,6 +5,7 @@ import { RouterProvider } from "react-router";
 import { router } from "./router";
 import "./styles/tokens.css";
 import "./styles/app.css";
+import "./styles/pipeline.css";
 
 const host = document.getElementById("root");
 if (!host) {

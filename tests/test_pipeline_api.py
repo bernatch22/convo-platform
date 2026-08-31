@@ -58,6 +58,10 @@ def test_the_snapshot_names_every_provider_the_next_call_will_use(client) -> Non
     assert view["tts"]["model"] == tts.DEFAULT_MODEL and view["tts"]["sync_alignment"] is True
     assert set(view["tts"]["forbidden_models"]) == set(tts.FORBIDDEN_MODELS)
     assert view["tts"]["voice"], "voice is project data and the console shows it"
+    reasons = view["tts"]["forbidden_reasons"]
+    assert set(reasons) == set(tts.FORBIDDEN_MODELS)
+    for model, why in reasons.items():
+        assert model in why and tts.DEFAULT_MODEL in why, "the console greys it out and says why"
 
 
 def test_medians_are_measured_over_the_project_s_stored_voice_calls(client, store) -> None:

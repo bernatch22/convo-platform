@@ -1,118 +1,158 @@
-/* Pipeline — see the three providers a project runs on, and change what is changeable. */
+/* Pipeline — see the three providers a project runs on, and change what is changeable.
+ *
+ * One GET answers the whole screen: the STT / LLM / TTS legs as the NEXT
+ * session will run them (overrides already applied by the control plane), the
+ * medians its stored calls measured, and the three fields a supervisor may
+ * set. The project lives in the query string, so a screen is shareable and
+ * switching project is a navigation, not a store write.
+ */
 
-import { useParams } from "react-router";
+import { useState } from "react";
+import { Link, redirect, useLoaderData, useParams, type LoaderFunctionArgs } from "react-router";
 
-import { EmptyState } from "../components/EmptyState";
+import { PipelineControls } from "../components/PipelineControls";
+import { LlmLeg, SttLeg, TtsLeg } from "../components/PipelineLegs";
+import { Waterfall } from "../components/Waterfall";
+import { ApiError, getPipeline, listTenants, type PipelineSnapshot } from "../lib/api";
 
 import { useShellData } from "./Shell";
 
+/** What this screen renders: one project's snapshot, or the refusal that replaced it. */
+export interface PipelineData {
+  tenant: string;
+  project: string | null;
+  snapshot: PipelineSnapshot | null;
+  error: string | null;
+}
+
+/** Read one project's pipeline; with no `?project=` in the URL, redirect to the tenant's first. */
+export async function pipelineLoader({
+  params,
+  request,
+}: LoaderFunctionArgs): Promise<PipelineData> {
+  const tenant = params.tenant ?? "";
+  const wanted = new URL(request.url).searchParams.get("project");
+
+  if (!wanted) {
+    const first = (await listTenants()).find((row) => row.tenant === tenant)?.projects[0];
+    if (!first) {
+      return { tenant, project: null, snapshot: null, error: `${tenant} has no projects` };
+    }
+    throw redirect(`/t/${tenant}/pipeline?project=${encodeURIComponent(first.id)}`);
+  }
+
+  try {
+    return { tenant, project: wanted, snapshot: await getPipeline(tenant, wanted), error: null };
+  } catch (cause) {
+    const error = cause instanceof ApiError ? cause.detail : String(cause);
+    return { tenant, project: wanted, snapshot: null, error };
+  }
+}
+
 export function Pipeline() {
   const { tenant = "" } = useParams();
+  const data = useLoaderData() as PipelineData;
   const { tenants } = useShellData();
   const projects = tenants.find((row) => row.tenant === tenant)?.projects ?? [];
 
   return (
     <div className="page">
       <header className="page__head">
-        <div className="page__eyebrow">{tenant}</div>
-        <h1 className="page__title">Pipeline</h1>
+        <div className="page__eyebrow">{tenant} · pipeline</div>
+        <h1 className="page__title">{data.snapshot?.name ?? "Pipeline"}</h1>
         <p className="page__lede">
           The three legs of a voice turn as data, not as prose: what hears, what decides, what
-          speaks — with the medians measured over this project&apos;s stored sessions, and the
-          three fields a supervisor may change without a deploy.
+          speaks — every value read from the platform&apos;s own configuration with this
+          project&apos;s overrides already applied, so this screen cannot show a pipeline the next
+          call will not run.
         </p>
       </header>
 
-      <section className="section">
-        <h2 className="section__title">Legs</h2>
-        <div className="grid grid--3">
-          <Leg
-            role="hears"
-            provider="Soniox"
-            rows={[
-              ["model", "stt-rt-v5"],
-              ["hints", "es · en"],
-              ["endpointing", "level 2 · 0.3"],
-              ["max delay", "1000 ms"],
-            ]}
-          />
-          <Leg
-            role="decides"
-            provider="Anthropic"
-            rows={[
-              ["model", "claude-haiku-4-5"],
-              ["caching", "ephemeral"],
-              ["cache floor", "4096 tok"],
-              ["preemptive", "retries 1"],
-            ]}
-          />
-          <Leg
-            role="speaks"
-            provider="ElevenLabs"
-            rows={[
-              ["model", "eleven_v3_conversational"],
-              ["alignment", "sync"],
-              ["voice", projects[0]?.voice ?? "—"],
-              ["projects", String(projects.length)],
-            ]}
-          />
-        </div>
-        <p className="note">
-          the platform&apos;s invariants — the live snapshot and the medians come from GET /pipeline
-        </p>
-      </section>
+      {projects.length > 1 && (
+        <nav className="tabs" aria-label="Projects">
+          {projects.map((project) => (
+            <Link
+              key={project.id}
+              to={`/t/${tenant}/pipeline?project=${encodeURIComponent(project.id)}`}
+              className={project.id === data.project ? "tabs__tab is-active" : "tabs__tab"}
+            >
+              {project.id}
+            </Link>
+          ))}
+        </nav>
+      )}
 
-      <section className="section">
-        <EmptyState
-          title="Reading the real snapshot is the next card"
-          milestone="ms-9"
-          card="the pipeline card"
-          command={`curl -s localhost:8090/pipeline/${tenant}/${projects[0]?.id ?? "<project>"}`}
-        >
-          <p>
-            <code className="mono">GET /pipeline/{"{tenant}"}/{"{project}"}</code> is merged: the
-            three legs as the NEXT session will run them, the overrides already applied, and the
-            medians (<code className="mono">transcription_delay</code>,{" "}
-            <code className="mono">end_of_turn_delay</code>, <code className="mono">llm_node_ttft</code>
-            , <code className="mono">tts_node_ttfb</code>, <code className="mono">e2e_latency</code>)
-            — null, never zero, when nothing measured them.
-          </p>
-          <p>
-            <code className="mono">PUT</code> takes voice, tts_model and greeting and returns the
-            changed snapshot, so no refetch. A model the platform refuses to run comes back 422
-            naming the rule it broke.
-          </p>
-        </EmptyState>
-      </section>
+      {data.snapshot ? (
+        <Loaded key={data.project} snapshot={data.snapshot} />
+      ) : (
+        <p className="ctl__error">{data.error}</p>
+      )}
     </div>
   );
 }
 
-interface LegProps {
-  role: string;
-  provider: string;
-  rows: [string, string][];
+function Loaded({ snapshot }: { snapshot: PipelineSnapshot }) {
+  const [shown, setShown] = useState(snapshot);
+
+  return (
+    <>
+      <section className="section">
+        <h2 className="section__title">Providers</h2>
+        <div className="grid grid--3">
+          <SttLeg stt={shown.stt} />
+          <LlmLeg llm={shown.llm} />
+          <TtsLeg tts={shown.tts} />
+        </div>
+      </section>
+
+      <section className="section">
+        <h2 className="section__title">Anatomy of a turn</h2>
+        <Waterfall
+          medians={shown.latency.medians}
+          sessions={shown.latency.sessions}
+          turns={shown.latency.turns}
+        />
+      </section>
+
+      <section className="section">
+        <h2 className="section__title">Control</h2>
+        <PipelineControls snapshot={shown} onSaved={setShown} />
+        <Overrides snapshot={shown} />
+      </section>
+    </>
+  );
 }
 
-function Leg({ role, provider, rows }: LegProps) {
+function Overrides({ snapshot }: { snapshot: PipelineSnapshot }) {
+  if (snapshot.overrides.length === 0) {
+    return (
+      <p className="note">
+        nothing overridden — this project runs exactly what git deployed. The console may set{" "}
+        <code className="mono">{snapshot.overridable.join(", ")}</code>.
+      </p>
+    );
+  }
+
   return (
-    <article className="panel">
-      <div className="panel__head">
-        <span className="panel__title">{provider}</span>
-        <span className="badge">{role}</span>
-      </div>
-      <div className="panel__body">
-        <table className="kv">
-          <tbody>
-            {rows.map(([key, value]) => (
-              <tr key={key}>
-                <td className="kv__key">{key}</td>
-                <td className="kv__val">{value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </article>
+    <div className="table-wrap">
+      <table className="table">
+        <thead>
+          <tr>
+            <th>field</th>
+            <th>value</th>
+            <th>changed</th>
+          </tr>
+        </thead>
+        <tbody>
+          {snapshot.overrides.map((row) => (
+            <tr key={row.field}>
+              <td className="mono">{row.field}</td>
+              <td className="mono">{row.value || "(empty)"}</td>
+              <td className="mono dim">{new Date(row.updated_at * 1000).toLocaleString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
