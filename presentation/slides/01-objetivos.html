@@ -9,8 +9,10 @@
                border-radius: 12px; background: var(--accent-soft); padding: 16px 26px; flex: none; }
     .p1-live .lbl { font: 500 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); flex: none; }
     .p1-live .url { font: 600 23px var(--mono); color: var(--ink); letter-spacing: -.01em; }
-    .p1-live .demo { font: 400 14px var(--sans); color: var(--ink-2); }
-    .p1-live .demo strong { font-family: var(--mono); color: var(--accent); font-weight: 600; }
+    .p1-live .demo { display: inline-flex; align-items: center; gap: 8px; background: var(--accent);
+                     color: #FBFAF7; border-radius: 999px; padding: 7px 18px;
+                     font: 600 13.5px var(--sans); align-self: center; white-space: nowrap; }
+    .p1-live .demo strong { font-family: var(--mono); font-weight: 600; color: #FBFAF7; opacity: .85; }
     .p1-live .tel { font: 400 15px var(--sans); color: var(--ink-2); margin-left: auto; }
     .p1-live .tel strong { font-family: var(--mono); color: var(--ink); font-weight: 600; }
     .p1-cards { display: grid; grid-template-columns: 1fr 1fr 1.15fr; gap: 18px; margin-top: 20px; }
@@ -43,7 +45,7 @@
     <div class="p1-live" data-anim="3">
       <span class="lbl">Plataforma en vivo</span>
       <span class="url">https://lk.bernardocastro.dev</span>
-      <span class="demo">· demo en vídeo: <strong>/demo.html</strong></span>
+      <span class="demo">▶ Ver demo <strong>/demo.html</strong></span>
       <span class="tel">y por teléfono: <strong>+1 417 674 3169</strong> — atiende la clínica</span>
     </div>
 

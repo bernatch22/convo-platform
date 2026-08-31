@@ -96,8 +96,11 @@
           autorización y la auditoría fuera del bucle; el control transaccional exige poseerlo.</div>
           <div class="r"><strong>Generación anticipada apagada</strong> — medida: con fin de turno
           en ~0,4 s, especular no ocultaba latencia y solo gastaba modelo.</div>
-          <div class="r"><strong>Base embebida antes que Postgres</strong> — un solo escritor hoy;
-          migrar antes del disparador sería ceremonia.</div>
+          <div class="r"><strong>Base embebida antes que Postgres — single-node deliberado</strong> —
+          el contrato de persistencia no depende del storage local: todo proceso escribe a través
+          del plano de control, nunca contra el fichero, así que cambiar el motor no toca a un
+          solo llamante. Hoy hay un único escritor; el primer disparador de escala es el segundo,
+          y ese día la migración es un cambio de conexión, no de arquitectura.</div>
         </div>
       </div>
     </div>
