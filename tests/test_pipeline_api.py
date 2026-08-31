@@ -68,7 +68,9 @@ def test_the_snapshot_names_every_provider_the_next_call_will_use(client) -> Non
         assert model in why and tts.DEFAULT_MODEL in why, "the console greys it out and says why"
 
 
-async def test_a_put_switches_the_ear_the_next_session_opens(client, store) -> None:
+async def test_a_put_switches_the_ear_the_next_session_opens(client, store, monkeypatch) -> None:
+    monkeypatch.setenv(stt.DEEPGRAM_KEY_ENV, "dg-test")
+
     reply = client.put(PIPELINE, json={"stt_provider": "deepgram"}).json()
 
     assert reply["stt"]["provider"] == "deepgram"
@@ -83,12 +85,32 @@ async def test_a_put_switches_the_ear_the_next_session_opens(client, store) -> N
     assert stt.provider_for(tc.project) == "deepgram"
 
 
-def test_the_snapshot_names_the_ears_a_supervisor_may_switch_between(client) -> None:
+def test_the_snapshot_names_the_ears_a_supervisor_may_switch_between(client, monkeypatch) -> None:
+    monkeypatch.setenv(stt.KEY_ENV, "sx-test")
+    monkeypatch.delenv(stt.DEEPGRAM_KEY_ENV, raising=False)
+
     view = client.get(PIPELINE).json()
 
     assert view["stt"]["providers"] == ["soniox", "deepgram"]
     assert view["stt"]["requested_provider"] == "soniox"
     assert "stt_provider" in view["overridable"]
+    greyed = view["stt"]["unavailable_reasons"]
+    assert set(greyed) == {"deepgram"}, "this box has no Flux key; Soniox is the one it can open"
+    assert stt.DEEPGRAM_KEY_ENV in greyed["deepgram"], "the console greys it out and says why"
+
+
+def test_an_ear_this_host_has_no_key_for_is_refused_naming_the_variable(
+    client, store, monkeypatch
+) -> None:
+    """api.py runs ON the box, so it is the one place that can answer 'is the key here?'."""
+    monkeypatch.delenv(stt.DEEPGRAM_KEY_ENV, raising=False)
+
+    reply = client.put(PIPELINE, json={"stt_provider": "deepgram"})
+
+    assert reply.status_code == 422
+    detail = reply.json()["detail"]
+    assert "deepgram" in detail and stt.DEEPGRAM_KEY_ENV in detail
+    assert store.pipeline_overrides(TENANT, PROJECT) == [], "the door held: nothing was stored"
 
 
 def test_an_stt_provider_the_platform_does_not_run_is_refused_with_both_names(
@@ -334,6 +356,38 @@ def test_a_model_outside_the_allow_list_is_refused_with_the_list(client, store) 
     for allowed in llm.ALLOWED_MODELS:
         assert allowed in detail, "a refusal names every model that would have been accepted"
     assert store.pipeline_overrides(TENANT, PROJECT) == [], "nothing unpriced reaches the store"
+
+
+def test_a_model_this_host_has_no_key_for_is_refused_naming_the_variable(
+    client, store, monkeypatch
+) -> None:
+    """The live incident, at the door: `gpt-5.4-mini` is priced and legal — and unrunnable here."""
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    reply = client.put(PIPELINE, json={"llm_model": "gpt-5.4-mini"})
+
+    assert reply.status_code == 422
+    detail = reply.json()["detail"]
+    assert "gpt-5.4-mini" in detail and "OPENAI_API_KEY" in detail
+    assert llm.DEFAULT_MODEL in detail, "a refusal says what the project stays on"
+    assert store.pipeline_overrides(TENANT, PROJECT) == [], "the door held: nothing was stored"
+
+
+async def test_an_override_stored_before_the_key_vanished_still_builds_a_session(
+    client, store, monkeypatch
+) -> None:
+    """The net under the door: the row outlives the key, and the project stays on the air."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    assert client.put(PIPELINE, json={"llm_model": "gpt-5.4-mini"}).status_code == 200
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    tc = await router.resolve(fake_job_context(metadata=META), store)
+
+    assert tc.project.llm_model == "gpt-5.4-mini", "the stored row is untouched"
+    assert llm.llm_for(tc.tenant, tc.project).model == llm.DEFAULT_MODEL, "the call still happens"
+    view = client.get(PIPELINE).json()["llm"]
+    assert view["requested_model"] == "gpt-5.4-mini" and view["model"] == llm.DEFAULT_MODEL
+    assert "OPENAI_API_KEY" in view["unavailable_reasons"]["gpt-5.4-mini"]
 
 
 def test_every_model_the_platform_runs_has_a_price(client) -> None:
