@@ -33,6 +33,7 @@ from core.registry import load_registry
 from core.rooms import RoomsUnreachable
 from core.state import overrides
 from core.state.store import PipelineOverride, SQLiteStore, Store
+from core.webui import mount_ui
 
 app = FastAPI(title="convo control plane")
 
@@ -275,3 +276,7 @@ def _effective(tenant: str, project: str, store: Store) -> tuple[Tenant, Project
         detail = f"tenant {tenant!r} has no project {project!r}; known: {sorted(known.projects)}"
         raise HTTPException(404, detail)
     return known, overrides.apply(tenant, found, store)
+
+
+# Last, always: the SPA catch-all must not shadow an endpoint declared above it.
+UI_IS_BUILT = mount_ui(app)

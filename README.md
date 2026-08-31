@@ -146,12 +146,37 @@ uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-te
 
 [`docs/evals.md`](docs/evals.md) explains every metric and how to add one.
 
+## The web UI
+
+`ui/` is the operator console: the tenant/project switcher, Talk (the three
+channels — WebRTC voice, web chat, and the phone line on **+1 417 674 3169**),
+Sessions, Pipeline, and the shells for Evals and Supervisor. Vite + React +
+TypeScript + react-router; no state library, no CSS framework.
+
+Two ways to run it. In development the vite server serves the app and proxies
+`/tenants`, `/token`, `/sessions` and `/pipeline` to the control plane:
+
+```bash
+uv run uvicorn api:app --port 8090        # terminal 1: the control plane
+cd ui && npm install && npm run dev       # terminal 2: http://localhost:5173
+```
+
+In production there is one port: build once and `api.py` serves the bundle
+itself, with the API paths keeping priority and everything else falling back to
+the SPA.
+
+```bash
+cd ui && npm install && npm run build     # writes ui/dist (never committed)
+uv run uvicorn api:app --port 8090        # http://localhost:8090
+```
+
 ## Layout
 
 ```
 worker.py     data plane: one AgentServer, one fleet, every tenant
 api.py        control plane (ms-8+): tokens, dispatch, tools hub, call log
 core/         runtime: contracts, agents, tools, adapters, state, observability
+ui/           the operator console: React + vite, served by api.py once built
 tenants/      one folder per customer: adapters + projects (agents, prompts, evals)
 infra/        compose/ — the local dev stack (livekit-server + redis)
 scripts/      dev_call.py: a browser-less chat call against a running server
