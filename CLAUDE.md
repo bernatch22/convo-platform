@@ -32,7 +32,8 @@ and, when a decision was made, a short essay in its thread.
   single `TenantContext` (`core/context.py`) — the only definition of that object.
   The channel (voice|chat) belongs to the **session**, not the project.
 - Every tool has a `ToolSpec` (`side_effect: read|write|irreversible`,
-  `idempotency_key`, `pii_scope`, `timeout_s`, `compensation`). `guard.check`
+  `idempotency_key`, `pii_scope`, `timeout_s`, `compensation`,
+  `result_summary`). `guard.check`
   refuses `irreversible` without a `confirmation_token` minted by `ConfirmTask`.
   Tools raise `ToolError(msg)` for user-facing failures (the LLM sees it); any
   other exception is hidden by the framework.
