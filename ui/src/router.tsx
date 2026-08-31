@@ -11,8 +11,8 @@ import { Crash } from "./routes/Crash";
 import { Evals } from "./routes/Evals";
 import { Home } from "./routes/Home";
 import { Pipeline, pipelineLoader } from "./routes/Pipeline";
-import { SessionDetail } from "./routes/SessionDetail";
-import { Sessions } from "./routes/Sessions";
+import { SessionDetail, sessionDetailLoader } from "./routes/SessionDetail";
+import { Sessions, sessionsLoader } from "./routes/Sessions";
 import { Shell, shellLoader } from "./routes/Shell";
 import { Supervisor } from "./routes/Supervisor";
 import { Talk } from "./routes/Talk";
@@ -26,8 +26,8 @@ export const router = createBrowserRouter([
     errorElement: <Crash />,
     children: [
       { index: true, element: <Home /> },
-      { path: "t/:tenant/sessions", element: <Sessions /> },
-      { path: "t/:tenant/sessions/:id", element: <SessionDetail /> },
+      { path: "t/:tenant/sessions", element: <Sessions />, loader: sessionsLoader },
+      { path: "t/:tenant/sessions/:id", element: <SessionDetail />, loader: sessionDetailLoader },
       { path: "t/:tenant/pipeline", element: <Pipeline />, loader: pipelineLoader },
       { path: "t/:tenant/:project", element: <Talk /> },
       { path: "evals", element: <Evals /> },
