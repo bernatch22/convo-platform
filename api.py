@@ -67,7 +67,7 @@ class ObserveRequest(BaseModel):
 
 
 class PipelineUpdate(BaseModel):
-    """The three fields the console may change between calls; anything else is refused.
+    """The fields the console may change between calls; anything else is refused.
 
     `extra="forbid"`: a typo like `ttsModel` must come back as a 422 naming the
     field, not be stored as an override nothing will ever read.
@@ -78,6 +78,7 @@ class PipelineUpdate(BaseModel):
     voice: str | None = None
     tts_model: str | None = None
     greeting: str | None = None
+    stt_provider: str | None = None
 
 
 @app.post("/token")
@@ -223,9 +224,8 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
     """The three providers as data, plus what the console changed and what calls measured.
 
     → `{"tenant", "project", "name", "language", "greeting",
-        "stt": {"provider", "model", "language_hints", "sample_rate",
-                "endpointing": {"max_endpoint_delay_ms", "latency_adjustment_level",
-                                "sensitivity"}, "keyterms"},
+        "stt": {"provider", "requested_provider", "providers", "model", "language_hints",
+                "sample_rate", "endpointing": <the CHOSEN provider's own knobs>, "keyterms"},
         "llm": {"provider", "model", "caching", "max_tokens",
                 "cache_minimum_tokens", "cache_note"},
         "tts": {"provider", "model", "requested_model", "default_model", "latency_model",
@@ -247,13 +247,14 @@ async def pipeline_view(tenant: str, project: str, store: Reader) -> dict[str, A
 async def pipeline_set(
     tenant: str, project: str, update: PipelineUpdate, store: Reader
 ) -> dict[str, Any]:
-    """Change voice, TTS model or greeting for the next session — no deploy, no restart.
+    """Change voice, TTS model, greeting or STT provider for the next session — no restart.
 
     Returns the same object as `GET /pipeline/{tenant}/{project}`, already
     reflecting the change, so the console renders one response instead of
     refetching. A model the platform refuses to run (`eleven_v3`,
-    `eleven_turbo_v2_5`) is a 422 naming the rule; an unknown field is a 422
-    from the body itself; a body that sets nothing is a 422 too.
+    `eleven_turbo_v2_5`) is a 422 naming the rule, and so is an STT provider
+    that is not `soniox` or `deepgram`; an unknown field is a 422 from the body
+    itself; a body that sets nothing is a 422 too.
     """
     edits = update.model_dump(exclude_none=True)
     if not edits:

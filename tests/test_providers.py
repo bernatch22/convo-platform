@@ -3,6 +3,7 @@
 import dataclasses
 
 import pytest
+from livekit.plugins import deepgram
 
 from core.context import Project
 from core.providers import stt, tts, turn
@@ -55,6 +56,68 @@ def test_with_a_key_soniox_is_built_with_those_options(project: Project, monkeyp
 
     assert built is not None and built.model == "stt-rt-v5"
     assert built._params.endpoint_sensitivity == 0.3
+
+
+# --- Deepgram Flux -----------------------------------------------------------
+
+
+def test_flux_runs_the_multilingual_model_because_the_english_one_refuses_a_hint(
+    project: Project,
+) -> None:
+    options = stt.deepgram_options(project)
+
+    assert options["model"] == "flux-general-multi"
+    assert options["language_hint"] == ["es", "en"]
+    assert options["sample_rate"] == 16000
+    assert options["eot_threshold"] == 0.7
+    assert options["eot_timeout_ms"] == 1000
+
+
+def test_the_project_vocabulary_travels_as_flux_keyterms(project: Project) -> None:
+    project.keyterms = ["Clínica Norte", "Dra. Campos"]
+
+    assert stt.deepgram_options(project)["keyterm"] == ["Clínica Norte", "Dra. Campos"]
+
+
+def test_choosing_deepgram_builds_flux_and_never_touches_soniox(
+    project: Project, monkeypatch
+) -> None:
+    monkeypatch.setenv(stt.DEEPGRAM_KEY_ENV, "dg-test")
+    monkeypatch.setenv(stt.KEY_ENV, "sx-test")
+    project.stt_provider = "deepgram"
+    tc = fake_context("clinica-norte", "reagendamiento")
+
+    built = stt.stt_for(tc.tenant, project)
+
+    assert isinstance(built, deepgram.STTv2), "the /v2/listen class, not the nova-3 one"
+    assert built.model == "flux-general-multi"
+    assert built._opts.language_hint == ["es", "en"]
+    assert built._opts.eot_threshold == 0.7
+
+
+def test_without_a_deepgram_key_the_chosen_provider_still_yields_no_stt(
+    project: Project, monkeypatch
+) -> None:
+    monkeypatch.delenv(stt.DEEPGRAM_KEY_ENV, raising=False)
+    monkeypatch.setenv(stt.KEY_ENV, "sx-test")
+    project.stt_provider = "deepgram"
+    tc = fake_context("clinica-norte", "reagendamiento")
+
+    assert stt.stt_for(tc.tenant, project) is None, "a key it does not have is not a fallback"
+
+
+@pytest.mark.parametrize("named", ["whisper", "", "SONIOX"])
+def test_a_provider_the_platform_does_not_have_falls_back_to_the_default(
+    project: Project, named
+) -> None:
+    project.stt_provider = named
+
+    assert stt.provider_for(project) == "soniox"
+
+
+def test_the_default_project_is_still_heard_by_soniox(project: Project) -> None:
+    assert project.stt_provider == "soniox"
+    assert stt.provider_for(project) == "soniox"
 
 
 # --- ElevenLabs --------------------------------------------------------------
