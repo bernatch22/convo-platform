@@ -1,0 +1,73 @@
+<section class="slide" data-title="Infraestructura, roadmap y trade-offs" data-entregable="11">
+  <style>
+    .f15-col h3 { font: 600 15.5px var(--sans); color: var(--ink); margin: 0 0 8px; }
+    .f15-now p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 8px; }
+    .f15-now p strong { color: var(--ink); font-weight: 600; }
+    .f15-tbl { width: 100%; border-collapse: collapse; }
+    .f15-tbl th { font: 500 10.5px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+                  color: var(--muted); text-align: left; padding: 0 10px 7px 0; border-bottom: 1px solid var(--rule); }
+    .f15-tbl td { font: 400 12.5px/1.45 var(--sans); color: var(--ink-2); padding: 7px 10px 7px 0;
+                  border-bottom: 1px solid var(--line); vertical-align: top; }
+    .f15-tbl td strong { color: var(--ink); font-weight: 600; }
+    .f15-sec { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+               color: var(--accent); margin: 0 0 8px; }
+    .f15-gap { margin-top: 18px; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">15 <span class="sep">·</span> Infraestructura, despliegue — roadmap y trade-offs</div>
+      <h2 class="head" style="max-width:56ch">Un nodo hoy, y cada palanca de escalado con su disparador escrito</h2>
+    </div>
+
+    <div class="grid2 fill" data-anim="2">
+      <div class="f15-col">
+        <p class="f15-sec">Hoy — en producción</p>
+        <div class="f15-now">
+          <p><strong>Un nodo cloud</strong> concentra el servidor de medios, el puente telefónico,
+          los workers de conversación y el plano de control, tras un único dominio con TLS.
+          Sin GPU: todo el tiempo real corre en CPU.</p>
+          <p><strong>Desplegar es un comando</strong>, idéntico e idempotente; la configuración de
+          los negocios no se toca al desplegar — es estado vivo, no artefacto.</p>
+          <p><strong>El gate de calidad es la evaluación</strong>: la batería de conversaciones
+          corre en integración continua y la nocturna vigila lo desplegado.</p>
+        </div>
+        <p class="f15-sec f15-gap">Escalado — el disparador es un hecho, no un adjetivo</p>
+        <table class="f15-tbl">
+          <tr><th>Cuando ocurra…</th><th>…se mueve esta palanca</th></tr>
+          <tr><td>las llamadas simultáneas se acercan a los procesos precalentados</td>
+              <td>segundo nodo de workers — son procesos sin estado, el dispatch ya los reparte</td></tr>
+          <tr><td>un segundo proceso necesita escribir el estado</td>
+              <td>la base embebida pasa a Postgres — el disparador está documentado desde el diseño</td></tr>
+          <tr><td>una red corporativa bloquea el audio saliente</td>
+              <td>relé TURN en el puerto 443 — hoy diferido porque la prueba móvil real no lo necesitó</td></tr>
+          <tr><td>clientes en otra región</td>
+              <td>segundo servidor de medios federado; el plano de control no se duplica</td></tr>
+        </table>
+      </div>
+
+      <div class="f15-col">
+        <p class="f15-sec">Roadmap por fases</p>
+        <table class="f15-tbl">
+          <tr><td><strong>1 · Verticales instanciables</strong> — el segundo negocio de un rubro sin copiar código; alta de cliente 100% configuración</td></tr>
+          <tr><td><strong>2 · Tools remotos</strong> — el protocolo WebSocket de la lámina 12: el código del cliente en su infraestructura</td></tr>
+          <tr><td><strong>3 · Re-enganche automático</strong> — la llamada que se corta retoma contexto al volver a llamar</td></tr>
+          <tr><td><strong>4 · Escala multi-nodo</strong> — según los disparadores de la izquierda, no antes</td></tr>
+        </table>
+        <p class="f15-sec f15-gap">Trade-offs principales — decididos con medición</p>
+        <table class="f15-tbl">
+          <tr><td><strong>Generación anticipada apagada</strong> — se midió: con fin-de-turno semántico en ~0,4 s, especular no ocultaba latencia y solo gastaba llamadas al modelo</td></tr>
+          <tr><td><strong>Base embebida antes que Postgres</strong> — un solo escritor hoy; migrar antes de necesitarlo sería ceremonia, y el disparador está escrito</td></tr>
+          <tr><td><strong>Grabación en el propio worker</strong> — cero latencia añadida y simplicidad, a cambio de no captar la voz del supervisor en toma de línea; documentado, con la alternativa nombrada</td></tr>
+          <tr><td><strong>Modelo económico por defecto</strong> — Haiku con caché de prompt; el premium se decide por la matriz de evaluación, no por marketing</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      Coste de infraestructura conocido y coste por llamada medido en céntimos — la decisión de
+      escalar siempre tendrá un número delante. Plataforma en vivo: https://lk.bernardocastro.dev
+    </p>
+
+  </div>
+</section>

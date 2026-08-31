@@ -1,82 +1,72 @@
-<section class="slide" data-title="Integraciones y el protocolo remote-tenant" data-entregable="8">
+<section class="slide" data-title="Integraciones" data-entregable="8">
+  <style>
+    .i12-col h3 { font: 600 16px var(--sans); color: var(--ink); margin: 0 0 4px; }
+    .i12-col .en { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                   color: var(--accent); display: block; margin-bottom: 12px; }
+    .i12-col p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 10px; }
+    .i12-col p strong { color: var(--ink); font-weight: 600; }
+    .i12-box { border: 1px solid var(--line); background: var(--card); padding: 16px 20px; height: 100%; }
+    .i12-box.hot { border: 1.5px solid var(--accent); background: var(--accent-soft); }
+    .i12-frames { font: 400 12px var(--mono); color: var(--ink-2); background: var(--paper);
+                  border: 1px solid var(--rule); border-radius: 6px; padding: 10px 14px; margin: 10px 0; }
+    .i12-keep { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+    .i12-keep .t { font: 500 10.5px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+                   color: var(--accent); display: block; margin-bottom: 5px; }
+    .i12-keep p { font: 400 13px/1.5 var(--sans); }
+  </style>
   <div class="slide-body">
 
     <div class="head-block" data-anim="1">
-      <div class="eyebrow">09 <span class="sep">·</span> Entregable 8 — integración con sistemas externos</div>
-      <h2 class="head" style="max-width:44ch">Su agente vive en su proyecto; nuestro core le da vida a todos</h2>
-      <p class="lede">
-        Integrar no es abrirnos un puerto en su red: es que su proceso salga hacia nosotros. El
-        cliente se queda con su código y sus datos; nosotros, con el runtime, el guard, el log y
-        el consentimiento. La autoridad no se muda.
+      <div class="eyebrow">12 <span class="sep">·</span> Estrategia de integración con sistemas externos</div>
+      <h2 class="head" style="max-width:54ch">Los sistemas del cliente se conectan por adapters — y mañana, desde su propio proceso</h2>
+      <p class="lede" style="max-width:100ch">
+        La regla es una: <strong>el contrato del tool no cambia según dónde viva el código que lo
+        cumple</strong>. Hoy los adapters viven junto al vertical; el diseño ya contempla que
+        vivan en la infraestructura del propio cliente.
       </p>
     </div>
 
-    <div class="compare fill" data-anim="2">
-
-      <div style="padding:20px 26px">
-        <div class="when">Hoy <span class="tag ok">en producción</span></div>
-        <dl class="kv">
-          <dt>dónde corre</dt>
-          <dd>El tenant es un paquete en nuestro árbol: <code>tenants/&lt;t&gt;/</code>, un
-            <code>Adapter</code> por sistema suyo y las tools declaradas en su proyecto.</dd>
-          <dt>quién abre</dt>
-          <dd>Nadie: salimos nosotros hacia su API. Mientras no la haya, el adapter es un doble
-            con la misma firma y todo lo de arriba ya funciona.</dd>
-          <dt>qué cuesta</dt>
-          <dd>El cliente depende de nuestro ciclo de release: cambiar una tool suya es un
-            despliegue nuestro y una revisión nuestra.</dd>
-          <dt>no cambia</dt>
-          <dd><b>guard</b> · <b>log</b> · <b>consentimiento</b> · <b>máscara PII</b></dd>
-        </dl>
+    <div class="grid2 fill" data-anim="2">
+      <div class="i12-box i12-col">
+        <h3>Hoy: adapters por negocio</h3>
+        <span class="en">en producción</span>
+        <p>Un adapter es un módulo pequeño que traduce «crear cita» al sistema real del
+        cliente — su API de agenda, su gestor de pedidos, su ticketing. El vertical define
+        <strong>qué</strong> se hace; el adapter, <strong>contra qué sistema</strong>.</p>
+        <p>La demo opera con sistemas simulados que exponen <strong>la misma interfaz</strong>
+        que tendría el real: cambiar el simulador por la API verdadera del cliente no toca ni
+        los prompts, ni los tools, ni una prueba.</p>
+        <p>Las credenciales de cada negocio son suyas, viven en su configuración y jamás se
+        mezclan entre clientes.</p>
       </div>
 
-      <div style="padding:20px 26px">
-        <div class="when">Mañana <span class="tag warn">diseñado, no implementado</span></div>
-        <dl class="kv">
-          <dt>dónde corre</dt>
-          <dd>El tenant vive en el proceso del cliente: sus etapas, sus tools y sus prompts,
-            hablando con nosotros a través del SDK.</dd>
-          <dt>quién abre</dt>
-          <dd>Él, y hacia fuera: un WebSocket <b>saliente</b> contra el plano de control. Ni
-            agujero de firewall entrante ni webhook que firmar y rotar.</dd>
-          <dt>qué cuesta</dt>
-          <dd>Un protocolo versionado que mantener y una conexión viva por tenant: la segunda
-            sustituye a la primera, cerrada con motivo.</dd>
-          <dt>no cambia</dt>
-          <dd><b>guard</b> · <b>log</b> · <b>consentimiento</b> · <b>máscara PII</b></dd>
-        </dl>
-      </div>
-
-    </div>
-
-    <div class="grid-7-5" data-anim="3">
-      <pre class="code">→  <b>hello</b>          {tenant, sdk, proto}
-→  <b>register</b>       {manifest: stages · tools[{name, schema, ToolSpec}] · prompts_hash}
-⇄  <b>ping / pong</b>    la conexión ES el registro: sin latido, el tenant no es enrutable
-←  <b>session.start</b>  {session_id, project, channel}
-←  <b>invoke</b>         {invocation_id, tool, args, deadline}
-→  <b>result</b>         {invocation_id, payload}
-→  <b>fail</b>           {invocation_id, message, retriable}</pre>
-      <div class="note">
-        <b>→</b> del cliente a core · <b>←</b> de core al cliente. Caída a mitad de un
-        <code>invoke</code>: el <code>deadline</code> es el <code>timeout_s</code> del
-        <code>ToolSpec</code>; vencido, <code>ToolError</code> y la etapa ofrece un humano.
-        <b>Lo que no viaja:</b> <code>guard.check</code> rechaza una tool
-        <code>irreversible</code> sin <code>confirmation_token</code> antes de que salga un byte;
-        el log append-only sigue siendo nuestro y un argumento en <code>pii_scope</code> nunca
-        llega entero a él.
+      <div class="i12-box hot i12-col">
+        <h3>Mañana: el agente del cliente vive en su proyecto</h3>
+        <span class="en">diseño trazado — siguiente fase</span>
+        <p><strong>«Su agente vive en su proyecto; nuestra plataforma le da vida a todos.»</strong>
+        El proceso del cliente mantiene sus tools y sus prompts, y se conecta
+        <strong>saliente</strong> por WebSocket — nadie abre puertos entrantes, no hay webhooks
+        que firmar.</p>
+        <div class="i12-frames">hello → register { catálogo de tools + contratos } → invoke / result / fail → ping</div>
+        <div class="i12-keep">
+          <span class="t">Lo que no se muda con el código</span>
+          <p>La autorización, el consentimiento, el historial y la máscara de datos personales
+          quedan en la plataforma. Un tool remoto pasa por el mismo control que uno local —
+          <strong>la autoridad no viaja</strong>.</p>
+        </div>
+        <div class="i12-keep">
+          <span class="t">El enchufe ya existe</span>
+          <p>El ejecutor de tools es un contrato con una sola implementación (local) hoy —
+          la segunda implementación (remota) entra sin tocar al resto del sistema.</p>
+        </div>
       </div>
     </div>
 
-    <div class="proof" data-anim="4">
-      <b>Validación.</b> El hueco ya existe en el código: <b>ToolExecutor</b> es un
-      <span class="n">Protocol</span> en <b>core/tools/executor.py</b> y <b>LocalExecutor</b> es
-      hoy su única implementación — un ejecutor remoto es una segunda clase y nada por encima de
-      esa línea cambia. El protocolo está especificado en las cards
-      <span class="n">tk-1265f0</span> · <span class="n">tk-061906</span> ·
-      <span class="n">tk-8289fb</span> del hito ms-12, hoy sin implementar: es la fase siguiente
-      del roadmap (lámina 14).
-    </div>
+    <p class="proof" data-anim="3">
+      El catálogo de tools viaja con sus contratos: el mismo control gobierna un tool local y
+      uno remoto, y el historial no distingue dónde corrió el código — solo qué se autorizó y
+      qué se ejecutó.
+    </p>
 
   </div>
 </section>
