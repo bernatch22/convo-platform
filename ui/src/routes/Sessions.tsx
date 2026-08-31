@@ -130,6 +130,11 @@ function Row({ tenant, project, row }: { tenant: string; project: string; row: S
       <td>
         <span className={`medium medium--${medium}`}>{medium}</span>
         {row.phone && <span className="medium__number mono">{row.phone}</span>}
+        {row.audio && (
+          <span className="medium__audio" title="this call left a recording">
+            ♪
+          </span>
+        )}
       </td>
       <td className="mono dim">{startedAt(row.started_at)}</td>
       <td>

@@ -274,3 +274,63 @@ retargeted (`CONVO_API=…`) without editing the unit.
   `core.testing.nightly.status_of`. Measured on this box on 2026-08-31: a tuteo
   greeting scored `Keeps the register` 0.00 and pytest passed the suite.
 - **Port 8091 is `livekit-sip`**, not a free port. Anything ad hoc goes higher.
+
+## Call recordings — where they live, and when they go away
+
+Every voice call the fleet answers leaves a stereo OGG: the caller on the left
+channel, the agent on the right, on one absolute timeline whose sample zero is
+the `audio.start` row of that session's log. There is no egress container and
+no second recorder — the capture is the agent's own audio IO, tapped by
+livekit-agents' `RecorderIO`, which costs one `queue.put_nowait` per frame on
+the call path and does its Opus encoding in a daemon thread. Nothing about it
+touches the SFU, and nothing about it needs a GPU.
+
+```
+CONVO_RECORDINGS=/var/lib/convo/recordings        # in /etc/default/convo-worker
+   /var/lib/convo/recordings/<session_id>/audio.ogg
+```
+
+Read one back through the control plane and nowhere else:
+
+```bash
+curl -sf localhost:8090/sessions/<session_id>/recording -o /tmp/call.ogg
+# on a box that sets RECORDINGS_TOKEN:
+curl -sf -H "Authorization: Bearer $RECORDINGS_TOKEN" \
+     localhost:8090/sessions/<session_id>/recording -o /tmp/call.ogg
+```
+
+### The rules, in order of how much they matter
+
+- **A recording is PII.** It is a customer's voice, their name, and often their
+  telephone number spoken out loud. It never enters git (`recordings/`, `*.ogg`
+  and `tmp/` are all ignored), it is never a static mount, and `api.py` is the
+  only door: `GET /sessions/{id}/recording`, which composes the path from a
+  validated session id and refuses one it has no session row for.
+- **Set `RECORDINGS_TOKEN` on any box reachable from outside its own network.**
+  With it set the route wants `Authorization: Bearer <token>` (or `?t=<token>`,
+  because an `<audio src>` cannot send a header) and answers 401 otherwise.
+  Unset, the route is exactly as open as every other read on this API — which is
+  fine behind Caddy on a box only the operator reaches, and is not fine anywhere
+  else.
+- **Retention is thirty days, not forever.** Nothing rotates them yet; that is a
+  named follow-up, not a thing this milestone shipped. Until it exists, the
+  sweep is one line and it is safe to run by hand or from a timer:
+
+  ```bash
+  ssh convo-box 'find /var/lib/convo/recordings -type f -name audio.ogg \
+      -mtime +30 -delete && find /var/lib/convo/recordings -type d -empty -delete'
+  ```
+
+  Budget roughly 0.5 MB per minute of call (Opus, stereo, 24 kHz), so a
+  thousand five-minute calls a month is about 2.5 GB standing.
+- **A tenant can refuse to be recorded.** `Project.recording = False` in the
+  project's own `project.py` and that project's calls write no OGG at all — the
+  console then shows no player on its sessions, which is the visible proof.
+  `RECORD=0` in the worker's environment does the same for a whole deploy.
+- **A supervisor takeover is NOT in the recording.** The tap wraps the agent
+  session's audio IO, and `RoomIO` links exactly one remote participant, so the
+  OGG holds the caller and the agent and nobody else. A human who takes the line
+  is heard by the caller and is silent in the file. The day that has to change,
+  the answer is self-hosted `livekit-egress` composing the whole room — a new
+  container and a new keying problem (egress knows a room, the console knows a
+  session), which is a milestone of its own and not a patch to this one.

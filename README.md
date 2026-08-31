@@ -270,6 +270,36 @@ cd ui && npm install && npm run build     # writes ui/dist (never committed)
 uv run uvicorn api:app --port 8090        # http://localhost:8090
 ```
 
+### Hearing a call back
+
+Every voice call the fleet answers keeps its audio. Open a session in the
+console and there is a player above the latency strip; the Sessions list marks
+the rows that have one with a `♪` beside the channel. Stereo, on the log's own
+timeline: the caller on the left channel, the agent on the right, sample zero
+at the `audio.start` row.
+
+```bash
+# the same file, without a browser
+curl -sf localhost:8090/sessions/<session_id>/recording -o /tmp/call.ogg && afplay /tmp/call.ogg
+```
+
+The capture is the agent's own audio IO, tapped by the framework's
+`RecorderIO`, which costs one queue push per frame on the call path and encodes
+in a daemon thread — there is no egress container and nothing that needs a GPU.
+What changed for ms-17 is only the destination: outside the console the
+framework aimed it at a temp directory it then deleted, so every real call
+recorded perfectly and lost the file on the way out. Recordings now land under
+`CONVO_RECORDINGS` (`tmp/recordings` locally, `/var/lib/convo/recordings` on the
+box), keyed by session id, and never in git.
+
+They hold PII, so `GET /sessions/{id}/recording` is the only door — a validated
+session id, never a path from a log — and a box reachable from outside its own
+network should set `RECORDINGS_TOKEN`. A project can refuse to be recorded with
+`recording=False` in its own `project.py`, and its sessions then show no
+player at all; `RECORD=0` does the same for a whole deploy. Retention, the
+storage budget and the one thing these recordings do NOT contain (a supervisor
+who took the line) are in `infra/box/README.md`.
+
 ## Layout
 
 ```

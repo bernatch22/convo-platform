@@ -42,6 +42,17 @@ and, when a decision was made, a short essay in its thread.
 - Event log is append-only with a per-session `seq`; the stage is appended
   **during** the call (SIGKILL-safe), not only in `on_session_end`.
   `on_session_end` persists `ctx.make_session_report()`.
+- Every voice call keeps its audio, and the tap is the framework's own
+  `RecorderIO` (one `queue.put_nowait` per frame on the call path, Opus encoded
+  in a daemon thread) — never egress, never a GPU. `core/recordings.py` is the
+  ONLY module that composes a recording path: outside the console a
+  `JobContext` aims the recorder at a temp dir it deletes on cleanup, so
+  `recordings.aim` redirects it to `CONVO_RECORDINGS/<session_id>/audio.ogg`
+  during the call (SIGKILL-safe, like the event log). Recordings hold PII: out
+  of git, never a static mount, served only by `GET /sessions/{id}/recording`
+  from a validated session id. `Project.recording=False` opts a project out,
+  `RECORD=0` a deploy. A supervisor takeover is NOT in the file — `RoomIO`
+  links one participant.
 - Sessions are **re-engaged**, not resumed: a dropped call is a new room and job;
   we snapshot `ChatContext.to_dict()` + stage keyed by `sip.phoneNumber` and
   rehydrate on the next inbound within N minutes.
