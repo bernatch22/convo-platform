@@ -189,3 +189,15 @@ def consent_policy() -> ConversationalDAGMetric:
     `consent_policy` and calls its own metric whatever its business calls it.
     """
     return never_cancel_before_yes()
+
+
+def line_metric() -> GEval:
+    """This project's does-it-sound-like-us GEval, under the name the report looks up.
+
+    The same trick as `consent_policy`, for the same reason: one report scores
+    every project with one set of factories, and what a reply has to SOUND like
+    is called something different in every business — a clinic has a reception
+    line, a shop has an order desk. Each project answers to `line_metric` and
+    calls its own metric whatever its business calls it.
+    """
+    return order_desk_line()

@@ -12,7 +12,8 @@ Everything below is verified against DeepEval 4.2 and the code in
 `core/testing/` and the two tenants' `evals/` folders. Run the suite with
 `deepeval test run tests/evals -n 3`; read the HTML with
 `python -m core.testing.report clinica-norte reagendamiento` (writes
-`tmp/reports/deepeval/`).
+`tmp/reports/deepeval/`). Add `--model` twice to run the same goldens against
+both allowed models and get the comparison table — §9.
 
 Since ms-5 there are two businesses on this platform and the split above is
 what makes that cheap: the GRAPHS live in core and the WORDS live in each
@@ -609,6 +610,17 @@ about four minutes.
   day of the patient's own cita is looked up like any other, with the why: of
   that day the agent knows exactly one hour, and it is not the free ones. The
   golden and `test_reception_tools.py -k thursday` stay as the regression.
+- **The greeting golden fails on Haiku and passes on GPT-5.4-mini, in BOTH
+  projects**, and it is the agent, not the metric: Haiku reads the session date
+  note (`core/dates_note.py`) as an instruction addressed to it and answers the
+  operator instead of the caller — «Perfecto, tengo anotado que hoy es martes 1
+  de septiembre de 2026. Estoy listo para atender las llamadas de Tienda Sur.»,
+  and «Entendido. Hoy es martes 1 de septiembre de 2026. Estoy listo…» for the
+  clinic. It is intermittent, so it surfaces under a different metric each run
+  (Reception line, Order desk line, or Keeps the register on a stray "te"),
+  which is exactly why it went unnoticed until two models were run side by side.
+  The fix belongs in how the date note is delivered, not in the goldens: found
+  by the matrix (§9), and every golden stays exactly as it is.
 - DeepEval has no first-class deterministic node; `DeterministicNode` is the
   workaround and the shape of the upstream PR.
 - Ring 3 (stored sessions) landed with ms-4 — §3.6; ring 2's OFFLINE half with ms-6
@@ -633,3 +645,104 @@ about four minutes.
   `result_summary` is reviewing a data-protection decision. The upstream shape
   worth having is a declarative `result_fields: tuple[str, ...]` that can only
   name keys, so the dangerous version does not typecheck.
+
+## 9. The eval matrix — one `goldens.json`, two models
+
+The thesis of this platform is that the LLM is a swappable interface driver.
+That is a claim, and ring 1 is where it is either proved or shown to be talk:
+the same goldens, the same metrics, the same thresholds, run against every model
+the platform will serve, and a table that says where the two disagree.
+
+### How a model is chosen
+
+The model is **project data** (`Project.llm_model`), the same field a console
+override writes, and `core/providers/llm.py` dispatches on the name's family —
+`claude-*` builds the Anthropic plugin, `gpt-*` the OpenAI one.
+`ALLOWED_MODELS` is the short list of models somebody priced and measured, and
+it is not a suggestion.
+
+Nothing in the suites knows about any of this. `core.testing.fake_context`
+takes the model from its `llm_model=` argument or from `$CONVO_EVAL_MODEL`, and
+sets it on a **copy** of the project — the registry hands out one `Project` per
+process, and a suite must not leave the next test on a model it never asked for.
+
+```
+deepeval test run tests/evals -n 4                             # the platform's own model
+CONVO_EVAL_MODEL=gpt-5.4-mini deepeval test run tests/evals -n 4   # every golden, other model
+
+python -m core.testing.report clinica-norte reagendamiento \
+    --model claude-haiku-4-5 --model gpt-5.4-mini
+```
+
+A name outside `ALLOWED_MODELS` **raises** here rather than falling back the way
+a running call does. The fallback is right on the phone — a typo in a stored
+override must not take a project off the air — and wrong in an eval, where it
+would quietly measure Haiku and write `gpt-5.4-mini` at the top of the report.
+
+The report writes one HTML per model per case shape under
+`tmp/reports/deepeval/`, named `ring1@<model>_<tenant>-<project>-<shape>`, and
+ends on the metric × model table plus the divergences (`core/testing/matrix.py`).
+Two `evaluate()` calls per model, because DeepEval will not mix single-turn and
+conversational cases in one run — but both read the SAME conversations, so the
+second shape costs no agent turns.
+
+### What it measured (2026-08-31, ms-7 branch)
+
+**clinica-norte / reagendamiento**, 11 goldens:
+
+| metric | claude-haiku-4-5 | gpt-5.4-mini |
+|---|---|---|
+| Grounded facts [ConversationalDAG] | 9/11 (82%) · 0.82 | 11/11 (100%) · 1.00 |
+| Keeps the register [ConversationalDAG] | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+| Reception line [GEval] | 10/11 (91%) · 0.85 | 11/11 (100%) · 0.92 |
+| Tool Correctness | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+
+**tienda-sur / pedidos**, 11 goldens:
+
+| metric | claude-haiku-4-5 | gpt-5.4-mini |
+|---|---|---|
+| Grounded facts [ConversationalDAG] | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+| Keeps the register [ConversationalDAG] | 11/11 (100%) · 1.00 | 11/11 (100%) · 1.00 |
+| Order desk line [GEval] | 9/11 (82%) · 0.72 | 10/11 (91%) · 0.87 |
+| Tool Correctness | 9/11 (82%) · 0.82 | 9/11 (82%) · 0.82 |
+
+The full pytest ring, from the one `goldens.json`, is **50 passed / 6 failed**
+on Haiku and **52 passed / 6 failed** on GPT-5.4-mini — close enough that the
+suite is measuring the project and not the vendor, which is the only result that
+would have made this exercise worth running.
+
+### Reading the table
+
+Two numbers per cell, and both are needed. The **pass rate** is what CI gates
+on, and on eleven goldens it moves in steps of nine points, so a model that is
+worse everywhere can tie one that is worse nowhere. The **mean score** is the
+continuous half — it separates "0.72 against a 0.7 threshold" from "0.95" — and
+it is meaningless alone, because a metric with a 1.0 threshold only ever scores
+1.0 or 0.0.
+
+The **divergences** are the point. A golden that passes on one model and fails
+on the other is a finding, never a golden to soften: the suite is the fixed
+thing and the model is the variable, and the moment a golden is edited so that a
+specific model passes it, the matrix stops comparing anything. Both directions
+showed up in the first run — GPT is steadier on the clinic's grounded facts,
+Haiku answers the shop's misdirected-caller golden better — which is exactly the
+shape of evidence a table like this exists to produce.
+
+### What it cost
+
+A full ring per model is **≈ $0.10** (§6) and the matrix run for one project on
+two models is about the same again, because the agent turn is the expensive part
+and it is paid once per (golden, model). Do not loop it: run it, read the
+divergences, write them down.
+
+### The trap this replaced
+
+`tools_called[0]` is not the agenda. Since the clock became a tool every stage
+carries (`TenantAgent.fecha_y_hora_actual`), a turn about "mañana" often asks
+what day it is before it asks the agenda anything, and the date assertion in
+`test_reception_tools_deepeval.py` was reading the clock's arguments — which
+hold no `date` at all — and failing a turn that had asked exactly the right
+question. Calls are looked up by NAME now (`core.testing.deepeval.call_named`);
+the ORDER of the calls, when it matters, is ToolCorrectness's job. Index is not
+identity, and any suite that reaches into `tools_called` should say which tool
+it means.
