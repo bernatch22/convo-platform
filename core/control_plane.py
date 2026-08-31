@@ -117,7 +117,18 @@ def _match(running: list[SessionRow], numbers: dict[str, str | None], room: dict
 
 def _sip_number(store: Store, row: SessionRow) -> str | None:
     """The number this session was called on, off its `session.start` event."""
-    for event in store.events(row.id):
+    return _phone_of(store.events(row.id))
+
+
+def _phone_of(events: list[Event]) -> str | None:
+    """The caller's number, or the trunk's when the caller withheld it; None when not a call.
+
+    Only `session.start` carries the SIP attributes, so this reads the first
+    event and stops. A null answer is the honest way to say "this session never
+    came in over the telephone" — it is what makes a phone row distinguishable
+    from a browser one in the call log, where nothing else would tell them apart.
+    """
+    for event in events:
         sip = event.payload.get("sip") or {}
         for attribute in PHONE_ATTRS:
             if sip.get(attribute):
@@ -144,6 +155,7 @@ def _row_view(store: Store, row: SessionRow, events: list[Event] | None = None) 
         "events": len(events),
         "turns": sum(1 for e in events if e.kind.startswith("turn.")),
         "cost_eur": _cost(events),
+        "phone": _phone_of(events),
     }
 
 

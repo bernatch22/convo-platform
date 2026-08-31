@@ -55,7 +55,13 @@ export interface ObserverTicket {
 
 /* ── /sessions ────────────────────────────────────────────────────────────── */
 
-/** One line of the call log. `outcome` and `cost_eur` are null while the call runs. */
+/** One line of the call log. `outcome` and `cost_eur` are null while the call runs.
+ *
+ * `phone` is the caller's number off `session.start`, and null when the
+ * session never came in over the telephone: `channel` says "voice" for a
+ * browser call and a PSTN call alike, so this is the only field that tells
+ * the two apart in the log.
+ */
 export interface SessionLine {
   id: string;
   tenant: string;
@@ -67,6 +73,7 @@ export interface SessionLine {
   events: number;
   turns: number;
   cost_eur: number | null;
+  phone: string | null;
 }
 
 /** One fact in the append-only log. A turn's latencies live in `payload.metrics`. */
