@@ -7,8 +7,10 @@ the caller already told us travels, the whole transcript does not.
 
 Two of the framework's nodes are overridden here, once, for every project:
 `transcription_node` reads the agent's words on their way out and times them in
-the log, and `on_user_turn_completed` drops a murmur that landed on the agent's
-voice. Both are audit and turn-taking, not business, so no stage overrides them.
+the log, and `on_user_turn_completed` is the turn boundary — where a
+supervisor's whisper is applied, where a human holding the line cancels the
+reply, and where a murmur that landed on the agent's voice is dropped. All of
+it is audit and turn-taking, not business, so no stage overrides them.
 """
 
 import logging
@@ -80,17 +82,30 @@ class TenantAgent(Agent):
             words.flush()
 
     async def on_user_turn_completed(self, turn_ctx: ChatContext, new_message: ChatMessage) -> None:
-        """Answer the caller — unless the turn was a murmur over the agent's own voice.
+        """Answer the caller — unless a human holds the line, or the turn was a murmur.
 
-        "vale" while the agent is mid-sentence is agreement, not a question,
-        and a reply to it is a filler the caller hears as a mistake. The turn is
-        recorded as `turn.backchannel` and `StopResponse` cancels the reply.
+        This is the framework's turn boundary, which makes it the one safe
+        moment to swap the agent's chat context: a whisper queued while the
+        agent was mid-sentence is applied here, before the reply is built and
+        never during one. Then, while a supervisor holds the line,
+        `StopResponse` cancels every reply — the turn still lands in the
+        history, which is what `release` reads back to the model, but the
+        caller hears the human and not the agent (agents#3645).
 
-        It cannot cancel the interruption: `core.barge_in` documents where each
-        of the two filters sits in the framework's turn pipeline, and why
-        `InterruptionOptions.min_words` is the one that saves the audio.
+        The last filter is the old one: "vale" while the agent is mid-sentence
+        is agreement, not a question, and a reply to it is a filler the caller
+        hears as a mistake. It cannot cancel the interruption —
+        `core.barge_in` documents where each of the two filters sits in the
+        framework's turn pipeline, and why `InterruptionOptions.min_words` is
+        the one that saves the audio.
         """
         text = new_message.text_content or ""
+        control = self.tc.supervisor
+        if control is not None:
+            await control.flush(self)
+            if control.muted:
+                log.info("turn.muted %s (a human holds the line) %r", self.tc.label(), text)
+                raise StopResponse()
         if not holds_the_floor(self.session):
             return
         if not is_backchannel(text, backchannels_of(self.tc.project)):

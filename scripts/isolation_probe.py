@@ -1,0 +1,223 @@
+"""isolation_probe.py — can this SFU keep a briefing from the caller? Measured in audio frames.
+
+The warm transfer stands or falls on one primitive: two participants confer
+while a third, already in the room and already subscribed, hears nothing. This
+puts three peers in a room, has each publish a continuous tone, and counts the
+frames each one actually receives while both candidate mechanisms are switched
+on and off. A phase is isolated when the counter does not move.
+
+    docker compose -f infra/compose/dev.yml up -d          # a server to ask
+    uv run python scripts/isolation_probe.py
+
+Expected, on livekit-server v1.9.1 (this is the measurement `core/telephony/
+isolation.py` is built on — 400 frames is 4 s of audio, 0 is silence):
+
+    P0 baseline                     caller <- agent 400   caller <- human 400
+      settling                       44 frames still reached the caller
+    P1 update_subscriptions(False)  caller <- agent   0   caller <- human   0
+      settling                      198 frames (audio resuming, the other way)
+    P2 update_subscriptions(True)   caller <- agent 400   caller <- human 400
+      settling                       42 frames still reached the caller
+    P3 briefing (track perms)       caller <- agent   0   caller <- human   0
+      settling                      198 frames (audio resuming)
+    P4 bridged (perms re-opened)    caller <- agent 400   caller <- human 400
+
+Both mechanisms cut the audio completely, and both take about the same time to
+bite: 44 frames over two streams is ~220 ms per stream. That number is the
+warm transfer's one residual — see `core.telephony.transfer.WarmLeg.dial`.
+
+**Count frames, not events.** The first version of this probe watched
+`track_subscribed` / `track_unsubscribed` on the participant being cut off and
+concluded that neither mechanism worked — while the SFU's own log said
+`revoking subscription`. The Python SDK fires no unsubscribe for a server-side
+revocation; the `AudioStream` simply goes quiet. The wrong instrument gave a
+confident wrong answer, and it would have shipped as "warm is impossible here".
+
+Open source note: this measures a property of the SERVER, not of this project.
+Point it at any LiveKit deployment before building a side-channel on top of one.
+"""
+
+import argparse
+import asyncio
+import os
+import sys
+
+import numpy as np
+from livekit import api, rtc
+
+ROOM = "probe-isolation"
+RATE = 48000
+CHUNK = 480  # 10 ms of samples, the frame size the SFU is fed
+TONE_HZ = 440
+HEARD = 5  # frames in a phase below which a pair counts as silent
+SETTLE_S = 1.0  # how long a switch is given to bite before the phase is measured
+
+
+def main(argv: list[str]) -> int:
+    """Run the five phases and print a table an operator can read at a glance."""
+    args = parse_args(argv)
+    asyncio.run(probe(args.phase))
+    return 0
+
+
+async def probe(phase_s: float) -> None:
+    """Three peers, two mechanisms, five phases — and the counters between each."""
+    peers = [Peer("agent"), Peer("caller"), Peer("human")]
+    agent, _caller, human = peers
+    watched = [("caller", "agent"), ("caller", "human"), ("agent", "human"), ("human", "agent")]
+    client = api.LiveKitAPI(
+        url=os.getenv("LIVEKIT_URL", "ws://localhost:7880"),
+        api_key=os.getenv("LIVEKIT_API_KEY", "devkey"),
+        api_secret=os.getenv("LIVEKIT_API_SECRET", "secret"),
+    )
+    try:
+        for peer in peers:
+            await peer.join()
+        await asyncio.sleep(phase_s)
+        sids = await track_sids(client)
+
+        await measure(peers, watched, phase_s, "P0 baseline — everybody hears everybody")
+
+        await settle(peers, lambda: subscribe(client, sids, on=False))
+        await measure(peers, watched, phase_s, "P1 server-side UpdateSubscriptions(False)")
+
+        await settle(peers, lambda: subscribe(client, sids, on=True))
+        await measure(peers, watched, phase_s, "P2 the same call undone")
+
+        await settle(peers, lambda: permissions(agent, human, open_to_all=False))
+        briefing = "P3 BRIEFING — agent and human allow only each other"
+        await measure(peers, watched, phase_s, briefing)
+
+        await settle(peers, lambda: permissions(agent, human, open_to_all=True))
+        await measure(peers, watched, phase_s, "P4 BRIDGED — permissions re-opened")
+    finally:
+        for peer in peers:
+            await peer.leave()
+        await client.aclose()
+
+
+class Peer:
+    """One participant that publishes a tone and counts what it receives from each other one."""
+
+    def __init__(self, identity: str) -> None:
+        self.identity = identity
+        self.room = rtc.Room()
+        self.frames: dict[str, int] = {}
+        self.tasks: list[asyncio.Task] = []
+        self.room.on("track_subscribed", self._on_subscribed)
+
+    async def join(self) -> None:
+        """Connect, publish a microphone track, and start counting."""
+        await self.room.connect(_url(), token(self.identity), rtc.RoomOptions(auto_subscribe=True))
+        self.source = rtc.AudioSource(RATE, 1)
+        track = rtc.LocalAudioTrack.create_audio_track(f"{self.identity}-mic", self.source)
+        options = rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_MICROPHONE)
+        await self.room.local_participant.publish_track(track, options)
+        self.tasks.append(asyncio.create_task(self._tone()))
+
+    async def leave(self) -> None:
+        """Stop every task and disconnect; a probe that leaves peers behind blocks the next run."""
+        for task in self.tasks:
+            task.cancel()
+        try:
+            await self.room.disconnect()
+        except Exception as error:  # noqa: BLE001 — a probe's teardown is not its result
+            print(f"{self.identity}: disconnect failed: {error}", file=sys.stderr)
+
+    def _on_subscribed(self, track, publication, participant) -> None:
+        self.tasks.append(asyncio.create_task(self._count(track, participant.identity)))
+
+    async def _count(self, track, who: str) -> None:
+        async for _frame in rtc.AudioStream(track):
+            self.frames[who] = self.frames.get(who, 0) + 1
+
+    async def _tone(self) -> None:
+        sample = 0
+        while True:
+            samples = np.arange(sample, sample + CHUNK)
+            wave = (np.sin(2 * np.pi * TONE_HZ * samples / RATE) * 12000).astype(np.int16)
+            await self.source.capture_frame(rtc.AudioFrame(wave.tobytes(), RATE, 1, CHUNK))
+            sample += CHUNK
+
+
+async def measure(
+    peers: list[Peer], watched: list[tuple[str, str]], phase_s: float, title: str
+) -> None:
+    """Print how many frames moved on each watched pair over one phase."""
+    print(f"\n{title}")
+    before = {(p.identity, who): n for p in peers for who, n in p.frames.items()}
+    await asyncio.sleep(phase_s)
+    after = {(p.identity, who): n for p in peers for who, n in p.frames.items()}
+    for listener, publisher in watched:
+        moved = after.get((listener, publisher), 0) - before.get((listener, publisher), 0)
+        verdict = "HEARS" if moved > HEARD else "silent"
+        print(f"    {listener:<7} <- {publisher:<7} {moved:>5} frames   {verdict}")
+
+
+async def track_sids(client: api.LiveKitAPI) -> dict[str, str]:
+    """Each participant's first published track, by identity — what UpdateSubscriptions names."""
+    request = api.ListParticipantsRequest(room=ROOM)
+    people = (await client.room.list_participants(request)).participants
+    return {person.identity: person.tracks[0].sid for person in people if person.tracks}
+
+
+async def settle(peers: list[Peer], switch) -> None:
+    """Throw the switch and say how much audio still reached the caller before it bit.
+
+    This is the number the warm transfer is built around, not a formality: a
+    cut that takes effect a beat late is a beat of the briefing the caller
+    hears. It is reported in frames of 10 ms.
+    """
+    caller = next(peer for peer in peers if peer.identity == "caller")
+    before = dict(caller.frames)
+    await switch()
+    await asyncio.sleep(SETTLE_S)
+    leaked = sum(caller.frames.get(who, 0) - before.get(who, 0) for who in ("agent", "human"))
+    print(f"\n    settling ({SETTLE_S:.1f}s): {leaked} frame(s) still reached the caller")
+
+
+async def subscribe(client: api.LiveKitAPI, sids: dict[str, str], on: bool) -> None:
+    """Switch the caller's subscription to the agent and the human, server-side."""
+    request = api.UpdateSubscriptionsRequest(
+        room=ROOM, identity="caller", track_sids=[sids["agent"], sids["human"]], subscribe=on
+    )
+    await client.room.update_subscriptions(request)
+
+
+async def permissions(agent: Peer, human: Peer, open_to_all: bool) -> None:
+    """The publisher's own gate: either everybody may subscribe, or only the other one."""
+    for peer, only in ((agent, "human"), (human, "agent")):
+        peer.room.local_participant.set_track_subscription_permissions(
+            allow_all_participants=open_to_all,
+            participant_permissions=[]
+            if open_to_all
+            else [rtc.ParticipantTrackPermission(participant_identity=only, allow_all=True)],
+        )
+
+
+def token(identity: str) -> str:
+    """A join token for the probe room; the dev compose's default key signs it."""
+    grants = api.VideoGrants(room_join=True, room=ROOM, can_publish=True, can_subscribe=True)
+    return (
+        api.AccessToken(
+            os.getenv("LIVEKIT_API_KEY", "devkey"), os.getenv("LIVEKIT_API_SECRET", "secret")
+        )
+        .with_identity(identity)
+        .with_grants(grants)
+        .to_jwt()
+    )
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    """`--phase` is the only knob: how many seconds each measurement runs for."""
+    parser = argparse.ArgumentParser(description="Measure audio isolation on a LiveKit server.")
+    parser.add_argument("--phase", type=float, default=4.0, help="seconds per phase (default 4)")
+    return parser.parse_args(argv)
+
+
+def _url() -> str:
+    return os.getenv("LIVEKIT_URL", "ws://localhost:7880")
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

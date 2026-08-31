@@ -18,6 +18,8 @@ from livekit.agents.cli import AgentsConsole
 
 from core.providers import vad_for
 from core.router import resolve
+from core.security.control import SupervisorControl
+from core.security.monitor import watch_supervisors
 from core.session import build_session, start_session
 from core.state.attach import close_log
 
@@ -40,6 +42,14 @@ async def entrypoint(ctx: JobContext) -> None:
     """Resolve the tenant for this job and run its conversation."""
     tc = await resolve(ctx)
     session = build_session(tc, vad=ctx.proc.userdata.get("vad"))
+    # A supervisor's verbs are aimed at THIS session, so the control is built with
+    # it and hung on the context every stage already carries. The watch stays out
+    # of `build_session` because it is about the ROOM: a console run has no room,
+    # gets no control, and so has no second human to obey. The room is passed too
+    # because `transfer` needs a NAME and a caller identity, and only the room has
+    # those — a console run is refused the verb rather than guessing at them.
+    tc.supervisor = SupervisorControl(tc, session, ctx.room)
+    watch_supervisors(ctx.room, tc, tc.supervisor)
     ctx.add_shutdown_callback(_report_filer(ctx, session, tc))
     await start_session(
         session,

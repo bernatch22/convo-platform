@@ -5,11 +5,12 @@ import { defineConfig } from "vite";
 
 /** The control plane the dev server proxies to; every API path below is forwarded there. */
 const API = process.env.CONVO_API ?? "http://127.0.0.1:8090";
-
+// Prefixes, not exact paths: "/supervise" carries "/supervise/entered" with it.
 const API_PATHS = [
   "/tenants",
   "/token",
   "/observe",
+  "/supervise",
   "/sessions",
   "/live-calls",
   "/pipeline",
