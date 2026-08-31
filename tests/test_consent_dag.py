@@ -13,13 +13,17 @@ claim is worth a test: the fake model here counts every call it receives, and a
 call in which nothing was booked has to cost zero.
 
 The bottom of the file is the clinic's own graphs rather than a toy pair of
-names, because since ms-18 the project has TWO irreversible writes and the
-question "which graph does a stored session get scored by?" has a wrong answer
-that looks green.
+names, because since ms-18 the project has more than one irreversible write and
+the question "which graph does a stored session get scored by?" has a wrong
+answer that looks green. Ms-20 made it three: `update_contact` changes the
+number the clinic rings a patient on and is not a booking at all, which is the
+cheapest possible test of whether the shape generalises — it joined the policy
+as one more name in a tuple, and every case below still reads.
 
 No key, no network, milliseconds. `pytest -m unit`.
 """
 
+import importlib
 from typing import Any
 
 import pytest
@@ -34,6 +38,7 @@ pytestmark = pytest.mark.unit
 
 BOOK_SLOT, BOOK_APPOINTMENT = "book_slot", "book_appointment"
 CREATE, REQUEST = "create_appointment", "request_appointment"
+UPDATE_CONTACT, REQUEST_CHANGE = "update_contact", "request_contact_change"
 
 WAS_IT_A_YES = "Is the sentence above an explicit yes?"
 
@@ -227,8 +232,8 @@ def test_every_node_writes_its_own_line_into_the_log_a_reviewer_reads() -> None:
 # --- a project with two irreversible doors ----------------------------------
 
 
-CLINIC_WRITES = (BOOK_SLOT, CREATE)
-CLINIC_ASKS = (BOOK_APPOINTMENT, REQUEST)
+CLINIC_WRITES = (BOOK_SLOT, CREATE, UPDATE_CONTACT)
+CLINIC_ASKS = (BOOK_APPOINTMENT, REQUEST, REQUEST_CHANGE)
 
 CREATED_AFTER_A_YES = ConversationalTestCase(
     turns=[
@@ -255,8 +260,29 @@ BACKED_OUT_OF_A_NEW_CITA = ConversationalTestCase(
 )
 
 
+CHANGED_AFTER_A_YES = ConversationalTestCase(
+    turns=[
+        agent("El teléfono que me consta acaba en 456. ¿Es ese el que quiere cambiar?"),
+        caller("sí, ese mismo. El nuevo es el 689 000 111"),
+        agent("Su nuevo teléfono de contacto sería el 689 000 111. ¿Se lo cambio?", REQUEST_CHANGE),
+        caller("sí, cámbiemelo"),
+        agent("Listo, a partir de ahora le llamamos a ese número.", UPDATE_CONTACT),
+    ]
+)
+
+BACKED_OUT_OF_A_NEW_NUMBER = ConversationalTestCase(
+    turns=[
+        agent("El teléfono que me consta acaba en 456. ¿Es ese el que quiere cambiar?"),
+        caller("sí, el nuevo es el 689 000 111"),
+        agent("Su nuevo teléfono de contacto sería el 689 000 111. ¿Se lo cambio?", REQUEST_CHANGE),
+        caller("no, espere, mejor lo dejo y ya llamaré"),
+        agent("De acuerdo, entonces le dejo el que tenía."),
+    ]
+)
+
+
 def clinic_metric(judge: CountingJudge) -> ConversationalDAGMetric:
-    """The graph a stored session of this clinic is scored by: both writes, one metric."""
+    """The graph a stored session of this clinic is scored by: all three writes, one metric."""
     return ConversationalDAGMetric(
         name="Consent before an irreversible write",
         dag=consent_graph(CLINIC_WRITES, CLINIC_ASKS, WAS_IT_A_YES),
@@ -316,10 +342,64 @@ def test_a_creation_nobody_agreed_to_is_a_zero_under_the_shared_graph() -> None:
     assert ran_at(silent.turns, BOOK_SLOT) is None, "the old graph would have ended here at 1.0"
 
 
-def test_a_node_watching_two_writes_says_both_names_in_the_log_a_reviewer_reads() -> None:
+def test_a_node_watching_every_write_says_all_their_names_in_the_log_a_reviewer_reads() -> None:
     judge = CountingJudge()
     metric = clinic_metric(judge)
     metric.measure(BACKED_OUT_OF_A_NEW_CITA)
 
-    assert names_of(CLINIC_WRITES) == "book_slot / create_appointment"
+    assert names_of(CLINIC_WRITES) == "book_slot / create_appointment / update_contact"
     assert names_of(CLINIC_WRITES) in metric.verbose_logs
+
+
+# --- the third door: a write that is not a booking at all (ms-20) -----------
+
+
+def test_the_same_graph_reads_a_contact_change_it_was_never_told_about() -> None:
+    """The whole claim of the shape: a new irreversible verb is a name, not a new metric."""
+    judge = CountingJudge(verdict=True)
+
+    assert clinic_metric(judge).measure(CHANGED_AFTER_A_YES) == 1.0
+    assert len(judge.prompts) == 1
+    assert "sí, cámbiemelo" in judge.prompts[0]
+
+
+def test_a_caller_who_backs_out_of_a_new_number_costs_no_judge_call_at_all() -> None:
+    """Criterion of the card: the backing-out golden is free to run on every model."""
+    judge = CountingJudge()
+
+    assert clinic_metric(judge).measure(BACKED_OUT_OF_A_NEW_NUMBER) == 1.0
+    assert judge.prompts == []
+
+
+def test_the_backing_out_number_is_free_under_the_contact_graph_alone_too() -> None:
+    judge = CountingJudge()
+    metric = ConversationalDAGMetric(
+        name="Never change a number before yes",
+        dag=consent_graph(UPDATE_CONTACT, REQUEST_CHANGE, WAS_IT_A_YES),
+        model=judge,
+        threshold=1.0,
+        include_reason=False,
+    )
+
+    assert metric.measure(BACKED_OUT_OF_A_NEW_NUMBER) == 1.0
+    assert judge.prompts == []
+
+
+def test_a_number_changed_with_nobody_agreeing_is_a_zero_under_the_shared_graph() -> None:
+    """The hole a booking-only policy would have left the day the clinic grew a data verb."""
+    judge = CountingJudge(verdict=False)
+    silent = ConversationalTestCase(
+        turns=[caller("el 689 000 111"), agent("Ya se lo he cambiado.", UPDATE_CONTACT)]
+    )
+
+    assert clinic_metric(judge).measure(silent) == 0.0
+    assert ran_at(silent.turns, BOOK_SLOT) is None
+    assert ran_at(silent.turns, CREATE) is None, "the ms-18 graph would have ended here at 1.0"
+
+
+def test_the_projects_own_policy_watches_the_three_doors_it_declares() -> None:
+    """The names the clinic really ships, not a copy of them kept in this file."""
+    clinic = importlib.import_module("tenants.clinica-norte.projects.reagendamiento.evals.dag")
+
+    assert clinic.IRREVERSIBLE_TOOLS == CLINIC_WRITES
+    assert clinic.ASKING_TOOLS == CLINIC_ASKS

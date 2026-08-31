@@ -13,7 +13,21 @@ call.
 from core.agents import RunContext, TenantAgent, function_tool
 from core.context import TenantContext
 
-from .. import dates, prompts
+from .. import dates, prompts, tools
+
+# Which errand the caller turned out to want. It is not a routing flag — the handoff
+# already routed the call — but the one thing `summary()` cannot read off the patient:
+# somebody changing a phone number and somebody moving a cita are the same record, and
+# the next stage is owed a different amount of it.
+APPOINTMENT, CONTACT = "appointment", "contact"
+
+NO_RECORD_TO_CHANGE = (
+    "No consta ninguna ficha con esos datos, así que no hay nada que puedas cambiar: sin "
+    "localizar al paciente no se toca ningún dato de nadie. Pídele que te repita el nombre o "
+    "el teléfono por si se ha oído mal y vuelve a llamar a esta herramienta con lo que te "
+    "diga. Si sigue sin aparecer, explícale que no le encuentras y que puede pasarse por "
+    "recepción con su DNI. No le preguntes por el número nuevo: no hay dónde apuntarlo."
+)
 
 NOT_FOUND = (
     "No consta ninguna cita con esos datos. Pídele que te repita el nombre o el teléfono "
@@ -26,16 +40,19 @@ NOT_FOUND = (
 
 
 class Identify(TenantAgent):
-    """Greets, asks for the name and the phone, and routes to a change or to a new cita."""
+    """Greets, asks for the name and the phone, and routes to a change, a new cita or a datum."""
 
     def __init__(self, tc: TenantContext) -> None:
         super().__init__(tc, instructions=prompts.identify_prompt(tc))
+        self.errand = APPOINTMENT
 
     def summary(self) -> str:
         """What the next stage needs from this one: who is calling and what they already have."""
         patient = self.tc.customer
         if not patient:
             return "Todavía no se ha identificado al paciente."
+        if self.errand == CONTACT:
+            return self._contact_summary(patient)
         if not patient.get("appointment_id"):
             return (
                 f"Paciente identificado: {patient['patient']}, teléfono {patient['phone']}. "
@@ -110,3 +127,57 @@ class Identify(TenantAgent):
         from .new_booking import NewBooking
 
         return self.hand_off(NewBooking(tc))
+
+    @function_tool
+    async def start_contact_update(
+        self,
+        ctx: RunContext[TenantContext],
+        name: str,
+        phone: str | None = None,
+    ) -> str | tuple:
+        """Localiza la ficha del paciente y da paso a cambiarle el teléfono de contacto.
+
+        Llámala en cuanto el paciente te haya dicho su NOMBRE y sepas que lo que quiere es
+        cambiar su teléfono. El nombre es la condición: mientras no lo hayas oído no la
+        llames, pídeselo y llámala en el turno siguiente. Lo que esta herramienta hace es
+        buscar la ficha, así que llamarla sin nombre es buscar a nadie y perder un turno.
+        No la llames para cambiar una cita —para eso está la de buscar al paciente— ni le
+        pidas el número nuevo antes de llamarla: eso viene después y no es de esta parte de
+        la llamada.
+
+        Args:
+            name: el nombre del paciente tal y como LO HA DICHO ÉL. Si todavía no ha dicho
+                su nombre, no llames a esta herramienta: pídeselo primero. Nunca pongas aquí
+                un trozo de lo que ha dicho («el que tenéis está mal») ni te lo inventes; con
+                eso dentro la búsqueda no encuentra a nadie y el paciente se queda igual.
+            phone: el teléfono ANTIGUO, el que ya consta, y solo si el paciente lo ha dicho.
+                Casi nunca lo dirá: llama justamente porque ese número ya no le sirve.
+                Omítelo mientras no lo sepas, que con el nombre suele bastar.
+
+        Devuelve el paso a esa parte de la llamada, o la indicación de que no consta ninguna
+        ficha con esos datos —y entonces no se cambia nada.
+        """
+        tc = ctx.userdata
+        patient = await tc.tools.call("find_patient", {"name": name, "phone": phone})
+        if not patient:
+            return NO_RECORD_TO_CHANGE
+        tc.customer = patient
+        self.errand = CONTACT
+        from .update_contact import UpdateContact
+
+        return self.hand_off(UpdateContact(tc))
+
+    def _contact_summary(self, patient: dict) -> str:
+        """The one summary in this project that hands the next stage LESS than it holds.
+
+        A phone number is what UpdateContact is about to change and what it must
+        never read out, and the surest way to stop a stage saying something is to
+        keep it out of the stage. So the number crosses the handoff as its last
+        three digits and nothing else: a prompt paragraph can be argued with by a
+        model, a value it was never given cannot.
+        """
+        return (
+            f"Paciente identificado: {patient['patient']}. El teléfono que consta en su ficha "
+            f"{tools.masked_phone(patient.get('phone'))} — esas cifras son lo único que sabes "
+            "de él y lo único que puedes decirle. Quiere cambiarlo por otro."
+        )

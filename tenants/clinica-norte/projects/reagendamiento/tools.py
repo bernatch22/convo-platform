@@ -15,6 +15,7 @@ one-line unit test.
 import datetime
 import re
 
+from ...adapters import patients
 from . import dates
 
 HHMM = re.compile(r"(\d{1,2})\s*[:.hy ]?\s*(\d{2})?")
@@ -40,6 +41,20 @@ NEW_BOOKING_FAILED = (
     "El sistema de citas ha rechazado esa hora y no se ha guardado nada: el paciente sigue "
     "sin ninguna cita apuntada. Díselo con estas dos ideas —no ha podido reservarse y no le "
     "queda nada a su nombre— y ofrécele otra hora."
+)
+
+UNREADABLE_PHONE = (
+    "Ese número no son nueve cifras, así que no se ha cambiado nada. Pídele que te lo repita "
+    "cifra a cifra y vuelve a llamar a la herramienta con el número entero."
+)
+CONTACT_NOT_CONFIRMED = (
+    "El paciente no ha confirmado, así que su teléfono sigue siendo el que ya constaba. "
+    "Pregúntale qué prefiere hacer y no vuelvas a intentarlo sin que te lo pida."
+)
+CONTACT_UPDATE_FAILED = (
+    "La ficha del paciente no ha aceptado el cambio y su teléfono sigue siendo el que ya "
+    "constaba. Díselo tal cual —no se ha podido cambiar y el número de antes sigue en pie— y "
+    "ofrécele que lo intentemos de nuevo o que pase por recepción."
 )
 
 
@@ -72,6 +87,58 @@ def sms_text(patient: str, slot: dict[str, str]) -> str:
         f"Clínica Norte: {patient}, su cita queda el {dates.spanish_moment(slot['when'])} "
         f"con {slot['doctor']}. Para cambiarla llame al 910 000 000."
     )
+
+
+def masked_phone(phone: str | None) -> str:
+    """`600123456` → `acaba en 456`: the only thing reception may say about a number on file.
+
+    Validation without disclosure, which is the whole shape of this errand. The
+    patient rings because the number the clinic holds is wrong, so the agent has
+    to make sure they are both talking about the same record — and reading nine
+    digits out to whoever picked up the phone would hand a stranger the very
+    datum the call is about to change. Three digits are recognised instantly by
+    the person who owns them and are worth nothing to anybody else, which is why
+    every bank in Spain says a number this way.
+
+    `patients.last_digits` is the tail, this is the sentence: one place decides
+    how much, one place decides how it sounds.
+    """
+    return f"acaba en {patients.last_digits(phone)}"
+
+
+def normalise_phone(said: str | None) -> str:
+    """The digits of a number the caller read out, or "" — `689 00 01 11` and `689000111` are one.
+
+    Spoken numbers arrive with spaces, dots and dashes in them, and a Spanish
+    mobile is nine digits. Anything shorter is a number that was misheard rather
+    than a number that was given, and the stage asks again instead of writing it.
+    """
+    digits = "".join(character for character in (said or "") if character.isdigit())
+    return digits if len(digits) == patients.PHONE_DIGITS else ""
+
+
+def spoken_phone(phone: str) -> str:
+    """`689000111` → `689 000 111`: a number grouped so a TTS reads it as a phone number.
+
+    Nine digits in a row are read out as one enormous cardinal — «seiscientos
+    ochenta y nueve millones…» — which is not a number anybody can check against
+    the one they just said. Three groups of three is how the number is printed
+    on every Spanish document and how it is said out loud.
+    """
+    return " ".join(phone[index : index + 3] for index in range(0, len(phone), 3))
+
+
+def contact_confirmation_question(phone: str) -> str:
+    """The sentence the caller has to say yes to before the clinic changes how it reaches them.
+
+    Rendered here from the digits the platform is about to write, never by the
+    model, for the same reason as the two booking questions: what the caller
+    agreed to and what is written have to be the same thing by construction. The
+    NEW number is read out whole — the caller said it seconds ago, and a
+    confirmation that masked it would be asking somebody to agree to a number
+    they cannot hear.
+    """
+    return f"Su nuevo teléfono de contacto sería el {spoken_phone(phone)}. ¿Se lo cambio?"
 
 
 def confirmation_question(slot: dict[str, str]) -> str:

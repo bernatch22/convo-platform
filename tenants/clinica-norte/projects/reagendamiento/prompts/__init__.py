@@ -42,15 +42,23 @@ from .new_booking import (
     NEW_BOOKING_INSTRUCTIONS,
     NEW_BOOKING_ROLE,
 )
+from .update_contact import (
+    CONFIRM_CONTACT_INSTRUCTIONS,
+    UPDATE_CONTACT_EXAMPLES,
+    UPDATE_CONTACT_INSTRUCTIONS,
+    UPDATE_CONTACT_ROLE,
+)
 
 __all__ = [
     "choose_slot_prompt",
+    "confirm_contact_instructions",
     "confirm_instructions",
     "confirm_new_booking_instructions",
     "farewell_prompt",
     "identify_prompt",
     "new_booking_prompt",
     "stage_prompt",
+    "update_contact_prompt",
 ]
 
 
@@ -69,6 +77,13 @@ def new_booking_prompt(tc: TenantContext) -> str:
     return stage_prompt(tc, NEW_BOOKING_ROLE, NEW_BOOKING_INSTRUCTIONS, NEW_BOOKING_EXAMPLES)
 
 
+def update_contact_prompt(tc: TenantContext) -> str:
+    """The stage that validates the number on file by its last digits and changes it."""
+    return stage_prompt(
+        tc, UPDATE_CONTACT_ROLE, UPDATE_CONTACT_INSTRUCTIONS, UPDATE_CONTACT_EXAMPLES
+    )
+
+
 def confirm_instructions() -> str:
     """The prompt ConfirmTask asks with when a cita is being MOVED, in the clinic's register."""
     return CONFIRM_INSTRUCTIONS
@@ -77,6 +92,11 @@ def confirm_instructions() -> str:
 def confirm_new_booking_instructions() -> str:
     """The same, for a cita being CREATED: there is no earlier hour to promise back."""
     return CONFIRM_NEW_BOOKING_INSTRUCTIONS
+
+
+def confirm_contact_instructions() -> str:
+    """The same, for a contact number being REPLACED: what is read back is digits, not an hour."""
+    return CONFIRM_CONTACT_INSTRUCTIONS
 
 
 def farewell_prompt(tc: TenantContext) -> str:

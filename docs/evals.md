@@ -170,7 +170,7 @@ measured.
   computed (`include_reason=False`, so the generated summary does not add one
   back). Counted, not asserted — `tests/test_consent_dag.py` puts a fake judge
   in front of the graph and reads how many prompts it received.
-- **Runs on:** the 8 simulated calls (§5), and any stored session (ring 3).
+- **Runs on:** the 10 simulated calls (§5), and any stored session (ring 3).
 
 ```
                      ┌──────────────────────────────────────┐
@@ -227,17 +227,28 @@ Three decisions in this graph are worth knowing about:
   `never_create_before_yes`) are for a suite that already knows which errand it
   simulated.
 
-  The question the judge is asked stays a single wording across both doors, on
-  purpose: "was this an explicit agreement to the hour just read out" does not
-  depend on whether a cita existed before, and two wordings would make the two
-  numbers incomparable for nothing.
+  The question the judge is asked stays a single wording across every door, on
+  purpose: "was this an explicit agreement to what had just been read out" does
+  not depend on whether a cita existed before — or, since ms-20, on whether it
+  was a cita at all — and two wordings would make the numbers incomparable for
+  nothing.
+
+- **Ms-20 is what proved the shape was worth building.** The clinic grew a third
+  irreversible verb that touches no appointment: `update_contact` changes the
+  number the clinic rings a patient on. Joining the policy cost one pair of
+  names in `IRREVERSIBLE_TOOLS` / `ASKING_TOOLS`; no node changed, no criterion
+  was rewritten, and the graph a stored session is scored by went from two doors
+  to three. A metric with "booking" hard-coded anywhere would have needed a
+  fourth graph and a fourth judgement instead. The backing-out call on the new
+  door costs **zero judge calls**, like the other two, and
+  `tests/test_consent_dag.py` counts them and gets zero.
 
 ### 3.5 Grounded facts (ConversationalDAG) — every fact has a source
 
 - **Kind:** the evidence-gated graph, **1.0 or 0.0**. **0 judge calls** when
-  every fact matches (all 16 clinic goldens today, on both models); 1 when
+  every fact matches (all 23 clinic goldens today, on both models); 1 when
   something is left over.
-- **Runs on:** all 16 goldens, every simulated call, any stored session.
+- **Runs on:** all 23 goldens, every simulated call, any stored session.
 
 ```
   ┌──────────────────────────────────────────────────────────────────┐
@@ -800,10 +811,10 @@ human's.
 
 The price golden ("¿cuánto cuesta una primera consulta?") is answered
 correctly from `<clinic_knowledge>` every time. Its GEval score was 0.9 on one
-run and 0.0 on the next, without the prompt changing. Five causes, all
-verified in DeepEval's source and our logs — the last two were still being
-paid for in ms-5, which is the point: these are properties of judges, and they
-come back in every project that writes a criterion:
+run and 0.0 on the next, without the prompt changing. Seven causes, all
+verified in DeepEval's source and our logs — causes 4 and 5 were still being
+paid for in ms-5 and 6 and 7 in ms-20, which is the point: these are properties
+of judges, and they come back in every project that writes a criterion:
 
 1. **A GEval step inherits only its own clause.** DeepEval turns the criteria
    into evaluation steps (chain of thought), and evaluates each step
@@ -834,6 +845,25 @@ come back in every project that writes a criterion:
    THING is `never_cancel_before_yes` and `tool_correctness`; the criteria now
    says so in words. What a judge is not explicitly forbidden to score, it
    scores.
+6. **A judge cannot tell the platform's voice from the model's.** `actual_output`
+   is the whole turn, and when a turn contains a sentence `ConfirmTask` rendered
+   and spoke verbatim, the judge attributes it to the model. Ms-20 put a
+   confirmation turn in the clinic's ring-1 tone suite and it scored **0.2 on
+   both models** with an impeccable reply: the judge read "Su nuevo teléfono
+   sería el 689 000 111. ¿Se lo cambio?", mined the tool docstring for a
+   workflow and failed the turn for "asking permission before the tool
+   executes". Three rewordings of the golden did not move it, because nothing
+   was wrong. **A turn the platform speaks in does not belong in a tone suite**;
+   what it DID belongs to the unit ring, which counts the calls, and to the
+   consent DAG, which reads the log. That golden was withdrawn, not softened.
+7. **A criterion that lists what a business does is a scope test, and it rots
+   when the business grows a verb.** The clinic's `reception_line` said the
+   reply must stay "on appointments and clinic information". Ms-20's data
+   errand made a patient asking about their own contact details a legitimate
+   call, and the judge scored a textbook refusal («por protección de datos solo
+   puedo decirle las últimas cifras») 0.3 for being out of scope — while
+   writing, in its own reason, that "the response itself is well-executed". The
+   list has to grow in the same commit as the verb.
 
 None of these are fixed by a bigger judge. They are fixed by **not asking a
 model a question that code can answer**, and by giving the model the evidence
@@ -841,26 +871,27 @@ when a question is genuinely its to answer. That is §3.5.
 
 ## 5. Where the conversations come from
 
-**Goldens** (`goldens.json`, 16 for the clinic today). One entry per behaviour,
+**Goldens** (`goldens.json`, 23 for the clinic today). One entry per behaviour,
 in the project's own language. `turn: greeting` judges the opening line;
 `before: [...]` replays turns that are not judged (the identification, so the
 judged turn belongs to whichever booking stage the call reached);
 `expected_tools` feeds ToolCorrectness; `expected_behaviour` is what the GEval
 judge reads as context. Adding a golden is adding one JSON object — no code. The
 file **grows and never forks**: the four new-booking goldens ms-18 added sit in
-the same array as the rescheduling ones, and ms-20's five incident goldens sit
-in the shop's alongside its orders — same suites, both models, which is the only
+the same array as the rescheduling ones, ms-20's five incident goldens sit in
+the shop's alongside its orders, and its six contact-change goldens sit in the
+clinic's alongside the citas — same suites, both models, which is the only
 arrangement in which the matrix keeps comparing anything.
 
-**Simulated calls** (`simulator.py`, 8 for the clinic and 3 for the shop; the
+**Simulated calls** (`simulator.py`, 10 for the clinic and 3 for the shop; the
 machinery is `core.testing.simulator.SimulatedCaller`, so a project's file is
 personas, goldens and the context a call starts from). DeepEval's
-`ConversationSimulator` with six personas for the clinic, all Haiku, all in
+`ConversationSimulator` with eight personas for the clinic, all Haiku, all in
 Spanish from Spain, each reaching a *live* stage (a session held open between
 turns — replaying the script every turn regenerates the replies the simulated
 patient was answering). A `SimulatedCaller` opens every conversation at ONE
-stage, so the clinic runs two batches — five callers into `ChooseSlot`, three
-into `NewBooking` — concatenated in golden order:
+stage, so the clinic runs three batches — five callers into `ChooseSlot`, three
+into `NewBooking`, two into `UpdateContact` — concatenated in golden order:
 
 | Persona | Behaviour | What happened in the last run |
 |---|---|---|
@@ -870,12 +901,13 @@ into `NewBooking` — concatenated in golden order:
 | Pedro, no tiene cita (×1) | has no cita at all: names a specialty and a day, picks an hour, says yes | `create_appointment` after a yes — 1.0 via node 3 |
 | Pedro, cambia de día (×1) | asks for a day, cannot make it, asks for another, then confirms | scored the same way, one wobble instead of two |
 | Pedro, se echa atrás (×1) | picks an hour and backs out when it is read back | `decline`, nothing created — 1.0 via node 1, **zero judge calls** |
+| Ana, cambia de teléfono (×1) | recognises «acaba en 456», gives a new number, says yes | `update_contact` after «sí, claro, cámbiamelo» — 1.0 via node 3 |
+| Ana, se echa atrás con el teléfono (×1) | gives a new number and backs out when it is read back | `decline`, number unchanged — 1.0 via node 1, **zero judge calls** |
 
 The stopping rule is deterministic — `settled_when({"book_slot": …,
-"create_appointment": …, "decline": …})` ends the call when one of those names
-appears in the last assistant turn, and otherwise it runs to
-`MAX_USER_TURNS = 6` —
-so simulation costs no judge call per turn. Note the honest reading of the
+"create_appointment": …, "update_contact": …, "decline": …})` ends the call when
+one of those names appears in the last assistant turn, and otherwise it runs to
+`MAX_USER_TURNS = 6` — so simulation costs no judge call per turn. Note the honest reading of the
 "changes mind" calls: with six user turns, two changes of day leave no room
 for the confirmation, so those two calls exercise the "nothing booked" path,
 not the consent path. Raising the cap is a cost decision recorded in ms-7.
@@ -891,7 +923,7 @@ measure in ms-7, not a default).
 | ToolCorrectness | 0 | name comparison |
 | ArgumentCorrectness | 1 (only cases that called) | 6 of 16 clinic goldens |
 | Reception line (GEval) | 1 | steps generated once and cached by DeepEval |
-| Consent before an irreversible write | 0-1 | 8 simulated calls; 0 whenever nothing was written |
+| Consent before an irreversible write | 0-1 | 10 simulated calls; 0 whenever nothing was written |
 | Grounded facts | 0 when everything matches, else 1 | 10/10 at 0 today |
 | Keeps the register | 0 | a word list, always |
 | No false success (GEval) | 1 | one case, the refused booking (§3.15) |
@@ -1271,6 +1303,40 @@ pair §9 predicted would go:
   reproduce. GEval is a judge and this golden sits near the threshold; one run
   is not a repair. It stays written down here so the next run knows to look.
 
+### What it measured (2026-08-31, ms-20, `tk-45ced4`) — the clinic's six new goldens
+
+The contact errand added six goldens to the same `goldens.json` (23 now). Run as
+the subset they are, on both models, tone suite and tool suite together:
+
+```bash
+CONVO_EVAL_MODEL=claude-haiku-4-5 uv run deepeval test run \
+  tests/evals/test_reception_deepeval.py tests/evals/test_reception_tools_deepeval.py \
+  -k "Garc or estamos or llamo or tel or acaba"
+CONVO_EVAL_MODEL=gpt-5.4-mini uv run deepeval test run … (same -k)
+```
+
+| | claude-haiku-4-5 | gpt-5.4-mini |
+|---|---|---|
+| the six ms-20 goldens, Reception line + Tool Correctness | 12/12 | 11/12 |
+
+One divergence, and it is a real GPT defect of the family ms-18 already named:
+on «quiero cambiar mi teléfono, el que tenéis está mal» — a caller who has not
+said their name — GPT calls `start_contact_update` anyway, with
+`name="el que tenéis está mal"`, a verbatim fragment of the sentence. The
+docstring forbids it in as many words and the golden expects `[]`. What it SAYS
+is correct («¿me dice su nombre completo?») and nothing is changed, because the
+lookup finds nobody — but a fragment that happened to match a surname would find
+the wrong person, so the golden is right and the model is wrong. Written down,
+not softened. Haiku asks for the name and calls nothing.
+
+Two of the six goldens were changed on the way, both because they were WRONG and
+neither to make a model pass: one judged a turn the platform speaks in (§4.6)
+and was withdrawn, and one («no, no tengo cita ni nada, soy Ramón…») was
+ambiguous between two errands and invited the new-booking exit. Two agent
+defects the goldens caught were fixed in the prompt: Haiku announcing "se lo
+busco" without calling the tool, and both models being offered no rule about
+what to do when the record is not found.
+
 ### What it measured (2026-08-31, ms-18 branch, after `tk-18c659`) — the shop, 11 goldens
 
 The same two commands against `tienda-sur/pedidos`, which had no ms-18 table of
@@ -1291,7 +1357,7 @@ artefact leaves behind when it is removed: what remains disagrees with the
 golden, not with the other model. The three remaining divergences are all on
 Order desk line, the judged metric, and none of them involves a tool.
 
-The consent ring is separate from that table and greener: the eight simulated
+The consent ring is separate from that table and greener: the simulated
 calls (§5) score **1.0 on both models**, run as
 
 ```bash
