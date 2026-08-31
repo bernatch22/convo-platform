@@ -1,0 +1,105 @@
+<section class="slide" data-title="Roadmap y trade-offs" data-entregable="12,13">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">14 <span class="sep">·</span> Entregables 12 y 13 — roadmap por fases y trade-offs</div>
+      <h2 class="head" style="max-width:34ch">Las fases no son un plan: son un registro</h2>
+      <p class="lede">
+        Cada hito terminó con un comando que una persona ejecutó y un informe de lo que se aprendió
+        por las malas. Y cada decisión lleva al lado la opción que descartó: una decisión sin
+        alternativa rechazada no es una decisión.
+      </p>
+    </div>
+
+    <div class="grid-7-5 fill">
+
+      <div data-anim="2">
+        <table class="plain">
+          <thead>
+            <tr>
+              <th style="width:30%">Decisión</th>
+              <th style="width:26%">Opción descartada</th>
+              <th>Lo que cuesta haberla descartado</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>LiveKit autohospedado — SFU y SIP en nuestra caja</td>
+              <td>una pila gestionada de voz</td>
+              <td>operamos la caja: troncal, certificados y un firewall que ya nos costó un incidente
+                de fraude SIP. A cambio, PSTN, WebRTC y chat sobre <b>un</b> runtime, y el audio no sale
+                de casa.</td>
+            </tr>
+            <tr>
+              <td>Modelos pequeños con caché de prefijo, detrás de una allow-list</td>
+              <td>un modelo grande en cada turno</td>
+              <td>menos margen en razonamiento largo. A cambio, una llamada de 13 turnos cuesta
+                <b>0,0063 €</b>, y cambiar de modelo es configuración de proyecto.</td>
+            </tr>
+            <tr>
+              <td>STT, LLM y TTS como <em>slots</em> con lista de permitidos</td>
+              <td>fijar un proveedor por capa</td>
+              <td>mantener dos integraciones vivas por capa. A cambio, la plataforma se niega a correr
+                un modelo que nadie ha medido.</td>
+            </tr>
+            <tr>
+              <td>El tenant es un paquete en nuestro árbol</td>
+              <td>el agente del cliente en su propio proceso</td>
+              <td>el cliente depende de nuestro ciclo de release. Deuda reconocida: el protocolo de la
+                lámina 09 es cómo se salda.</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="note" style="margin-top:14px">
+          No construimos: cola de reintentos propia, almacén de audio a largo plazo, panel de
+          negocio. Producto, no plataforma.
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px" data-anim="3">
+        <div class="rows" style="--row-pad:10px">
+          <div class="row">
+            <div class="idx">0</div>
+            <div class="txt">Fundamentos <span class="tag off">ms-0 → ms-2</span>
+              <span class="why">Contratos y el primer tool con <code>ToolSpec</code>. Acabó con el modelo llamando a un adaptador falso.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="idx">1</div>
+            <div class="txt">La conversación transaccional <span class="tag off">ms-3 → ms-5</span>
+              <span class="why">Etapas, <code>ConfirmTask</code>, saga, log y dos negocios en un worker.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="idx">2</div>
+            <div class="txt">Voz real <span class="tag off">ms-6 · ms-8 · ms-11</span>
+              <span class="why">LiveKit propio y un número que contesta. Acabó con una llamada desde un móvil.</span>
+            </div>
+          </div>
+          <div class="row">
+            <div class="idx">3</div>
+            <div class="txt">El instrumento <span class="tag ok">en curso</span>
+              <span class="why">La consola: pipeline, sesiones con score y coste, supervisor, evals.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="shot-missing" style="padding:18px 22px">
+          <b>Falta: screenshots/board.png</b>
+          <div>El tablero con ms-0 … ms-16 y las cards de un hito desplegadas.
+            Cómo capturarlo: <code>screenshots/README.md</code>.</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="proof" data-anim="5">
+      <b>Validación.</b> <span class="n">Diez</span> de dieciséis hitos cerrados, cada uno con su
+      informe en <b>.taskops/reports/ms-N.md</b> y sus commits atados a una card del tablero. La
+      consola corre en <b>lk.bernardocastro.dev</b>; el juicio automático de la llamada
+      <span class="n">AJ_rdrkYph3FaeS</span> costó <span class="n">0,0018 €</span> contra un techo de
+      <span class="n">0,0100 €</span> comprobado <em>antes</em> de hacer la llamada.
+    </div>
+
+  </div>
+</section>

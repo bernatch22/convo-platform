@@ -1,0 +1,26 @@
+<section class="slide" data-title="Arquitectura de alto nivel" data-entregable="1">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">02 <span class="sep">·</span> Entregable 1 — arquitectura de alto nivel</div>
+      <h2 class="head">Arquitectura de alto nivel</h2>
+    </div>
+
+    <div class="todo" data-anim="2">
+      <div class="who">Sin escribir <span class="sep">·</span> card tk-14fc29 <span class="sep">·</span> el brief manda: MANIFEST.md § 4</div>
+      <ul>
+        <li>El diagrama: canales (SIP/PSTN, WebRTC, chat) → LiveKit SFU → un job por llamada → plano de control por HTTP → tools locales y remotas → sistemas del cliente.</li>
+        <li>La frontera de proceso, dibujada: un job es un proceso del sistema operativo y no sostiene ningún pool.</li>
+        <li>Los tres planos, nombrados y separados: datos (worker.py), control (api.py) y evidencia (el log y la consola).</li>
+        <li>Por qué el LLM es un nodo dentro de una caja y no el marco del dibujo: es reemplazable.</li>
+        <li>Qué cruza la red y qué no: nada de base de datos en el proceso del job.</li>
+      </ul>
+      <div class="note"><b>Figura:</b> Diagrama de arquitectura en SVG en línea, a todo el ancho — es la figura obligatoria del ejercicio.</div>
+      <div class="note">
+        La voz: decisión · justificación · línea de validación empírica. Toda lámina debe cerrar
+        con un bloque <code>.proof</code>. Sin adjetivo sin número.
+      </div>
+    </div>
+
+  </div>
+</section>

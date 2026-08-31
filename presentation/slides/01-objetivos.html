@@ -1,0 +1,79 @@
+<section class="slide" data-title="Objetivos de diseño" data-entregable="marco">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">01 <span class="sep">·</span> Marco — los criterios con los que se juzga el resto</div>
+      <h2 class="head" style="max-width:34ch">El LLM es un driver de interfaz; la plataforma es un runtime de procesos que habla</h2>
+      <p class="lede">
+        Todo lo que decide, cobra o deja rastro vive en el backend. El modelo elige <b>palabras</b>;
+        no elige si se ejecuta una escritura irreversible. Poner ese control en el prompt arranca
+        antes y no sabe fallar en voz alta: cuando el modelo se salta una instrucción no hay
+        excepción, hay una cita reservada que nadie pidió. Un contrato en código sí falla, y falla
+        donde se puede leer.
+      </p>
+    </div>
+
+    <div class="grid-7-5 fill">
+
+      <div class="rows" data-anim="2">
+        <div class="row">
+          <div class="idx">01</div>
+          <div class="txt">Determinismo donde se mueve dinero
+            <span class="why">El consentimiento es un paso de la saga con token firmado, no una frase
+              del prompt: <code>guard.check</code> rechaza toda tool <code>irreversible</code> sin un
+              <code>confirmation_token</code> que sólo <code>ConfirmTask</code> puede acuñar.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">02</div>
+          <div class="txt">La tenencia es dato, no despliegue
+            <span class="why">Una flota, muchos negocios. La identidad del cliente llega en los metadatos
+              del dispatch y se resuelve en un único <code>TenantContext</code>; cambiar la voz, el modelo
+              o el prompt de un proyecto no es un release.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">03</div>
+          <div class="txt">Auditable por construcción
+            <span class="why">Log append-only con <code>seq</code> por sesión, escrito <b>durante</b> la
+              llamada y no al colgar: un <code>SIGKILL</code> pierde la llamada, nunca la prueba de lo
+              que ya había pasado.</span>
+          </div>
+        </div>
+        <div class="row">
+          <div class="idx">04</div>
+          <div class="txt">Coste y latencia medidos por llamada
+            <span class="why">En céntimos y en segundos, en la misma fila. Una plataforma que no sabe
+              lo que cuesta una conversación no puede decidir qué modelo usar.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" data-anim="3">
+        <div class="label">Qué cuesta decir «transaccional»</div>
+        <div class="desc">
+          Una conversación que reserva algo no necesita un tono: necesita tres mecanismos, y los
+          tres son código.
+        </div>
+        <dl class="kv">
+          <dt>confirmación</dt>
+          <dd>en dos fases — el modelo pide, la máquina autoriza</dd>
+          <dt>idempotencia</dt>
+          <dd>una clave por intento, para que un reintento no reserve dos veces</dd>
+          <dt>compensación</dt>
+          <dd>declarada en el contrato de la tool, no improvisada al fallar</dd>
+        </dl>
+        <div class="note">Láminas 05 y 06 los desarrollan.</div>
+      </div>
+
+    </div>
+
+    <div class="proof" data-anim="4">
+      <b>Validación.</b> Sesión <span class="n">AJ_rdrkYph3FaeS</span> · 31-08-2026 — llamada de voz
+      real: 1 m 11 s, 13 turnos, 88 eventos, <span class="n">0,0063 €</span> de proveedores, score
+      <span class="n">0,96</span>. Cada número de este mazo sale de una llamada como ésta y se puede
+      releer entero con <b>python -m convo sessions show AJ_rdrkYph3FaeS</b>.
+    </div>
+
+  </div>
+</section>

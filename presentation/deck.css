@@ -1,0 +1,251 @@
+/* The deck's visual identity and slide chassis.
+ *
+ * Sober paper/ink: this is an architecture document that happens to advance,
+ * not a sales deck. One accent (the console's olive), one signal green, one
+ * amber for trade-offs. No brand, no gradients, no photography.
+ *
+ * The slide is a FIXED 1600x900 box. On screen it is scaled to fit the
+ * viewport; in print it is rendered at its natural size on a page of exactly
+ * those dimensions. Screen and PDF are therefore the same pixels, which is the
+ * whole reason the deck and the document can be one source.
+ *
+ * Fonts are system stacks on purpose: `npm run build` and `npm run pdf` must
+ * work with no network, and deck.html must be a single file you can email.
+ */
+
+:root {
+  --w: 1600px;
+  --h: 900px;
+
+  --desk: #EDEBE4;
+  --paper: #FBFAF7;
+  --card: #FFFFFF;
+  --ink: #14161A;
+  --ink-2: #454B52;
+  --muted: #8B9099;
+  --line: #E7E4DC;
+  --rule: #D6D2C7;
+  --accent: #5C6B22;
+  --accent-soft: #F0F2E5;
+  --ok: #3F6B3A;
+  --warn: #8A5A1E;
+  --danger: #8C3A2E;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--desk); color: var(--ink);
+  font-family: var(--sans); font-weight: 400;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  letter-spacing: -0.006em;
+}
+
+::selection { background: var(--accent-soft); }
+
+
+/* ── chassis ──────────────────────────────────────────────────────────── */
+
+.deck { position: fixed; inset: 0; display: grid; place-items: center; overflow: hidden; }
+
+.stage {
+  width: var(--w); height: var(--h); position: relative;
+  transform: scale(var(--scale, 1)); transform-origin: center center;
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgba(0,0,0,.07), 0 22px 60px rgba(0,0,0,.10);
+}
+
+.slide {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  padding: 58px 84px 46px; background: var(--paper);
+  opacity: 0; pointer-events: none; transform: translateX(26px);
+  transition: opacity .3s ease, transform .48s cubic-bezier(.22,.61,.36,1);
+}
+.slide.is-active { opacity: 1; pointer-events: auto; transform: none; }
+.slide.is-past { transform: translateX(-26px); }
+
+/* Staggered entrance. data-anim="1".."7" is the order, not the delay. */
+.slide [data-anim] { opacity: 0; transform: translateY(10px); transition: opacity .5s ease, transform .6s cubic-bezier(.22,.61,.36,1); }
+.slide.is-active [data-anim] { opacity: 1; transform: none; }
+.slide.is-active [data-anim="1"] { transition-delay: .04s; }
+.slide.is-active [data-anim="2"] { transition-delay: .12s; }
+.slide.is-active [data-anim="3"] { transition-delay: .21s; }
+.slide.is-active [data-anim="4"] { transition-delay: .30s; }
+.slide.is-active [data-anim="5"] { transition-delay: .39s; }
+.slide.is-active [data-anim="6"] { transition-delay: .48s; }
+.slide.is-active [data-anim="7"] { transition-delay: .57s; }
+
+.slide-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 26px; }
+
+.slide-foot {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-top: 18px; margin-top: auto; border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  color: var(--muted); text-transform: uppercase;
+}
+.slide-foot .num { color: var(--ink-2); }
+
+
+/* ── screen chrome (never printed) ────────────────────────────────────── */
+
+.chrome { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+.progress { position: absolute; top: 0; left: 0; height: 2px; background: var(--accent); width: 0; transition: width .45s cubic-bezier(.22,.61,.36,1); }
+.dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; pointer-events: auto; }
+.dots button {
+  width: 22px; height: 3px; border: 0; padding: 0; cursor: pointer;
+  background: var(--rule); transition: background .2s ease;
+}
+.dots button:hover { background: var(--muted); }
+.dots button[aria-current="true"] { background: var(--accent); }
+.hint {
+  position: absolute; bottom: 12px; right: 18px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+  color: var(--muted); text-transform: uppercase;
+}
+
+
+/* ── the writer's kit ─────────────────────────────────────────────────── */
+
+.eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--accent);
+}
+.sep { color: var(--rule); margin: 0 8px; }
+
+h1.title { font-size: 66px; line-height: 1.03; letter-spacing: -0.032em; font-weight: 500; max-width: 20ch; }
+h2.head { font-size: 42px; line-height: 1.06; letter-spacing: -0.028em; font-weight: 500; max-width: 24ch; }
+h3.sub { font-size: 20px; line-height: 1.35; font-weight: 500; color: var(--ink); }
+.lede { font-size: 19px; line-height: 1.5; color: var(--ink-2); max-width: 74ch; font-weight: 400; }
+p + p { margin-top: 12px; }
+b, strong { font-weight: 600; color: var(--ink); }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+code { color: var(--accent); }
+
+.head-block { display: flex; flex-direction: column; gap: 14px; }
+
+/* The validation line every slide owes the reader: what proves it. */
+.proof {
+  border-left: 2px solid var(--accent); padding: 8px 0 8px 14px;
+  font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--ink-2);
+}
+.proof b { color: var(--ink); font-weight: 500; }
+.proof .n { color: var(--accent); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+.grid-7-5 { display: grid; grid-template-columns: 7fr 5fr; gap: 48px; }
+.grid-5-7 { display: grid; grid-template-columns: 5fr 7fr; gap: 48px; }
+/* Take the leftover height, but never be squeezed below your own content:
+ * a compressed track does not look broken, it just quietly sits on top of
+ * whatever is under it. Let it push instead, and audit.mjs will catch it. */
+.fill { flex: 1 1 auto; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line); padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.card .label { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.card .value { font-size: 26px; letter-spacing: -0.02em; }
+.card .desc { font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+
+.rows { display: flex; flex-direction: column; }
+.rows .row { display: grid; grid-template-columns: 30px 1fr; gap: 18px; padding: var(--row-pad, 15px) 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.rows .row:last-child { border-bottom: none; }
+.rows .idx { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.rows .txt { font-size: 17px; line-height: 1.45; }
+.rows .txt .why { display: block; margin-top: 4px; font-size: 14px; color: var(--ink-2); }
+
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 8px 22px; align-items: baseline; }
+.kv dt { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.kv dd { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+
+table.plain { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.plain th {
+  text-align: left; font-family: var(--mono); font-size: 11px; font-weight: 400;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+  padding: 0 14px 10px 0; border-bottom: 1px solid var(--rule);
+}
+table.plain td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+table.plain tr:last-child td { border-bottom: none; }
+
+.tag {
+  display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; padding: 3px 8px; border: 1px solid var(--rule); color: var(--ink-2);
+}
+.tag.ok { color: var(--ok); border-color: #C9D6BF; background: #F2F6EF; }
+.tag.warn { color: var(--warn); border-color: #E0D0B4; background: #FAF4E9; }
+.tag.off { color: var(--muted); }
+
+pre.code {
+  font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink-2);
+  background: var(--card); border: 1px solid var(--line); padding: 18px 20px;
+  white-space: pre; overflow: hidden;
+}
+pre.code b { color: var(--ink); font-weight: 500; }
+
+.note { font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+/* Today | tomorrow, side by side — the shape slide 09 needs. */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); }
+.compare > div { padding: 24px 26px; display: flex; flex-direction: column; gap: 12px; }
+.compare > div + div { border-left: 1px solid var(--line); background: var(--card); }
+.compare .when { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+
+/* Figures: an inline SVG diagram or a console screenshot. */
+.fig { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.fig > svg { width: 100%; height: auto; display: block; }
+.fig figcaption, .figcaption { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+.shot { width: 100%; height: auto; display: block; border: 1px solid var(--rule); background: var(--card); }
+.shot-frame { min-height: 0; overflow: hidden; border: 1px solid var(--rule); }
+.shot-frame img { width: 100%; height: auto; display: block; }
+
+/* Diagram primitives, so every writer's SVG looks like the same hand. */
+svg .box { fill: var(--card); stroke: var(--rule); stroke-width: 1; }
+svg .box-accent { fill: var(--accent-soft); stroke: #C4CDA2; stroke-width: 1; }
+svg .edge { stroke: var(--rule); stroke-width: 1.25; fill: none; }
+svg .edge-accent { stroke: var(--accent); stroke-width: 1.25; fill: none; }
+svg .lbl { font-family: var(--sans); font-size: 14px; fill: var(--ink); }
+svg .lbl-sm { font-family: var(--mono); font-size: 11px; fill: var(--muted); letter-spacing: .06em; }
+
+/* The placeholder an unwritten slide wears. Deliberately loud on screen and
+ * in the PDF: a fragment nobody filled must be impossible to ship by accident. */
+.todo {
+  flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  border: 1px dashed var(--rule); padding: 30px 40px; background: var(--card);
+}
+.todo .who { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--warn); }
+.todo ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.todo li { font-size: 15px; line-height: 1.45; color: var(--ink-2); padding-left: 18px; position: relative; }
+.todo li::before { content: "—"; position: absolute; left: 0; color: var(--rule); }
+
+/* A screenshot the writers may reference but nobody captured yet. */
+.shot-missing {
+  border: 1px dashed var(--rule); background: var(--card); padding: 26px;
+  display: flex; flex-direction: column; gap: 8px; font-family: var(--mono);
+  font-size: 12px; line-height: 1.6; color: var(--muted);
+}
+.shot-missing b { color: var(--warn); font-weight: 400; }
+
+
+/* ── print: the same pixels, one slide per page ───────────────────────── */
+
+@page { size: 1600px 900px; margin: 0; }
+
+@media print {
+  html, body { height: auto; overflow: visible; background: #fff; }
+  .chrome, .hint { display: none !important; }
+  .deck { position: static; display: block; overflow: visible; }
+  .stage { width: 1600px; height: auto; transform: none; box-shadow: none; }
+  .slide {
+    position: relative; inset: auto; width: 1600px; height: 900px;
+    opacity: 1 !important; transform: none !important; pointer-events: auto;
+    transition: none; break-after: page; page-break-after: always;
+  }
+  .slide:last-child { break-after: auto; page-break-after: auto; }
+  .slide [data-anim] { opacity: 1 !important; transform: none !important; transition: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
