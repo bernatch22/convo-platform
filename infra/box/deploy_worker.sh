@@ -29,7 +29,8 @@ ssh "$BOX" "cd $APP && chmod 600 .env && set -a && . /home/berna/convo/livekit.e
 import os
 lines = [l for l in open('.env').read().splitlines()
          if not l.startswith(('LIVEKIT_URL=', 'LIVEKIT_PUBLIC_URL=', 'LIVEKIT_API_KEY=',
-                              'LIVEKIT_API_SECRET=', 'TENANT=', 'PROJECT='))]
+                              'LIVEKIT_API_SECRET=', 'SIP_OUTBOUND_TRUNK_ID=',
+                              'TENANT=', 'PROJECT='))]
 lines += ['LIVEKIT_URL=ws://127.0.0.1:7880',
           'LIVEKIT_API_KEY=' + os.environ['LIVEKIT_API_KEY'],
           'LIVEKIT_API_SECRET=' + os.environ['LIVEKIT_API_SECRET'],
@@ -40,6 +41,14 @@ lines += ['LIVEKIT_URL=ws://127.0.0.1:7880',
           # server that never signed it. It is written here, next to the two keys, because
           # this is the script that overwrites the file.
           'LIVEKIT_PUBLIC_URL=wss://lk.bernardocastro.dev']
+# The warm-transfer trunk id lives on the box, next to the SFU keypair it belongs
+# to (/home/berna/convo/livekit.env), NEVER in the laptop's .env — the laptop has
+# no trunk. Same trap as LIVEKIT_PUBLIC_URL: this script overwrites the file, so
+# any box-only line that is not re-added here is silently deleted and the warm
+# verb goes back to refusing at the door on the next deploy.
+trunk = os.environ.get('SIP_OUTBOUND_TRUNK_ID', '').strip()
+if trunk:
+    lines += ['SIP_OUTBOUND_TRUNK_ID=' + trunk]
 open('.env', 'w').write('\n'.join(lines) + '\n')
 print('env written (values not shown)')
 PY"

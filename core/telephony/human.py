@@ -30,7 +30,7 @@ the model knocks on).
 """
 
 from core.context import Project
-from core.telephony.transfer import TransferRefused, phone_number
+from core.telephony.transfer import WARM, TransferRefused, phone_number
 from core.tools.contract import SideEffect, ToolSpec
 
 # The project field the console may set, and the name the model calls.
@@ -70,10 +70,12 @@ NO_NUMBER = (
 )
 
 OFFERED = (
-    "the agent may hand a call to this number on its own, after announcing it. Only a PSTN "
-    "call can be moved — a REFER on the caller's own leg — so a browser call and a chat get "
-    "an honest refusal from the tool instead, and every attempt is one `supervisor.transfer` "
-    "line in the caller's log with its mode and its outcome."
+    "the agent may hand a call to this number on its own, after announcing it. A PSTN call "
+    "is moved with a REFER on its own leg; a browser voice call gets this number dialled "
+    "INTO its room instead — a warm bridge, which needs SIP_OUTBOUND_TRUNK_ID on the box and "
+    "is refused at the door without it; a chat gets an honest refusal, there being no audio "
+    "to join. Every attempt is one `supervisor.transfer` line in the caller's log with its "
+    "mode and its outcome."
 )
 
 
@@ -171,25 +173,18 @@ que la línea se mueva: un traspaso hecho en silencio se oye como una llamada qu
 </derivacion>
 """
 
-# The same shape for a business with nobody on the other end. It names the
-# situation and never the tool: a rule about a verb the model does not have is
-# the surest way to have it reach for one.
-ALONE = """\
-<derivacion>
-Si quien llama pide hablar con una persona, esa persona eres tú: se lo dices con
-naturalidad, le ofreces resolverlo tú o los otros canales del negocio que tengas en tu
-información, y sigues con lo que necesitaba. En esta línea no hay ningún compañero a quien
-pasarle la llamada, y un «ahora mismo te paso» la deja esperando una voz que no va a llegar.
-</derivacion>
-"""
-
-
-# What the tool answers with. Three sentences, one per thing that can happen, and
-# each one written as an instruction to the model rather than as a line to read
-# out: what the caller hears is the model's, in the project's own register.
+# What the tool answers with. One sentence per thing that can happen, and each
+# one written as an instruction to the model rather than as a line to read out:
+# what the caller hears is the model's, in the project's own register.
 MOVED = (
     "La llamada está pasando a un compañero: quien llamaba deja de estar contigo. No digas "
     "nada más y no te despidas otra vez."
+)
+
+# The warm half of MOVED: on a browser call nobody leaves — the colleague ARRIVES.
+JOINED = (
+    "El compañero está entrando a la llamada y quien llama ya puede hablar con él. No digas "
+    "nada más y no te despidas: la conversación sigue entre ellos."
 )
 
 FAILED = (
@@ -206,7 +201,16 @@ NO_PHONE_CALL = (
     "tanto."
 )
 
+# A voice call the platform cannot bridge right now — refused at the door, nothing rang.
+NO_BRIDGE = (
+    "Ahora mismo no es posible pasar esta llamada a un compañero y no se ha hecho nada: quien "
+    "llama sigue contigo. Díselo con naturalidad, ofrécele el teléfono del centro que tienes en "
+    "tu información para que le atienda una persona, y sigue ayudándole tú mientras tanto."
+)
 
+# The situation-paragraph for a business with nobody on the other end. It names
+# the situation and never the tool: a rule about a verb the model does not have
+# is the surest way to have it reach for one.
 ALONE = """\
 <derivacion>
 En esta línea no hay nadie más a quien pasar la llamada: quien atiende eres tú y no tienes
@@ -274,7 +278,11 @@ def protocol(project: Project) -> str:
 
 
 def said(payload: dict) -> str:
-    """What the model reads back after a transfer attempt — an outcome, never a stack trace."""
+    """What the model reads back after a transfer attempt — an outcome, never a stack trace.
+
+    The mode decides the success sentence, because the two ends differently:
+    a cold REFER takes the caller AWAY, a warm bridge brings the colleague IN.
+    """
     if payload.get("ok"):
-        return MOVED
+        return JOINED if payload.get("mode") == WARM else MOVED
     return FAILED.format(outcome=payload.get("outcome", "sin respuesta"))
