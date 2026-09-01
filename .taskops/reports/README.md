@@ -23,4 +23,4 @@ sheets) live under `tmp/reports/` and are not versioned.
 | ms-8 LiveKit server locally — rooms, tokens, dispatch by metadata | landed | [ms-8.md](ms-8.md) |
 | ms-11 telephone — a real number answered by the platform | landed | [ms-11.md](ms-11.md) |
 | ms-9 the console — three channels on screen, the pipeline governable | landed | [ms-9.md](ms-9.md) |
-| ms-16 the deck — fourteen slides, six writers, one voice | landed | [ms-16.md](ms-16.md) |
+| ms-16 the deck — fifteen slides, six writers, one editor with the human live | landed | [ms-16.md](ms-16.md) |
