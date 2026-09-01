@@ -1,0 +1,76 @@
+<section class="slide" data-title="Integraciones" data-entregable="8">
+  <style>
+    .i12-col h3 { font: 600 16px var(--sans); color: var(--ink); margin: 0 0 4px; }
+    .i12-col .en { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                   color: var(--accent); display: block; margin-bottom: 12px; }
+    .i12-col p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 10px; }
+    .i12-col p strong { color: var(--ink); font-weight: 600; }
+    .i12-box { border: 1px solid var(--line); background: var(--card); padding: 16px 20px; height: 100%; }
+    .i12-box.hot { border: 1.5px solid var(--accent); background: var(--accent-soft); }
+    .i12-frames { font: 400 12px var(--mono); color: var(--ink-2); background: var(--paper);
+                  border: 1px solid var(--rule); border-radius: 6px; padding: 10px 14px; margin: 10px 0; }
+    .i12-keep { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+    .i12-keep .t { font: 500 10.5px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+                   color: var(--accent); display: block; margin-bottom: 5px; }
+    .i12-keep p { font: 400 13px/1.5 var(--sans); }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">12 <span class="sep">·</span> Estrategia de integración con sistemas externos</div>
+      <h2 class="head" style="max-width:54ch">Los sistemas del cliente se conectan por adapters — y mañana, desde su propio proceso</h2>
+      <p class="lede" style="max-width:100ch">
+        La regla es una: <strong>el contrato del tool no cambia según dónde viva el código que lo
+        cumple</strong>. Hoy los adapters viven junto al vertical; el diseño ya contempla que
+        vivan en la infraestructura del propio cliente.
+      </p>
+    </div>
+
+    <div class="grid2 fill" data-anim="2">
+      <div class="i12-box i12-col">
+        <h3>Hoy: adapters por negocio</h3>
+        <span class="en">en producción</span>
+        <p>Un adapter es un módulo pequeño que traduce «crear cita» al sistema real del
+        cliente — su API de agenda, su gestor de pedidos, su ticketing. El vertical define
+        <strong>qué</strong> se hace; el adapter, <strong>contra qué sistema</strong>.</p>
+        <p>La demo opera con sistemas simulados que exponen <strong>la misma interfaz</strong>
+        que tendría el real: cambiar el simulador por la API verdadera del cliente no toca ni
+        los prompts, ni los tools, ni una prueba.</p>
+        <p>Las credenciales de cada negocio son suyas, viven en su configuración y jamás se
+        mezclan entre clientes.</p>
+        <p><strong>Con un contact center existente</strong>, la plataforma entra como un destino
+        SIP más de su ACD: recibe la llamada de la cola, y la transferencia la devuelve a un
+        agente humano de esa misma cola. El estado del agente y el CTI se integran por adapter,
+        como cualquier otro sistema del cliente.</p>
+      </div>
+
+      <div class="i12-box hot i12-col">
+        <h3>Mañana: el agente del cliente vive en su proyecto</h3>
+        <span class="en">diseño trazado — siguiente fase</span>
+        <p><strong>«Su agente vive en su proyecto; nuestra plataforma le da vida a todos.»</strong>
+        El proceso del cliente mantiene sus tools y sus prompts, y se conecta
+        <strong>saliente</strong> por WebSocket — nadie abre puertos entrantes, no hay webhooks
+        que firmar.</p>
+        <div class="i12-frames">hello → register { catálogo de tools + contratos } → invoke / result / fail → ping</div>
+        <div class="i12-keep">
+          <span class="t">Lo que no se muda con el código</span>
+          <p>La autorización, el consentimiento, el historial y la máscara de datos personales
+          quedan en la plataforma. Un tool remoto pasa por el mismo control que uno local —
+          <strong>la autoridad no viaja</strong>.</p>
+        </div>
+        <div class="i12-keep">
+          <span class="t">El enchufe ya existe</span>
+          <p>El ejecutor de tools es un contrato con una sola implementación (local) hoy —
+          la segunda implementación (remota) entra sin tocar al resto del sistema.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      El catálogo de tools viaja con sus contratos: el mismo control gobierna un tool local y
+      uno remoto, y el historial no distingue dónde corrió el código — solo qué se autorizó y
+      qué se ejecutó.
+    </p>
+
+  </div>
+</section>

@@ -1,0 +1,87 @@
+<section class="slide" data-title="La nota y el historial" data-entregable="9">
+  <style>
+    .n07-score { display: flex; flex-direction: column; }
+    .n07-score .r { display: grid; grid-template-columns: 22px 128px 1fr; gap: 12px;
+                    padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+    .n07-score .r:last-child { border-bottom: none; }
+    .n07-score .ok { color: var(--accent); font: 600 14px var(--sans); }
+    .n07-score .nm { font: 600 14px var(--sans); color: var(--ink); }
+    .n07-score .nm .how { display: block; font: 500 9.5px var(--mono); letter-spacing: .06em;
+                          text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+    .n07-score .tx { font: 400 13.5px/1.45 var(--sans); color: var(--ink-2); }
+    .n07-judge { border: 1px solid var(--rule); border-radius: 8px; background: var(--card);
+                 padding: 14px 18px; margin-top: 14px; }
+    .n07-judge p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+    .n07-judge .who { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                      color: var(--accent); display: block; margin-bottom: 6px; }
+    .n07-log { border: 1px solid var(--rule); border-radius: 10px; background: var(--card);
+               padding: 16px 20px; }
+    .n07-log .t { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                  color: var(--muted); margin: 0 0 10px; }
+    .n07-log .e { display: grid; grid-template-columns: 34px 118px 1fr; gap: 10px;
+                  padding: 6.5px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+    .n07-log .e:last-child { border-bottom: none; }
+    .n07-log .sq { font: 400 11px var(--mono); color: var(--muted); }
+    .n07-log .k  { font: 500 11px var(--mono); color: var(--accent); }
+    .n07-log .p  { font: 400 12.5px/1.35 var(--sans); color: var(--ink-2); }
+    .n07-log .p em { font-style: normal; color: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">07 <span class="sep">·</span> Auditoría y trazabilidad — una llamada real, II</div>
+      <h2 class="head" style="max-width:54ch">La misma llamada, por dentro: cómo se ganó su 0,98 — y el historial que lo prueba</h2>
+    </div>
+
+    <div class="grid-5-7 fill" data-anim="2">
+      <div>
+        <div class="n07-score">
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Consentimiento<span class="how">verificado por código</span></span>
+            <span class="tx">toda operación irreversible tuvo su confirmación concedida antes: crear_cita</span></div>
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Trato<span class="how">verificado por código</span></span>
+            <span class="tx">ninguna forma no permitida en 10 turnos del agente — usted, siempre</span></div>
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Privacidad<span class="how">verificado por código</span></span>
+            <span class="tx">ningún dato de otro negocio mencionado en toda la llamada</span></div>
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Errores<span class="how">verificado por código</span></span>
+            <span class="tx">ningún error de proveedor durante la conversación</span></div>
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Calidad · 0,90<span class="how">juez de IA</span></span>
+            <span class="tx">coste del juicio: 0,0018 € — bajo un tope de 0,01 € comprobado antes de llamar</span></div>
+        </div>
+        <div class="n07-judge">
+          <span class="who">El juez, en su propia explicación</span>
+          <p>«La paciente llamó para pedir una cita nueva de fisioterapia. Recepción la agendó
+          para el martes 1 de septiembre a las 09:00 con Eva Durán, la confirmó con la paciente
+          y le informó de que recibiría un SMS. La petición quedó totalmente resuelta.»</p>
+        </div>
+      </div>
+
+      <div class="n07-log">
+        <p class="t">El historial, tal cual — 12 de los 109 eventos</p>
+        <div class="e"><span class="sq">1</span><span class="k">inicio de sesión</span><span class="p">proyecto clínica · canal teléfono · voz Carolina Ruiz</span></div>
+        <div class="e"><span class="sq">2</span><span class="k">etapa</span><span class="p">Identificación</span></div>
+        <div class="e"><span class="sq">4</span><span class="k">grabación</span><span class="p">comienza a escribirse — sobrevive aunque el proceso muera</span></div>
+        <div class="e"><span class="sq">8</span><span class="k">turno · agente</span><span class="p">«Clínica Norte, buenos días, le atiende recepción. ¿En qué puedo ayudarle?» <em>voz en 0,12 s</em></span></div>
+        <div class="e"><span class="sq">11</span><span class="k">turno · cliente</span><span class="p">«Hola.» <em>transcrito en 0,24 s</em></span></div>
+        <div class="e"><span class="sq">27</span><span class="k">turno · cliente</span><span class="p">«Sí, mi nombre completo es Bernardo Castro.»</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">etapa</span><span class="p">Reserva nueva — la agenda se consulta antes de ofrecer</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">turno · cliente</span><span class="p">«Sí, confirmo.»</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">autorización</span><span class="p">vale de un solo uso emitido para crear_cita</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">operación</span><span class="p">cita creada: martes 1/9, 09:00, Eva Durán</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">operación</span><span class="p">SMS de confirmación enviado <em>con los datos personales enmascarados en el registro</em></span></div>
+        <div class="e"><span class="sq">109</span><span class="k">nota</span><span class="p">0,98 — escrita en el mismo historial, con el número de orden siguiente</span></div>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      Esta llamada corrió sobre gpt-5.4-mini — el modelo es un componente intercambiable, y la
+      auditoría es idéntica con cualquiera. Historial completo:
+      https://lk.bernardocastro.dev/t/clinica-norte/reagendamiento/sessions/AJ_yiCGykqgxwMu
+    </p>
+
+  </div>
+</section>

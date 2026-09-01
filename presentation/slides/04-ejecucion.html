@@ -1,0 +1,110 @@
+<section class="slide" data-title="Ejecución de una conversación" data-entregable="3">
+  <style>
+    .e04-h   { font: 600 16px var(--sans); fill: var(--ink); }
+    .e04-l   { font: 400 14px var(--sans); fill: var(--ink-2); }
+    .e04-n   { font: 600 11px var(--mono); fill: var(--paper); }
+    .e04-m   { font: 400 11.5px var(--mono); fill: var(--muted); }
+    .e04-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+    .e04-hot { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+    .e04-life{ stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 4 5; }
+    .e04-arr { stroke: var(--ink-2); stroke-width: 1.6; }
+    .e04-chip{ fill: var(--accent); }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">04 <span class="sep">·</span> Modelo de ejecución de una conversación</div>
+      <h2 class="head" style="max-width:52ch">Una llamada real, paso a paso: leer es libre, operar exige un sí</h2>
+      <p class="lede" style="max-width:100ch">
+        Cada llamada vive en un proceso aislado que muere con ella. El historial se escribe
+        <strong>mientras la llamada ocurre</strong>, paso a paso — si el proceso cae a mitad,
+        la evidencia ya está guardada.
+      </p>
+    </div>
+
+    <figure class="fig" data-anim="2">
+      <svg viewBox="0 0 1420 520" role="img" aria-label="Diagrama de secuencia de una llamada: el cliente pide mover su cita, la IA consulta, el cliente confirma, el control de negocio autoriza y ejecuta, y todo queda en el historial.">
+        <defs>
+          <marker id="e04a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" style="fill:var(--ink-2)"/>
+          </marker>
+        </defs>
+
+        <!-- cabeceras -->
+        <rect class="e04-box" x="40" y="4" width="200" height="44" rx="8"/>
+        <text class="e04-h" x="140" y="31" text-anchor="middle">Cliente</text>
+        <rect class="e04-box" x="440" y="4" width="200" height="44" rx="8"/>
+        <text class="e04-h" x="540" y="31" text-anchor="middle">Agente de IA</text>
+        <rect class="e04-hot" x="840" y="4" width="220" height="44" rx="8"/>
+        <text class="e04-h" x="950" y="31" text-anchor="middle">Control de negocio</text>
+
+        <!-- líneas de vida -->
+        <line class="e04-life" x1="140" y1="48" x2="140" y2="470"/>
+        <line class="e04-life" x1="540" y1="48" x2="540" y2="470"/>
+        <line class="e04-life" x1="950" y1="48" x2="950" y2="470"/>
+
+        <!-- historial -->
+        <rect class="e04-box" x="1120" y="4" width="296" height="466" rx="10"/>
+        <text class="e04-h" x="1144" y="34">Historial de la llamada</text>
+        <text class="e04-m" x="1144" y="56">inmutable · numerado · en tiempo real</text>
+        <text class="e04-m" x="1144" y="102">07 · el cliente pidió el cambio</text>
+        <text class="e04-m" x="1144" y="138">12 · se consultó la agenda</text>
+        <text class="e04-m" x="1144" y="174">15 · se ofreció jueves 10:00</text>
+        <text class="e04-m" x="1144" y="210">21 · el cliente dijo «sí, confirmo»</text>
+        <text class="e04-m" x="1144" y="246">22 · autorización emitida</text>
+        <text class="e04-m" x="1144" y="282">23 · cambio ejecutado en la agenda</text>
+        <text class="e04-m" x="1144" y="318">24 · SMS de confirmación enviado</text>
+        <text class="e04-m" x="1144" y="354">…</text>
+        <text class="e04-m" x="1144" y="390">al colgar: grabación disponible</text>
+        <text class="e04-m" x="1144" y="412">y nota de calidad automática</text>
+
+        <!-- 1 -->
+        <line class="e04-arr" x1="146" y1="110" x2="532" y2="110" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="93" r="10"/><text class="e04-n" x="160" y="97" text-anchor="middle">1</text>
+        <text class="e04-l" x="180" y="98">«quiero mover mi cita al jueves»</text>
+
+        <!-- 2 -->
+        <line class="e04-arr" x1="546" y1="165" x2="942" y2="165" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="148" r="10"/><text class="e04-n" x="560" y="152" text-anchor="middle">2</text>
+        <text class="e04-l" x="580" y="153">consulta la disponibilidad — leer no requiere permiso</text>
+
+        <!-- 3 -->
+        <line class="e04-arr" x1="942" y1="215" x2="548" y2="215" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="198" r="10"/><text class="e04-n" x="560" y="202" text-anchor="middle">3</text>
+        <text class="e04-l" x="580" y="203">huecos reales del jueves</text>
+
+        <!-- 4 -->
+        <line class="e04-arr" x1="532" y1="265" x2="148" y2="265" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="248" r="10"/><text class="e04-n" x="160" y="252" text-anchor="middle">4</text>
+        <text class="e04-l" x="180" y="253">«puedo ofrecerle el jueves a las 10:00 — ¿se la cambio?»</text>
+
+        <!-- 5 -->
+        <line class="e04-arr" x1="146" y1="315" x2="532" y2="315" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="298" r="10"/><text class="e04-n" x="160" y="302" text-anchor="middle">5</text>
+        <text class="e04-l" x="180" y="303">«sí, confirmo»</text>
+
+        <!-- 6 -->
+        <line class="e04-arr" x1="546" y1="365" x2="942" y2="365" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="348" r="10"/><text class="e04-n" x="560" y="352" text-anchor="middle">6</text>
+        <text class="e04-l" x="580" y="353">solicita ejecutar el cambio</text>
+
+        <!-- 7: el control trabaja -->
+        <rect class="e04-hot" x="830" y="390" width="240" height="52" rx="8"/>
+        <circle class="e04-chip" cx="846" cy="382" r="10"/><text class="e04-n" x="846" y="386" text-anchor="middle">7</text>
+        <text class="e04-l" x="850" y="411">verifica el «sí» · autoriza con un</text>
+        <text class="e04-l" x="850" y="431">vale de un solo uso · ejecuta</text>
+
+        <!-- 8 -->
+        <line class="e04-arr" x1="532" y1="465" x2="148" y2="465" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="448" r="10"/><text class="e04-n" x="160" y="452" text-anchor="middle">8</text>
+        <text class="e04-l" x="180" y="453">«hecho — le llega un SMS con la nueva hora»</text>
+      </svg>
+    </figure>
+
+    <p class="proof" data-anim="3">
+      La secuencia completa, con sus números de orden y tiempos, es consultable por llamada
+      en la consola (sección Sessions) — https://lk.bernardocastro.dev
+    </p>
+
+  </div>
+</section>

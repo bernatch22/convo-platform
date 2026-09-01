@@ -1,0 +1,83 @@
+<section class="slide" data-title="Observabilidad y operación" data-entregable="9">
+  <style>
+    .o13-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .o13-grid .b { border: 1px solid var(--line); background: var(--card); padding: 17px 20px; }
+    .o13-grid .b.hot { border-color: var(--accent); background: var(--accent-soft); }
+    .o13-grid h3 { font: 600 16px var(--sans); color: var(--ink); margin: 0 0 6px; }
+    .o13-grid p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+    .o13-grid .n { font: 500 11px var(--mono); color: var(--accent); display: block; margin-top: 8px; }
+    .o13-bill { margin-top: 22px; border: 1.5px solid var(--accent); border-radius: 10px;
+                background: var(--paper); padding: 16px 24px; display: grid;
+                grid-template-columns: 200px 1fr; gap: 20px; align-items: center; }
+    .o13-bill .big { font: 600 30px var(--sans); color: var(--ink); letter-spacing: -.02em; }
+    .o13-bill .big span { display: block; font: 500 11px var(--mono); letter-spacing: .07em;
+                          text-transform: uppercase; color: var(--accent); margin-top: 2px; }
+    .o13-bill p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">13 <span class="sep">·</span> Observabilidad, analítica operativa y billing</div>
+      <h2 class="head" style="max-width:54ch">La operación diaria: todo lo que un responsable mira, en una consola</h2>
+      <p class="lede" style="max-width:100ch">
+        La auditoría de cada llamada ya quedó demostrada (láminas 6 y 7) y la evaluación
+        continua también (lámina 3). Esta es la vista de <strong>flota</strong>: lo que la
+        operación consulta cada mañana, calculado siempre desde el mismo historial.
+      </p>
+    </div>
+
+    <div class="o13-grid fill" data-anim="2">
+      <div class="b hot">
+        <h3>El tablero del negocio</h3>
+        <p>Las transacciones reales, no las conversaciones: citas creadas, movidas y canceladas;
+        pedidos y tickets con sus estados — cada fila enlaza a la llamada que la produjo.</p>
+        <span class="n">consola → Board, por negocio y por día</span>
+      </div>
+      <div class="b">
+        <h3>El registro de llamadas</h3>
+        <p>Cada sesión con su resultado, coste, nota de calidad, turnos y duración —
+        y dentro, la grabación, la transcripción y el historial completo.</p>
+        <span class="n">consola → Sessions</span>
+      </div>
+      <div class="b">
+        <h3>Las llamadas en vivo</h3>
+        <p>Qué está sonando ahora mismo, con la puerta de supervisión al lado: escuchar,
+        susurrar, tomar la línea.</p>
+        <span class="n">consola → Supervisor</span>
+      </div>
+      <div class="b">
+        <h3>La calidad, corrida a corrida</h3>
+        <p>Cada batería de evaluación con su score por métrica y la diferencia contra la
+        corrida anterior — y el botón para lanzar otra, acotada y con registro.</p>
+        <span class="n">consola → Evals, con los datasets a la vista</span>
+      </div>
+      <div class="b">
+        <h3>El replay como QA</h3>
+        <p>Cualquier llamada almacenada se reevalúa bajo demanda con las mismas métricas —
+        la evidencia basta, no hace falta el audio.</p>
+        <span class="n">también por línea de comandos, para el equipo técnico</span>
+      </div>
+      <div class="b">
+        <h3>La noche vigila sola</h3>
+        <p>Cada madrugada, un cliente sintético llama a la plataforma desplegada con
+        presupuesto acotado; un rojo se ve como rojo, con el transcript adjunto.</p>
+        <span class="n">programado a las 04:00, resultado en la consola</span>
+      </div>
+    </div>
+
+    <div class="o13-bill" data-anim="3">
+      <span class="big">0,0162 €<span>una llamada real completa</span></span>
+      <p><strong>Billing preparado desde el primer día:</strong> cada llamada cierra con su coste
+      en euros por proveedor y por modelo, escrito en su propio historial al tipo del día — la
+      factura por cliente es una suma sobre datos ya auditados, no una estimación. Tarifas por
+      cliente, topes de consumo y alertas son un umbral sobre estos mismos datos — primera
+      fase del roadmap.</p>
+    </div>
+
+    <p class="proof" data-anim="4">
+      Todas las vistas se calculan del historial append-only — no existe una segunda base de
+      datos que pueda discrepar de la evidencia.
+    </p>
+
+  </div>
+</section>

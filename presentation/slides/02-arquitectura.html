@@ -1,0 +1,108 @@
+<section class="slide" data-title="Arquitectura de alto nivel" data-entregable="1">
+  <style>
+    .a02-t   { font: 600 19px/1.2 var(--sans); fill: var(--ink); }
+    .a02-b   { font: 400 14.5px/1.35 var(--sans); fill: var(--ink-2); }
+    .a02-m   { font: 400 11px var(--mono); fill: var(--muted); }
+    .a02-arr { font: 500 13px var(--sans); fill: var(--accent); }
+    .a02-cap { font: 500 11px var(--mono); fill: var(--muted); letter-spacing: .08em; }
+    .a02-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+    .a02-hot { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">02 <span class="sep">·</span> Arquitectura de alto nivel</div>
+      <h2 class="head" style="max-width:52ch">Cuatro piezas: canales, conversación, control de negocio y sistemas del cliente</h2>
+      <p class="lede" style="max-width:100ch">
+        La plataforma separa la <strong>conversación</strong> (tiempo real, donde opera la IA) del
+        <strong>control de negocio</strong> (donde se valida, se autoriza y se registra). Esa
+        frontera es la garantía central del diseño: el modelo de IA genera lenguaje — las
+        operaciones las ejecuta y audita el backend.
+      </p>
+    </div>
+
+    <figure class="fig" data-anim="2">
+      <svg viewBox="0 0 1420 470" role="img" aria-label="Diagrama de arquitectura: canales, conversación en tiempo real, control de negocio, sistemas del cliente y consola de operación.">
+        <defs>
+          <marker id="f02" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" style="fill:var(--accent)"/>
+          </marker>
+        </defs>
+
+        <text class="a02-cap" x="4" y="34">EL MODELO DE IA GENERA LENGUAJE — NINGUNA OPERACIÓN DE NEGOCIO SE EJECUTA FUERA DEL CONTROL DE NEGOCIO</text>
+
+        <!-- CANALES -->
+        <rect class="a02-box" x="4" y="60" width="230" height="200" rx="10"/>
+        <text class="a02-t" x="28" y="102">Canales</text>
+        <text class="a02-b" x="28" y="136">teléfono, voz web y chat —</text>
+        <text class="a02-b" x="28" y="158">el cliente usa el canal</text>
+        <text class="a02-b" x="28" y="180">que prefiera</text>
+        <text class="a02-m" x="28" y="238">PSTN · WebRTC · texto</text>
+
+        <!-- flecha 1 -->
+        <line x1="238" y1="150" x2="320" y2="150" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="243" y="138">audio / texto</text>
+
+        <!-- CONVERSACIÓN -->
+        <rect class="a02-box" x="326" y="60" width="330" height="200" rx="10"/>
+        <text class="a02-t" x="348" y="102">Conversación en tiempo real</text>
+        <text class="a02-b" x="348" y="136">convierte voz en texto, genera la</text>
+        <text class="a02-b" x="348" y="158">respuesta con el modelo de IA y</text>
+        <text class="a02-b" x="348" y="180">la devuelve como voz</text>
+        <text class="a02-m" x="348" y="216">un proceso aislado por llamada</text>
+        <text class="a02-m" x="348" y="238">STT · LLM · TTS — proveedores intercambiables</text>
+
+        <!-- flechas 2 (ida y vuelta) -->
+        <line x1="660" y1="128" x2="782" y2="128" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="662" y="116">solicita autorización</text>
+        <line x1="782" y1="188" x2="660" y2="188" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="662" y="214">autoriza y responde</text>
+
+        <!-- CONTROL DE NEGOCIO -->
+        <rect class="a02-hot" x="790" y="60" width="330" height="200" rx="10"/>
+        <text class="a02-t" x="812" y="102">Control de negocio</text>
+        <text class="a02-b" x="812" y="136">valida cada acción, exige confirmación</text>
+        <text class="a02-b" x="812" y="158">explícita antes de operaciones definitivas</text>
+        <text class="a02-b" x="812" y="180">y registra cada paso de la llamada</text>
+        <text class="a02-m" x="812" y="216">contratos de tools · confirmación en dos fases</text>
+        <text class="a02-m" x="812" y="238">historial de auditoría inmutable</text>
+
+        <!-- flecha 3 -->
+        <line x1="1124" y1="150" x2="1204" y2="150" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="1130" y="138">opera</text>
+
+        <!-- SISTEMAS DEL CLIENTE -->
+        <rect class="a02-box" x="1210" y="60" width="206" height="200" rx="10"/>
+        <text class="a02-t" x="1232" y="102">Sistemas</text>
+        <text class="a02-t" x="1232" y="126">del cliente</text>
+        <text class="a02-b" x="1232" y="160">agenda, pedidos,</text>
+        <text class="a02-b" x="1232" y="182">ticketing</text>
+        <text class="a02-m" x="1232" y="238">adapters por cliente</text>
+
+        <!-- CONSOLA -->
+        <line x1="491" y1="260" x2="491" y2="336" style="stroke:var(--rule);stroke-width:1.5;stroke-dasharray:5 5"/>
+        <line x1="955" y1="260" x2="955" y2="336" style="stroke:var(--rule);stroke-width:1.5;stroke-dasharray:5 5"/>
+        <rect class="a02-box" x="326" y="340" width="792" height="106" rx="10"/>
+        <text class="a02-t" x="350" y="380">Consola de operación</text>
+        <text class="a02-b" x="350" y="412">supervisión en tiempo real — escuchar, intervenir, transferir a un agente humano —</text>
+        <text class="a02-b" x="350" y="434">y auditoría posterior: transcripción, grabación, resultado, coste y calidad de cada llamada</text>
+      </svg>
+    </figure>
+
+    <div data-anim="3" style="border:1px solid var(--rule);border-radius:8px;padding:12px 20px;margin-top:4px;background:var(--card)">
+      <span style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)">La pata telefónica, propia</span>
+      <span style="font:400 13.5px/1.5 var(--sans);color:var(--ink-2);margin-left:12px">
+        número público → operador (troncal SIP) → puente SIP y servidor de medios <strong>propios,
+        autoalojados</strong> → el número marcado decide qué negocio atiende (una fila de configuración,
+        no un despliegue) → y la transferencia a un humano es una operación SIP estándar.
+        La señalización solo se acepta desde las IP publicadas del operador.
+      </span>
+    </div>
+
+    <p class="proof" data-anim="4">
+      En operación: dos negocios sobre un único despliegue — telefonía, voz web y chat —
+      verificable en https://lk.bernardocastro.dev
+    </p>
+
+  </div>
+</section>

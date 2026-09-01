@@ -1,0 +1,88 @@
+<section class="slide" data-title="Orquestación y estado" data-entregable="5">
+  <style>
+    .o10-steps { display: flex; flex-direction: column; }
+    .o10-steps .r { display: grid; grid-template-columns: 30px 1fr; gap: 16px;
+                    padding: 13px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+    .o10-steps .r:last-child { border-bottom: none; }
+    .o10-steps .n { font: 600 13px var(--mono); color: var(--accent); }
+    .o10-steps .tx { font: 400 14.5px/1.5 var(--sans); color: var(--ink-2); }
+    .o10-steps .tx strong { color: var(--ink); font-weight: 600; }
+    .o10-neg { margin-top: 14px; border: 1px solid var(--rule); border-radius: 8px;
+               background: var(--card); padding: 12px 18px; }
+    .o10-neg p { font: 400 13px/1.55 var(--sans); color: var(--ink-2); margin: 0; }
+    .o10-neg .t { font: 500 10.5px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+                  color: var(--accent); display: block; margin-bottom: 6px; }
+    .o10-st { display: flex; flex-direction: column; gap: 16px; }
+    .o10-st .b { border: 1px solid var(--line); background: var(--card); padding: 15px 20px; }
+    .o10-st .b.hot { border-color: var(--accent); background: var(--accent-soft); }
+    .o10-st h3 { font: 600 15px var(--sans); color: var(--ink); margin: 0 0 5px; }
+    .o10-st p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">10 <span class="sep">·</span> Orquestación transaccional y gestión de estado</div>
+      <h2 class="head" style="max-width:54ch">El modelo propone, la máquina dispone — y ningún fallo deja el sistema a medias</h2>
+      <p class="lede" style="max-width:100ch">
+        Una operación de negocio no es una frase afortunada del modelo: es un procedimiento con
+        pasos verificables. Y el estado que lo respalda está escrito <strong>antes</strong> de
+        que cualquier cosa pueda fallar.
+      </p>
+    </div>
+
+    <div class="grid2 fill" data-anim="2">
+      <div>
+        <div class="o10-steps">
+          <div class="r"><span class="n">01</span><span class="tx"><strong>El modelo propone.</strong>
+            Quiere crear la cita — pero primero la plataforma lee el resumen al cliente, con una
+            frase que redacta la plataforma, no el modelo: lo que se confirma es exacto.</span></div>
+          <div class="r"><span class="n">02</span><span class="tx"><strong>El cliente autoriza.</strong>
+            Su «sí» emite un vale de un solo uso, atado a esa operación exacta con esos datos
+            exactos. Caduca en 120 segundos.</span></div>
+          <div class="r"><span class="n">03</span><span class="tx"><strong>La máquina ejecuta.</strong>
+            Solo con vale válido. La autorización es un paso de código con firma — nunca una
+            interpretación del tono de la conversación.</span></div>
+          <div class="r"><span class="n">04</span><span class="tx"><strong>Varios pasos, una transacción.</strong>
+            Cada paso declara qué lo deshace; si el tercero falla, se compensan el segundo y el
+            primero. El cliente nunca queda con media operación hecha.</span></div>
+        </div>
+        <div class="o10-neg">
+          <span class="t">Las cuatro negativas del ejecutor</span>
+          <p>sin vale · vale de otra operación · vale caducado · vale ya usado — las cuatro se
+          rechazan en código y quedan como evento en el historial de la llamada.</p>
+        </div>
+      </div>
+
+      <div class="o10-st">
+        <div class="b hot">
+          <h3>El historial es la única fuente de verdad</h3>
+          <p>Numerado, solo-añadir, escrito durante la llamada. Todo lo demás — el tablero de
+          transacciones, la nota de calidad, el replay — se calcula leyéndolo, nunca se guarda
+          por segunda vez.</p>
+        </div>
+        <div class="b">
+          <h3>Un corte a mitad pierde la llamada, jamás la evidencia</h3>
+          <p>Si el proceso muere — un fallo, un reinicio, un corte — lo ya escrito está escrito:
+          qué se preguntó, qué se autorizó y qué se ejecutó hasta ese instante.</p>
+        </div>
+        <div class="b">
+          <h3>La sesión se re-engancha, no se congela</h3>
+          <p>Si el cliente vuelve a llamar en minutos, el agente retoma el contexto de la
+          conversación anterior. Diseñado sobre el mismo historial; el re-enganche automático
+          es la siguiente fase del roadmap.</p>
+        </div>
+        <div class="b">
+          <h3>La configuración es estado vivo</h3>
+          <p>Un cambio desde la consola — voz, modelo, saludo, número de derivación — aplica a
+          la siguiente llamada, sin desplegar ni reiniciar nada.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      La prueba de consentimiento de una llamada real, leída de su propio historial: orden 39
+      preguntó · 46 autorizó · 51 escribió (lámina 7).
+    </p>
+
+  </div>
+</section>
