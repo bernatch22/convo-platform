@@ -20,10 +20,17 @@
     .sub { font: 400 16.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 34px; max-width: 72ch; }
 
     .doors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 44px; }
-    .door { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--rule);
-            border-radius: 14px; background: #fff; padding: 22px 24px; text-decoration: none;
-            color: var(--ink); transition: border-color .15s ease, transform .15s ease; }
-    .door:hover { border-color: var(--accent); transform: translateY(-2px); }
+    /* The whole card is the link. The anchor stays a real anchor — one per card, so the
+       markup is valid — and its ::after stretches over the box, which is what makes the
+       padding, the heading and the empty space clickable too. Anything that must stay
+       clickable ON TOP of that sheet (the .pptx alternative) lifts itself with z-index. */
+    .door { position: relative; display: flex; flex-direction: column; gap: 8px;
+            border: 1px solid var(--rule); border-radius: 14px; background: #fff;
+            padding: 22px 24px; color: var(--ink);
+            transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+    .door:hover { border-color: var(--accent); transform: translateY(-2px);
+                  box-shadow: 0 6px 20px rgba(31, 30, 26, .07); }
+    .door:focus-within { border-color: var(--accent); }
     .door.hot { border: 1.5px solid var(--accent); background: var(--accent-soft); }
     .door .k { font: 500 10.5px var(--mono); letter-spacing: .09em; text-transform: uppercase;
                color: var(--accent); }
@@ -31,8 +38,9 @@
     .door p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0; }
     .door .go { margin-top: auto; padding-top: 10px; font: 600 13px var(--mono); color: var(--accent);
                 text-decoration: none; }
-    .door .go:hover { text-decoration: underline; }
-    .door .alt { font: 400 12px var(--sans); color: var(--muted); }
+    .door .go::after { content: ""; position: absolute; inset: 0; border-radius: 14px; }
+    .door:hover .go { text-decoration: underline; }
+    .door .alt { position: relative; z-index: 1; font: 400 12px var(--sans); color: var(--muted); }
     .door .alt a { color: var(--accent); text-decoration: none; }
     .door .alt a:hover { text-decoration: underline; }
 
