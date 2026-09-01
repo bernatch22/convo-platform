@@ -135,9 +135,7 @@ def build(runs: Mapping[str, Sequence[Score]]) -> Matrix:
         for model in models
         if any(score.metric == metric for score in runs[model])
     }
-    return Matrix(
-        models=models, metrics=metrics, cells=cells, divergences=divergences(runs)
-    )
+    return Matrix(models=models, metrics=metrics, cells=cells, divergences=divergences(runs))
 
 
 def divergences(runs: Mapping[str, Sequence[Score]]) -> list[Divergence]:

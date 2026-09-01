@@ -104,8 +104,7 @@ async def build_runs(
 def turn_cases(runs: list[tuple[dict[str, Any], Conversation, dict[str, str]]]) -> list:
     """One `LLMTestCase` per golden: the judged turn, what it called, what was expected."""
     return [
-        test_case_for(golden, conversation, described)
-        for golden, conversation, described in runs
+        test_case_for(golden, conversation, described) for golden, conversation, described in runs
     ]
 
 
@@ -155,9 +154,7 @@ def main(argv: list[str]) -> None:
     text_only()
     args = _parse(argv[1:])
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    runs = {
-        model: asyncio.run(score(args.tenant, args.project, model)) for model in args.model
-    }
+    runs = {model: asyncio.run(score(args.tenant, args.project, model)) for model in args.model}
     built = matrix.build(runs)
     table = matrix.markdown(built, title=f"{args.tenant}/{args.project} — ring 1")
     print("\n" + table)

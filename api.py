@@ -287,9 +287,7 @@ async def outcomes(
     strip has a stable axis; `rows` is newest first and capped by `limit`.
     There is no rollup table — see `core/outcomes.py` for why.
     """
-    return core_outcomes.outcomes(
-        store, tenant=tenant, project=project, days=days, limit=limit
-    )
+    return core_outcomes.outcomes(store, tenant=tenant, project=project, days=days, limit=limit)
 
 
 @app.get("/reservations")

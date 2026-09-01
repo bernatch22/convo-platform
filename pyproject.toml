@@ -29,6 +29,12 @@ default-groups = []
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Markdown is prose, not a module. `ruff format` reaches into fenced python blocks,
+# and REPORT.md's illustrative ToolSpec aligns its trailing comments into a column
+# ON PURPOSE — that alignment is how a reader of the design document sees which
+# field carries which guarantee. A formatter collapsing it would be the tool
+# rewriting an argument to suit itself.
+extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
