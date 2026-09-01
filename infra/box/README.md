@@ -145,14 +145,27 @@ What Twilio documents about the SIP conversation, and what it does not:
 **Warm transfer needs more than this.** It dials the colleague INTO the room
 with `CreateSIPParticipant`, which is an *outbound* call and therefore needs a
 Termination domain, credentials and a LiveKit `SIPOutboundTrunk` whose id goes
-in `SIP_OUTBOUND_TRUNK_ID`. None of those exist on this box, so the warm verb
-is refused at the door with a message naming the variable — never halfway
-through a live call. Cold needs none of it.
+in `SIP_OUTBOUND_TRUNK_ID`. Without the variable the warm verb is refused at
+the door with a message naming it — never halfway through a live call. Cold
+needs none of it.
+
+Since ms-21 this box HAS the whole chain, built additively (Origination, IP
+ACLs, numbers and dispatch untouched): the trunk's Termination URI is
+`convo-platform.pstn.twilio.com`, termination auth is the credential list
+`convo-warm-termination` (username `convo-warm`; the password lives only in
+Twilio and in the LiveKit trunk), and the LiveKit side is the outbound trunk
+`convo-warm-outbound` (`ST_MqsBkqKqhsL8`). The id is in
+`/home/berna/convo/livekit.env` next to the SFU keypair, and
+`deploy_worker.sh` re-adds it to the app's `.env` on every deploy — the same
+overwrite trap `LIVEKIT_PUBLIC_URL` already paid for. It is used by browser
+(WebRTC) callers who ask for a person: their call has no SIP leg a REFER could
+move, so the phone comes to them instead and the human who answers joins the
+caller's room.
 
 ```
 TRANSFER_TO=+34600111222        # where a transfer goes when the desk names no number
 TRANSFER_RINGING_S=25           # how long the far end rings (LiveKit's own default is 30)
-SIP_OUTBOUND_TRUNK_ID=ST_…      # warm only; unset means warm is refused
+SIP_OUTBOUND_TRUNK_ID=ST_…      # warm only; unset means warm is refused at the door
 ```
 
 ## Verifying without a phone
