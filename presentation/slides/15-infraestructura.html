@@ -21,7 +21,7 @@
                     font: 400 13px/1.45 var(--sans); color: var(--ink-2); }
     .f15-road .rw strong { color: var(--ink); font-weight: 600; }
     .f15-tof { margin-top: 0; }
-    .f15-tof .r { padding: 7px 0; border-bottom: 1px solid var(--line);
+    .f15-tof .r { padding: 5px 0; border-bottom: 1px solid var(--line);
                   font: 400 12.5px/1.45 var(--sans); color: var(--ink-2); }
     .f15-tof .r:last-child { border-bottom: none; }
     .f15-tof .r strong { color: var(--ink); font-weight: 600; }
@@ -87,20 +87,23 @@
         <div class="f15-tof">
           <div class="r"><strong>LiveKit autoalojado, evaluado frente a Vapi y Pipecat</strong> —
           Vapi es un panel sobre el bucle de otro: el prompt, el estado y las credenciales viven
-          en su SaaS, y toda la tesis de este documento — control, consentimiento, auditoría y
-          segregación en el backend — sería inexpresable allí. Pipecat da el pipeline pero no el
-          SFU, el SIP ni la supervisión multiusuario. LiveKit autoalojado da el tiempo real
-          completo dejando el bucle, los datos y la telefonía en casa; se asume la dependencia,
-          con la migración como coste conocido.</div>
+          en su SaaS, y la tesis de este documento — control, consentimiento y auditoría en el
+          backend — sería inexpresable allí. Pipecat da el pipeline, no el SFU ni el SIP ni la
+          supervisión. LiveKit deja el bucle, los datos y la telefonía en casa; la dependencia
+          se asume con la migración como coste conocido.</div>
           <div class="r"><strong>Motor conversacional propio</strong> — un motor SaaS dejaría la
           autorización y la auditoría fuera del bucle; el control transaccional exige poseerlo.</div>
-          <div class="r"><strong>Generación anticipada apagada</strong> — medida: con fin de turno
-          en ~0,4 s, especular no ocultaba latencia y solo gastaba modelo.</div>
+          <div class="r"><strong>Sub-agentes especializados antes que un agente que lo hace
+          todo</strong> — medido aquí: una herramienta extra en una etapa cuesta ~17 puntos de
+          acierto (38/40 sin ella, 16/20 con ella, 154 corridas). Cada mostrador es un agente de
+          dos o tres verbos y el traspaso lleva el contexto: la precisión se compra quitando
+          opciones, no añadiendo prompt.</div>
+          <div class="r"><strong>Generación anticipada apagada</strong> — medida: con fin de
+          turno en ~0,4 s, especular no ocultaba latencia y solo gastaba modelo.</div>
           <div class="r"><strong>Base embebida antes que Postgres — single-node deliberado</strong> —
-          el contrato de persistencia no depende del storage local: todo proceso escribe a través
-          del plano de control, nunca contra el fichero, así que cambiar el motor no toca a un
-          solo llamante. Hoy hay un único escritor; el primer disparador de escala es el segundo,
-          y ese día la migración es un cambio de conexión, no de arquitectura.</div>
+          el contrato de persistencia no depende del storage local (todo proceso escribe por el
+          plano de control, nunca contra el fichero). Un único escritor hoy; el segundo es el
+          disparador, y ese día migrar es un cambio de conexión, no de arquitectura.</div>
         </div>
       </div>
     </div>
