@@ -106,11 +106,11 @@
     <div class="videos">
       <div class="head">
         <h2>La demo en vídeo</h2>
-        <span class="badge">Próximamente</span>
+        <span class="badge" id="badge">5 min 49 s</span>
       </div>
-      <p class="note">Una llamada real de punta a punta: el agente identifica, ejecuta con
-      consentimiento, y la operación lo ve todo — supervisión en vivo, grabación, coste y nota
-      de calidad. Los vídeos aparecen aquí en cuanto estén subidos.</p>
+      <p class="note">El recorrido completo, grabado sobre el sistema en vivo: una llamada de
+      punta a punta — el agente identifica, ejecuta con consentimiento — y lo que la operación
+      ve mientras tanto: supervisión, grabación, coste y nota de calidad.</p>
       <div class="player" id="player">
         <video controls preload="metadata" src="/demo.mp4"></video>
         <div class="soon">
@@ -128,10 +128,17 @@
   </div>
 
   <script>
-    // The curtain lifts itself the moment /demo.mp4 exists — no redeploy, no edit.
+    // The curtain lifts itself the moment /demo.mp4 exists, and the badge says the running
+    // time the file actually has — so neither can go stale against the other.
     const player = document.getElementById("player");
     const video = player.querySelector("video");
-    video.addEventListener("loadedmetadata", () => player.setAttribute("data-ready", ""));
+    const badge = document.getElementById("badge");
+    video.addEventListener("loadedmetadata", () => {
+      player.setAttribute("data-ready", "");
+      const total = Math.round(video.duration);
+      badge.textContent = `${Math.floor(total / 60)} min ${String(total % 60).padStart(2, "0")} s`;
+    });
+    video.addEventListener("error", () => { badge.textContent = "Próximamente"; });
   </script>
 </body>
 </html>
