@@ -119,6 +119,34 @@ class Handover:
         finally:
             await api_client.aclose()
 
+    async def join(self, to: str) -> Outcome:
+        """The AGENT's warm bridge: ring the human's phone INTO the caller's own room.
+
+        A browser caller has no SIP leg a REFER could move, so the phone comes
+        to them instead: `CreateSIPParticipant` dials the project's number and
+        the human who answers arrives as one more participant in the same room.
+        No hold line and no briefing — the agent announced the handover in the
+        turn that called the tool, and once the two can hear each other its only
+        remaining job is silence (`core.adapters.human` mutes it).
+
+        → an `Outcome`. Raises `TransferRefused` only when nothing was even
+        attempted — no outbound trunk on this box (the message names
+        `SIP_OUTBOUND_TRUNK_ID`), no room, no caller, a destination that is not
+        a number — always BEFORE anybody's phone has rung.
+        """
+        target = destination(to)
+        room, caller = self.room_name(), self.caller()
+        api_client = client()
+        try:
+            # The leg refuses at the door: a box with no trunk promises nothing.
+            leg = WarmLeg(api_client, room, caller, target)
+            dialled = await leg.dial([])
+            if not dialled.ok:
+                return dialled
+            return await leg.bridge()
+        finally:
+            await api_client.aclose()
+
     def on_a_phone(self) -> bool:
         """Whether the caller is a SIP leg — the only kind of call a REFER can move.
 
