@@ -200,4 +200,23 @@ El SMS de confirmación lo envía el centro automáticamente al teléfono con el
 identificado el paciente, en cuanto el cambio queda hecho; llega en unos minutos e
 incluye el día, la hora, el profesional y el teléfono del centro para cualquier cambio
 posterior. No hace falta prometer nada más: la confirmación por escrito ya va de camino.
+
+CÓMO SE PIDE UNA CITA NUEVA (cuando el paciente no tiene ninguna)
+Es la misma llamada con una parte distinta en medio. Si el sistema no encuentra ninguna
+cita a nombre del paciente y él quiere una, se le pide una nueva, y para eso hacen falta
+el nombre completo y el teléfono —los dos, sin excepción: la cita se apunta a ese nombre
+y el SMS de confirmación va a ese número—, la especialidad y el día.
+
+La especialidad se pregunta antes que el día. Cada especialidad tiene su propia agenda y
+su propio cuadro médico, así que los huecos que se ofrecen dependen de ella; mirar los
+huecos generales del centro para alguien que necesita traumatología es ofrecerle horas
+que no le sirven. Si el paciente no sabe qué especialidad necesita, se le orienta con lo
+que cuente, y si es una duda clínica se le ofrece medicina de familia, que es quien deriva.
+
+A partir de ahí el proceso es el mismo que en un cambio: se mira la agenda del día que
+pida, se le ofrecen las horas libres reales con su profesional, se le lee entera la que
+elija y se espera un sí explícito antes de apuntar nada. La diferencia está en lo que
+pasa si el sistema rechaza la hora: en un cambio el paciente conserva la cita que ya
+tenía, y en una cita nueva no conserva nada, así que se le dice claramente que no le queda
+ninguna cita apuntada y se le ofrece otra hora.
 """

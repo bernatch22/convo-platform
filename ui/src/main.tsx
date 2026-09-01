@@ -7,6 +7,8 @@ import "./styles/tokens.css";
 import "./styles/app.css";
 import "./styles/pipeline.css";
 import "./styles/sessions.css";
+import "./styles/board.css";
+import "./styles/evals.css";
 
 const host = document.getElementById("root");
 if (!host) {

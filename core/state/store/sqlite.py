@@ -5,20 +5,29 @@ dying mid-call. WAL journaling with `synchronous=FULL` makes every `append`
 durable when it returns, and two triggers refuse UPDATE and DELETE on
 `events`. ``routes`, `project_versions` and
 `pipeline_overrides` are the three small tables the router reads before a
-session starts. Postgres later is this same interface over a
-pool in `api.py`; the job process never opens a database of its own in
-production, but on a laptop the file is the control plane.
+session starts, and `eval_runs` is what the console's evals screen reads.
+Postgres later is this same interface over a pool in `api.py`; the job process
+never opens a database of its own in production, but on a laptop the file is
+the control plane.
 """
 
 import json
 import os
 import sqlite3
 import time
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
 from core.state.events import Event
-from core.state.store.protocol import PipelineOverride, ProjectVersion, Route, SessionRow
+from core.state.store.protocol import (
+    EvalRun,
+    MetricScore,
+    PipelineOverride,
+    ProjectVersion,
+    Route,
+    SessionRow,
+)
 
 DEFAULT_DB = "tmp/convo.db"
 DB_ENV = "CONVO_DB"
@@ -48,6 +57,12 @@ CREATE TABLE IF NOT EXISTS pipeline_overrides (
   tenant TEXT NOT NULL, project TEXT NOT NULL, field TEXT NOT NULL, value TEXT NOT NULL,
   updated_at REAL NOT NULL, PRIMARY KEY (tenant, project, field)
 );
+CREATE TABLE IF NOT EXISTS eval_runs (
+  id TEXT PRIMARY KEY, tenant TEXT NOT NULL, project TEXT NOT NULL, suite TEXT NOT NULL,
+  status TEXT NOT NULL, started_at REAL NOT NULL, finished_at REAL, git_sha TEXT,
+  milestone TEXT, metrics_json TEXT NOT NULL, report_html TEXT, log_path TEXT, detail TEXT
+);
+CREATE INDEX IF NOT EXISTS eval_runs_by_start ON eval_runs (started_at DESC);
 """
 
 
@@ -176,6 +191,42 @@ class SQLiteStore:
                 override.updated_at or time.time(),
             ),
         )
+
+    def eval_runs(self) -> list[EvalRun]:
+        cursor = self.db.execute(
+            "SELECT id, tenant, project, suite, status, started_at, finished_at, git_sha, "
+            "milestone, metrics_json, report_html, log_path, detail "
+            "FROM eval_runs ORDER BY started_at DESC"
+        )
+        return [_run(row) for row in cursor]
+
+    def add_eval_run(self, run: EvalRun) -> None:
+        self.db.execute(
+            "INSERT OR REPLACE INTO eval_runs (id, tenant, project, suite, status, started_at, "
+            "finished_at, git_sha, milestone, metrics_json, report_html, log_path, detail) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                run.id,
+                run.tenant,
+                run.project,
+                run.suite,
+                run.status,
+                run.started_at or time.time(),
+                run.finished_at,
+                run.git_sha,
+                run.milestone,
+                _dumps([asdict(m) for m in run.metrics]),
+                run.report_html,
+                run.log_path,
+                run.detail,
+            ),
+        )
+
+
+def _run(row: tuple) -> EvalRun:
+    """One eval_runs row back as the frozen dataclass, metrics parsed out of their JSON column."""
+    metrics = tuple(MetricScore(**m) for m in json.loads(row[9]))
+    return EvalRun(*row[:9], metrics=metrics, report_html=row[10], log_path=row[11], detail=row[12])
 
 
 def _dumps(payload: Any) -> str:

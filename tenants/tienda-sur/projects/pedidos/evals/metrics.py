@@ -28,7 +28,10 @@ ORDER_DESK_LINE_CRITERIA = (
     "would say: Spanish from Spain addressing the customer as 'tú', warm and direct, at most "
     "three short sentences (one or two is fine and never a fault), stays on the customer's "
     "order and on shop information (sizes, shipping, returns, payment), never asks for card "
-    "details. It hands the turn back with EITHER a question — any question, however open, "
+    "details. This shop has nobody to put a customer through to, so telling a customer who "
+    "asks for a person that they are already speaking to support, and offering the shop's "
+    "own other channels instead, is exactly right and is never a reason to mark a reply "
+    "down. It hands the turn back with EITHER a question — any question, however open, "
     "«¿te ayudo con algo más?» included — OR a concrete next step: either one alone is enough, "
     "and a reply that does BOTH is also correct and must never be marked down for it. Whether "
     "the agent did the right THING — cancelled or did not cancel, called a tool or did not — is "
@@ -64,6 +67,14 @@ def order_desk_line() -> GEval:
     it, and one that has misread a line then fails the whole reply for it.
     Consent is `never_cancel_before_yes` and tool choice is `tool_correctness`;
     this metric is now told in words that neither is its business.
+
+    The remit clause grew in ms-20 with the clinic's, and for the same reason
+    read the other way round: the platform's `transfer_to_human` exists, this
+    shop names no `transfer_number`, and so a customer asking for a person gets
+    an honest "you are already speaking to support" and the shop's other
+    channels. A criterion that lists what a business does has to say that is
+    correct, or it fails the very answer the missing number is supposed to
+    produce.
     """
     return GEval(
         name="Order desk line",
@@ -90,11 +101,16 @@ def tool_correctness() -> ToolCorrectnessMetric:
     worth running.
 
     There is no ArgumentCorrectness in this project, and that is not an
-    oversight: the two tools of the order desk take no arguments at all (the
-    order is already identified), and the one tool that does take them —
-    `identify_order` — is pinned by `tests/test_tienda_stages.py` against the
-    order book, where there is exactly one right answer and a judge would only
-    add variance to it.
+    oversight. The two tools of the order desk take no arguments at all (the
+    order is already identified); `identify_order` does, and is pinned by
+    `tests/test_tienda_stages.py` against the order book, where there is exactly
+    one right answer and a judge would only add variance to it. `open_ticket`
+    is the third case and the reason the rule is worth writing down: its
+    argument is free text a customer dictated, so there is no right answer to
+    compare against — only a rule about what must NOT be in it, which the
+    goldens judge as words and `tests/test_tienda_tickets.py` pins as storage
+    (what the helpdesk keeps is the caller's own sentence, trimmed and never
+    rewritten).
     """
     return ToolCorrectnessMetric(threshold=0.9)
 
@@ -107,12 +123,18 @@ def never_cancel_before_yes() -> ConversationalDAGMetric:
     0.0, so "mostly asked for consent" is a failure and reads like one. The
     graph is `core.testing.dag.consent_graph`; what this project supplies is the
     two tool names and the wording of "was that a yes".
+
+    `include_reason=False` for the same reason as `grounded_facts_dag`: the two
+    first nodes are computed, so a call in which nothing was cancelled costs
+    zero model calls — and DeepEval's generated summary would be the only one
+    left. Each node writes its own line into `verbose_logs` instead.
     """
     return ConversationalDAGMetric(
         name="Never cancel before yes",
         dag=dag.cancellation_consent_graph(),
         model=AnthropicModel(model=JUDGE_MODEL),
         threshold=1.0,
+        include_reason=False,
     )
 
 
@@ -183,3 +205,15 @@ def consent_policy() -> ConversationalDAGMetric:
     `consent_policy` and calls its own metric whatever its business calls it.
     """
     return never_cancel_before_yes()
+
+
+def line_metric() -> GEval:
+    """This project's does-it-sound-like-us GEval, under the name the report looks up.
+
+    The same trick as `consent_policy`, for the same reason: one report scores
+    every project with one set of factories, and what a reply has to SOUND like
+    is called something different in every business — a clinic has a reception
+    line, a shop has an order desk. Each project answers to `line_metric` and
+    calls its own metric whatever its business calls it.
+    """
+    return order_desk_line()

@@ -1,10 +1,28 @@
 <!doctype html>
-<html lang="en" data-theme="ops">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="dark light" />
     <title>convo — control</title>
+    <!-- Set the theme before first paint: no flash of the wrong ground on load.
+         Reads the stored choice, else the OS preference. Key mirrors lib/theme.ts. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("convo-theme");
+          var theme =
+            stored === "light" || stored === "dark"
+              ? stored
+              : window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark";
+          document.documentElement.dataset.theme = theme;
+        } catch (e) {
+          document.documentElement.dataset.theme = "dark";
+        }
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

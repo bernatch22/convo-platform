@@ -118,6 +118,27 @@
   color: var(--text-dim);
 }
 
+/* One hairline glyph, the weight of the meta beside it — a switch, not a button. */
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s1);
+  border: none;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  line-height: 0;
+}
+
+.theme-toggle:hover {
+  color: var(--text);
+}
+
+.theme-toggle svg {
+  stroke-width: 1.5;
+}
+
 /* ── connection dot ──────────────────────────────────────────────────────── */
 
 .probe {
@@ -165,6 +186,13 @@
   font-size: var(--text-xs);
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+/* The section group is labelled with the path it acts on: an identifier, not a heading. */
+.rail__label--path {
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  text-transform: none;
 }
 
 .rail__tenant {
@@ -275,6 +303,12 @@
   font-size: var(--text-sm);
 }
 
+/* A note INTRODUCES the block under it, so it must not touch it: without this the
+ * paragraph above the phone panel sat flush against its top border. */
+.note + .panel {
+  margin-top: var(--s4);
+}
+
 .note--warn {
   color: var(--warn);
 }
@@ -354,6 +388,65 @@
 /* The phone line is a real address a stranger can dial — the one accent on this screen. */
 .channel__addr--live {
   color: var(--accent);
+}
+
+/* ── the project's inbound line, wherever it is shown ────────────────────── */
+
+/* One block, two frames: a strip under a page title (Talk) and a stacked panel
+ * body (Pipeline). The row inside is the same markup in both, so the number
+ * cannot be spelled one way on one screen and another way on the other. */
+.dial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2) var(--s3);
+}
+
+.dial--header {
+  margin-top: var(--s4);
+}
+
+.dial--panel {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.dial__label {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.dial__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--s2) var(--s3);
+}
+
+/* The number is a real address a stranger can dial — the one accent this block spends. */
+.dial__number {
+  color: var(--accent);
+  font-size: var(--text-lg);
+}
+
+.dial__meta {
+  font-size: var(--text-sm);
+}
+
+/* No line at all, and a line another fleet answers: both are warnings, not blanks. */
+.dial__none,
+.dial__warn {
+  margin: 0;
+  color: var(--warn);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.dial__warn {
+  flex-basis: 100%;
 }
 
 /* ── badges + mono bits ──────────────────────────────────────────────────── */
@@ -699,6 +792,16 @@ tr.is-watched td {
   border: 1px solid var(--accent);
   border-radius: var(--radius);
   color: var(--accent);
+  letter-spacing: 0.06em;
+}
+
+/* The same edge as badge--live, for the fact a supervisor most needs to see go wrong:
+ * "the caller CAN see you". A monitor that is not hidden is not a monitor. */
+.badge--warn {
+  padding: 1px var(--s2);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  color: var(--warn);
   letter-spacing: 0.06em;
 }
 

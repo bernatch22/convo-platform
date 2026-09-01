@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from livekit.agents.llm import ToolError
 
+from core.adapters.human import HumanTransfer
 from core.state.log import record
 from core.tools import guard
 from core.tools.contract import ToolSpec
@@ -37,6 +38,11 @@ log = logging.getLogger("platform.tools")
 # from its own CRM, so this is a convention, not a schema — an unknown key is
 # simply not learned, and the tool that carries it still masks it by name.
 CUSTOMER_PII_KEYS = ("patient", "name", "phone")
+
+# How much of a result a log line may carry. Long enough for three slots with their
+# doctors, short enough that nobody is tempted to dump a payload through it: a summary
+# is evidence that a fact came from a system, not a copy of the system's answer.
+SUMMARY_CHARS = 400
 
 
 class ToolExecutor(Protocol):
@@ -72,9 +78,32 @@ class LocalExecutor:
         self._record("tool.call", spec, args=safe_args)
         result = await self._execute(spec, adapter, args, safe_args)
         guard.consume(spec, self.tc)
-        self._record("tool.result", spec, shape=_shape(result))
+        self._record("tool.result", spec, shape=_shape(result), **self._summary(spec, result))
         log.info("tool.result %s %s ok", self.tc.label(), spec.name)
         return result
+
+    def _summary(self, spec: ToolSpec, result: Any) -> dict[str, str]:
+        """The `summary=` of this result's log line, when the tool declares a renderer.
+
+        A dict rather than a value so the common case — a tool with no
+        renderer — adds no key at all and the log of every project that never
+        opted in is byte-for-byte what it was.
+
+        Two things happen before the line is written. The result's own identity
+        fields are learned as PII first (`_learn_pii` only ever saw the
+        ARGUMENTS, and `find_patient` is asked for a phone and answers with a
+        name), so the mask in `record` can blank them; and a renderer that
+        raises is a bug worth a traceback in the developer log and nothing
+        else — the call succeeded, the caller is owed their result, and a
+        missing summary degrades exactly one eval.
+        """
+        guard.learn(self.tc.pii_values, _identity_in(result))
+        try:
+            summary = spec.summarise(result)
+        except Exception:
+            log.exception("tool.summary %s %s renderer failed", self.tc.label(), spec.name)
+            return {}
+        return {"summary": _capped(summary)} if summary else {}
 
     def _learn_pii(self, spec: ToolSpec, args: dict[str, Any]) -> None:
         """Remember this call's PII values BEFORE masking, so its own log line is masked too.
@@ -157,10 +186,39 @@ def attach_local_tools(tc: "TenantContext") -> "TenantContext":
     Two steps that only make sense together and only after the context exists
     (the executor holds it), so every builder of a TenantContext — the router in
     production, the harness in tests — ends with this one line.
+
+    One adapter is the PLATFORM's and not the tenant's: `HumanTransfer` reaches
+    the carrier rather than a customer system, and it is here so that handing a
+    call to a person is a write like any other — declared in a catalog, vetted
+    by the guard, timed by its spec and logged twice. It is unreachable for a
+    project whose catalog does not name `transfer_to_human`, so a tenant that
+    never opts in is exactly where it was.
     """
-    tc.adapters = tc.tenant.build_adapters()
+    tc.adapters = {**tc.tenant.build_adapters(), "human": HumanTransfer(tc)}
     tc.tools = LocalExecutor(tc)
     return tc
+
+
+def _identity_in(result: Any) -> list[Any]:
+    """Who a RESULT names, by the same conventional keys a context's customer uses.
+
+    `find_patient` is called with a phone number and comes back with the
+    patient's full name: a value no argument ever carried, which the mask
+    therefore did not know and would have written into a summary in the clear.
+    A list of rows is walked too, since an agenda answering with several
+    appointments names several people.
+    """
+    if isinstance(result, dict):
+        return [result.get(key) for key in CUSTOMER_PII_KEYS]
+    if isinstance(result, (list, tuple)):
+        return [value for row in result for value in _identity_in(row)]
+    return []
+
+
+def _capped(summary: str, limit: int = SUMMARY_CHARS) -> str:
+    """A summary short enough to belong in a log line; the rest is not evidence, it is a dump."""
+    text = " ".join(str(summary).split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
 def _identity_of(customer: dict[str, Any] | None) -> list[Any]:

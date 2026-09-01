@@ -59,6 +59,40 @@ class ProjectVersion:
     created_at: float = 0.0
 
 
+@dataclass(frozen=True)
+class MetricScore:
+    """One metric's verdict over a whole eval run: its mean score and the cases it decided."""
+
+    metric: str
+    score: float
+    passed: int = 0
+    failed: int = 0
+
+
+@dataclass(frozen=True)
+class EvalRun:
+    """One `deepeval` run of one project's suite: what it scored and where its evidence is.
+
+    Stored the moment it starts (`status="running"`) so the console can watch it
+    land, then replaced by id when it ends. `suite` is free text on purpose —
+    ring 1 today, personas tomorrow — and nothing here knows which is which.
+    """
+
+    id: str
+    tenant: str
+    project: str
+    suite: str
+    status: str = "running"  # running | done | failed
+    started_at: float = 0.0
+    finished_at: float | None = None
+    git_sha: str | None = None
+    milestone: str | None = None
+    metrics: tuple[MetricScore, ...] = ()
+    report_html: str | None = None
+    log_path: str | None = None
+    detail: str | None = None
+
+
 class Store(Protocol):
     """Sessions and their events, plus the three small tables the router reads."""
 
@@ -116,4 +150,12 @@ class Store(Protocol):
 
     def set_pipeline_override(self, override: PipelineOverride) -> None:
         """Set (or replace) one overridden field of a project's pipeline."""
+        ...
+
+    def eval_runs(self) -> list[EvalRun]:
+        """Every stored eval run, newest first."""
+        ...
+
+    def add_eval_run(self, run: EvalRun) -> None:
+        """Store one eval run, replacing the row with the same id."""
         ...

@@ -1,4 +1,12 @@
-"""Ring 3, with the audio: a recorded session as a ConversationalTestCase that carries sound.
+"""What was HEARD: a session's sound, cut into the clips a turn carries.
+
+Two callers, one vocabulary. Ring 3 (`voice_case_from`) reads the stereo OGG a
+finished call left behind; ring 2 (`core.testing.ring2`) has no file at all —
+it holds a live track and builds a `Timeline` as the frames arrive. Both end
+at `audio_clip`, which is the only place in the codebase that decides what an
+`Audio` on a turn looks like, `start_time` included.
+
+The ring-3 half, in full:
 
 `core.testing.replay` rebuilds what was SAID from the append-only log. This
 adds what was HEARD: the stereo OGG a `--record` call leaves behind, cut into
@@ -86,14 +94,7 @@ def attach_audio(case: ConversationalTestCase, events: list[Event], path: str | 
         clip = cut(channels[AGENT], rate, start, end)
         if clip.size == 0:
             continue
-        turn.audio = Audio.from_bytes(
-            wav_bytes(clip, rate),
-            "audio/wav",
-            sampleRate=rate,
-            encoding="wav",
-            duration=len(clip) / rate,
-            start_time=max(0.0, start),
-        )
+        turn.audio = audio_clip(clip, rate, start_time=max(0.0, start))
 
 
 def agent_windows(events: list[Event]) -> list[tuple[int, int]]:
@@ -145,6 +146,63 @@ def cut(samples: np.ndarray, rate: int, start_s: float, end_s: float) -> np.ndar
     lo = max(0, int(round(start_s * rate)))
     hi = min(len(samples), int(round(end_s * rate)))
     return samples[lo:hi] if hi > lo else samples[:0]
+
+
+def audio_clip(samples: np.ndarray, rate: int, start_time: float) -> Audio:
+    """One channel's slice as the `Audio` a turn carries, `start_time` always set.
+
+    `start_time` is where this clip begins inside the conversation, in seconds.
+    It is not decoration: `TurnTakingNaturalnessMetric` rebuilds the call's
+    timeline from it (`metrics/voice/turn_taking.py:18-23`) and scores nothing
+    without it, so every turn that carries audio carries an offset too.
+    """
+    return Audio.from_bytes(
+        wav_bytes(samples, rate),
+        "audio/wav",
+        sampleRate=rate,
+        encoding="wav",
+        duration=len(samples) / rate,
+        start_time=max(0.0, start_time),
+    )
+
+
+class Timeline:
+    """Audio arriving live, placed on the wall clock it arrived on.
+
+    An OGG is one continuous file, so `cut` addresses it by offset. A track on
+    the wire is not: it carries frames only while somebody speaks, and the
+    silence between two answers is nothing anybody sent. Writing each frame at
+    its arrival offset rebuilds the missing silence, and a clip cut by two wall
+    times then lines up with what the room's own events say happened.
+
+    Open source note: this is the receiving half of any headless LiveKit
+    client that wants per-turn audio; it knows nothing about this platform.
+    """
+
+    def __init__(self, rate: int, origin: float) -> None:
+        self.rate = rate
+        self.origin = origin
+        self._samples = np.zeros(0, dtype=np.int16)
+
+    def add(self, samples: np.ndarray, at: float) -> None:
+        """Write one frame at the second it arrived, growing the silence before it if needed."""
+        start = max(0, int(round((at - self.origin) * self.rate)))
+        end = start + len(samples)
+        if end > len(self._samples):
+            pad = np.zeros(end - len(self._samples), dtype=np.int16)
+            self._samples = np.concatenate([self._samples, pad])
+        self._samples[start:end] = samples
+
+    def clip(self, from_wall: float, to_wall: float) -> np.ndarray:
+        """The samples between two wall-clock times, clamped to what actually arrived."""
+        return cut(self._samples, self.rate, from_wall - self.origin, to_wall - self.origin)
+
+    def audio(self, from_wall: float, to_wall: float) -> Audio | None:
+        """That slice as a turn's `Audio`, offset from the start of the call; None if empty."""
+        clip = self.clip(from_wall, to_wall)
+        if clip.size == 0:
+            return None
+        return audio_clip(clip, self.rate, start_time=from_wall - self.origin)
 
 
 def wav_bytes(samples: np.ndarray, rate: int) -> bytes:

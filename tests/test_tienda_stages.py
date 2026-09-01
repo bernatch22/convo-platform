@@ -9,7 +9,9 @@ walk the whole call; they are skipped without a key.
 
 The clinic's suite is `tests/test_stages.py` and the two read almost the same,
 which is the point of the milestone: one runtime, two businesses, and the only
-files that differ are the ones a customer owns.
+files that differ are the ones a customer owns. That includes what they do NOT
+assert: no test here asks a judge whether a sentence was good enough, because a
+judged sentence in a gate is a coin flip with a build behind it.
 """
 
 import importlib
@@ -183,11 +185,21 @@ async def test_a_compensated_cancellation_spends_the_yes_it_was_given() -> None:
 def test_every_tool_the_project_can_call_declares_what_it_does_to_the_world() -> None:
     catalog = project_module.PROJECT.tools
 
-    assert catalog.names() == ["cancel_order", "find_order", "restore_order", "send_sms"]
+    assert catalog.names() == [
+        "cancel_order",
+        "find_order",
+        "open_ticket",
+        "restore_order",
+        "send_sms",
+        "ticket_status",
+        "transfer_to_human",
+    ]
     assert catalog.get("cancel_order").side_effect is SideEffect.IRREVERSIBLE
     assert catalog.get("cancel_order").needs_confirmation() is True
     assert catalog.get("cancel_order").compensation == "restore_order"
     assert catalog.get("find_order").needs_confirmation() is False
+    assert catalog.get("open_ticket").side_effect is SideEffect.WRITE
+    assert catalog.get("open_ticket").needs_confirmation() is False
     assert catalog.get("find_availability") is None, "the shop has no agenda to consult"
 
 
@@ -227,11 +239,20 @@ def test_identify_hands_the_next_stage_the_order_but_never_its_state(tc) -> None
 
 def test_order_desk_hands_the_farewell_the_cancellation_that_now_exists(tc) -> None:
     stage = desk(tc)
-    assert "Todavía no" in stage.summary()
 
     stage.cancelled = tc.customer
     assert "TS-10432 cancelado" in stage.summary()
     assert "74,90 euros" in stage.summary()
+
+
+def test_order_desk_hands_the_ticket_desk_the_order_and_not_a_non_cancellation(tc) -> None:
+    """The summary is a turn the model ANSWERS, so "nothing was cancelled" gets said out loud."""
+    said = desk(tc).summary()
+
+    assert "TS-10432" in said
+    assert "Marta Alonso Gil" in said
+    assert "no vuelvas a pedir el número" in said
+    assert "no se lee en voz alta" in said
 
 
 # --- the model --------------------------------------------------------------
@@ -277,10 +298,8 @@ async def test_a_yes_cancels_the_order_and_writes_to_the_customer(tc) -> None:
 
 
 @needs_llm
-async def test_a_shipped_order_is_never_cancelled_and_the_return_is_offered_instead(
-    judge_llm,
-) -> None:
-    """What is asserted is the writes and the words, never which tool was reached for.
+async def test_a_shipped_order_is_never_cancelled_whatever_the_model_reaches_for() -> None:
+    """What is asserted is the writes, never which tool was reached for nor what was said.
 
     Twice in three runs the model called `request_cancellation` and read the
     refusal off it; once it answered from the status it had read seconds
@@ -288,20 +307,22 @@ async def test_a_shipped_order_is_never_cancelled_and_the_return_is_offered_inst
     risk either way — a cancellation can only happen through the tool, and the
     order system refuses a shipped order regardless — so pinning the call here
     would fail a build for a defensible reply.
+
+    The words were judged here too, and they flipped. They are judged in the
+    evals ring instead, on the shipped-order golden — «quiero cancelarlo, que me
+    he equivocado de talla» on TS-10433 — whose expected behaviour is the same
+    sentence this test used to hand a judge: it has already gone out, it cannot
+    be cancelled, here is the free 30-day return, and no cancellation is ever
+    promised.
     """
     tc = identified_context(SHIPPED)
     orders, sms = tc.adapters["orders"], tc.adapters["sms"]
 
-    conversation = await run_conversation(tc, ["quiero cancelar el pedido"], desk(tc))
+    await run_conversation(tc, ["quiero cancelar el pedido"], desk(tc))
 
     assert writes(orders) == [], "no saga runs for a shipped order"
     assert orders.book[SHIPPED]["status"] == "enviado"
     assert sms.sent == []
-    await final_message_of(conversation).judge(
-        judge_llm,
-        intent="dice que el pedido ya ha salido y no se puede cancelar, y le ofrece devolverlo "
-        "gratis en 30 días; en ningún caso dice que lo haya cancelado",
-    )
 
 
 @needs_llm
@@ -315,10 +336,3 @@ async def test_the_order_desk_prompt_is_served_from_the_cache_on_its_second_turn
         "Haiku 4.5 caches prefixes of 4096+ tokens: a cache read of 0 means this stage's "
         "prefix shrank below the floor or something in it changes between turns"
     )
-
-
-def final_message_of(conversation):
-    """The last assistant message of the last turn, ready to hand to a judge."""
-    from core.testing import final_message
-
-    return final_message(conversation.results[-1])

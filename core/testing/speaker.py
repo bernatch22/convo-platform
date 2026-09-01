@@ -1,4 +1,4 @@
-"""Recording a headless call: a virtual speaker, and the framework's own OGG writer.
+"""The two ends of a call nobody is sitting at: a virtual speaker and a virtual microphone.
 
 A real `--record` run needs a microphone and a room. `RecorderIO` — the thing
 that writes the stereo OGG — is only wired by `AgentSession.start` when there
@@ -17,15 +17,26 @@ truthful stereo file — L = caller (silence), R = agent — of a call in which 
 caller typed. What that costs each voice metric is written down in
 `docs/evals.md` §3.9.
 
-Open source note: nothing here knows about tenants. Hand it any `AgentSession`
-with a TTS and it hands back the OGG that session would have produced.
+`VirtualMicrophone` is the other end, and the one ring 2 needs: a synthetic
+caller in a REAL room has to put sound on the wire, so it speaks its line with
+a TTS of its own and reports the wall-clock window that line occupied. The two
+classes never meet — one is an `AgentSession`'s output, the other a
+`rtc.Room`'s input — but they are the same idea twice and belong together.
+
+Open source note: nothing here knows about tenants. Hand `Recording` any
+`AgentSession` with a TTS and it hands back the OGG that session would have
+produced; hand `VirtualMicrophone` any livekit-agents TTS and it is a headless
+caller's mouth in any LiveKit room.
 """
 
 import asyncio
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 from livekit import rtc
+from livekit.agents import tts as agent_tts
 from livekit.agents.voice import io
 from livekit.agents.voice.recorder_io import RecorderIO
 
@@ -83,6 +94,75 @@ class VirtualSpeaker(io.AudioOutput):
     def _report(self, *, position: float, interrupted: bool) -> None:
         self._pushed, self._started_at, self._playout = 0.0, None, None
         self.on_playback_finished(playback_position=position, interrupted=interrupted)
+
+
+@dataclass
+class Spoken:
+    """One line the caller said: the text, the wall-clock window, and the samples that went out."""
+
+    text: str
+    started_at: float
+    ended_at: float
+    samples: np.ndarray
+    rate: int
+
+
+class VirtualMicrophone:
+    """A synthetic caller's mouth: text in, real audio on a real room's wire.
+
+    The pacing is the SFU's, not ours. `AudioSource.capture_frame` blocks once
+    its queue is full and `wait_for_playout` returns when the queue has
+    drained, so pushing every synthesised frame and then waiting takes the same
+    wall-clock time the sentence takes to say. That matters twice: the agent's
+    VAD must see the real gap after the line, and the window `say` reports is
+    what gives the caller's turn an `Audio.start_time` that is true.
+
+    The samples are kept as they go out, because a scored turn needs the SOUND
+    of what the caller said and no track carries our own voice back to us.
+
+    `http_session` is not optional plumbing. A livekit-agents plugin asks the
+    framework's job context for its HTTP session, and a harness that is not a
+    job has none: without one handed in, the first `say` dies with "Attempted
+    to use an http session outside of a job context". Whoever passes it owns
+    nothing — this closes it.
+    """
+
+    def __init__(self, tts: agent_tts.TTS, http_session=None) -> None:
+        self.tts = tts
+        self.http_session = http_session
+        self.source = rtc.AudioSource(tts.sample_rate, tts.num_channels)
+        self.track = rtc.LocalAudioTrack.create_audio_track("caller", self.source)
+
+    async def say(self, text: str) -> Spoken:
+        """Speak one line into the room and report when it started, ended, and how it sounded."""
+        started: float | None = None
+        blocks: list[np.ndarray] = []
+        stream = self.tts.synthesize(text)
+        try:
+            async for synthesized in stream:
+                if started is None:
+                    started = time.time()
+                blocks.append(np.frombuffer(synthesized.frame.data, dtype=np.int16).copy())
+                await self.source.capture_frame(synthesized.frame)
+        finally:
+            await stream.aclose()
+        await self.source.wait_for_playout()
+        now = time.time()
+        samples = np.concatenate(blocks) if blocks else np.zeros(0, dtype=np.int16)
+        began = started if started is not None else now
+        return Spoken(text, began, now, samples, self.tts.sample_rate)
+
+    async def publish(self, room: rtc.Room) -> None:
+        """Put the microphone on the wire — the agent subscribes to this as the caller."""
+        options = rtc.TrackPublishOptions(source=rtc.TrackSource.SOURCE_MICROPHONE)
+        await room.local_participant.publish_track(self.track, options)
+
+    async def aclose(self) -> None:
+        """Close the source, the TTS behind it, and the HTTP session it was given."""
+        await self.source.aclose()
+        await self.tts.aclose()
+        if self.http_session is not None:
+            await self.http_session.close()
 
 
 class Recording:

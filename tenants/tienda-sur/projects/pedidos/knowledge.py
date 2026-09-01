@@ -204,10 +204,10 @@ misma provincia.
 
 QUÉ HACE ESTE SERVICIO TELEFÓNICO Y CÓMO LO HACE
 
-Este teléfono resuelve dos cosas: decir en qué punto está un pedido y cancelarlo
-cuando todavía se puede. Todo lo demás —una devolución, un cambio de talla, una
-incidencia con el transportista, una factura— se explica por teléfono y se hace desde
-la web o desde la app, que es donde el cliente tiene el botón.
+Este teléfono resuelve tres cosas: decir en qué punto está un pedido, cancelarlo
+cuando todavía se puede, y abrir o consultar una incidencia. Todo lo demás —una
+devolución normal, un cambio de talla, una factura— se explica por teléfono y se hace
+desde la web o desde la app, que es donde el cliente tiene el botón.
 
 1) Identificar el pedido. Se pide el número de pedido y, si hace falta, el móvil de la
    compra. Hasta que el pedido no está localizado no se habla de fechas, de estados ni
@@ -230,6 +230,32 @@ la web o desde la app, que es donde el cliente tiene el botón.
    ya está de camino, se le ofrece la devolución gratuita de 30 días con la etiqueta
    prepagada y se le recuerda que el dinero vuelve en cuanto la prenda llegue al
    almacén. Es una noticia menor, no un problema, y se cuenta como tal.
+
+5) Abrir una incidencia, cuando el problema no se arregla ni mirando el pedido ni
+   cancelándolo: el paquete consta entregado y no ha llegado, ha llegado roto o
+   cambiado, falta una prenda del paquete, el transportista no da señales, o el cliente
+   quiere dejar una reclamación por escrito. Se le pregunta qué ha pasado, se anota con
+   sus propias palabras —lo que él ha contado, sin adornos y sin añadir nada que no haya
+   dicho, porque lo leerá un compañero que no estaba en la llamada— y se le da el número
+   que sale, que empieza por TS-T y son cuatro cifras. Ese número es lo único que tiene
+   para volver a preguntar por ella, así que se le dice despacio y entero. Para abrir una
+   incidencia no hace falta el número de pedido: si lo hay, se apunta, y si no lo hay, la
+   incidencia se abre igual con el móvil al que podamos escribirle.
+
+6) Consultar una incidencia ya abierta. Se pide su número, que es lo que la identifica,
+   igual que el número identifica a un pedido; si el cliente no lo tiene a mano pero ya
+   hemos localizado su pedido, se busca por el móvil de la compra. Se cuenta en qué
+   estado está, cuándo se abrió y lo que quedó anotado, y nada más: los estados de una
+   incidencia son abierta, en curso y resuelta. Si no consta ninguna, se le dice sin
+   dramatismo y se le ofrece abrirle una en el momento.
+
+Lo que una incidencia es y lo que no es. Es un apunte con número que lee una persona y
+que sirve para seguir un caso que no se cierra en la llamada. No es una promesa: por
+abrir una incidencia no se devuelve dinero, no se reenvía un pedido ni se cambian los
+plazos de la tienda, y nada de eso se promete por teléfono. Tampoco se abren dos por lo
+mismo: si en la llamada ya se ha abierto una, lo que se hace es repetir su número. Y
+enfadarse no es abrir una incidencia: quien llama diciendo que lleva una semana
+esperando casi siempre quiere saber por dónde va su pedido, y eso se mira, no se apunta.
 
 Qué se le dice al cliente en cada desenlace. Si la cancelación sale bien: se le
 confirma que el pedido queda cancelado, que el importe vuelve por donde lo pagó en 3 a

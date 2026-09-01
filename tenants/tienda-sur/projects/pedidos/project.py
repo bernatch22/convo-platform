@@ -19,10 +19,12 @@ spoken failure instead of a refusal, and the refusal is the honest answer.
 from dataclasses import dataclass
 
 from core.context import Project, TenantContext
+from core.telephony.human import TRANSFER_TO_HUMAN
 from core.tools.catalog import ToolCatalog
 from core.tools.contract import SideEffect, ToolSpec
 from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
+from ...adapters.tickets import summarise_ticket
 from . import knowledge
 
 FIND_ORDER = ToolSpec(
@@ -53,6 +55,29 @@ SEND_SMS = ToolSpec(
     pii_scope=frozenset({"phone"}),
     timeout_s=5.0,
 )
+# Opening an incident is a WRITE and not an irreversible, and the distinction is the
+# whole reason the platform declares one: a ticket opened by mistake is closed by the
+# team that reads it, and nothing happened to the customer's money, their parcel or
+# their data. Asking a person to say yes out loud before we write down the problem they
+# just described would be asking them to consent to being listened to. `cancel_order`
+# stays irreversible, so the shop's consent metric still watches exactly one door.
+#
+# `subject` is free text a customer dictated, which is the widest PII surface in this
+# project — an address, a neighbour's name, somebody else's order. It is masked in the
+# log by declaration, and `summarise_ticket` never hands it to a renderer at all.
+OPEN_TICKET = ToolSpec(
+    name="open_ticket",
+    side_effect=SideEffect.WRITE,
+    pii_scope=frozenset({"subject", "phone", "name"}),
+    timeout_s=6.0,
+    result_summary=summarise_ticket,
+)
+TICKET_STATUS = ToolSpec(
+    name="ticket_status",
+    side_effect=SideEffect.READ,
+    pii_scope=frozenset({"phone"}),
+    timeout_s=5.0,
+)
 
 # When a tool call cannot produce a result the model still has to say something. The
 # platform's defaults already address the caller as "tú", but they talk about "sistemas";
@@ -78,18 +103,36 @@ class PedidosProject(Project):
 
     def stages(self, tc: TenantContext) -> list:
         """Every stage of the call, in order — the project's whole tool surface for evals."""
-        from .stages import Farewell, Identify, OrderDesk
+        from .stages import Farewell, Identify, OrderDesk, TicketDesk
 
-        return [Identify(tc), OrderDesk(tc), Farewell(tc)]
+        return [Identify(tc), OrderDesk(tc), TicketDesk(tc), Farewell(tc)]
 
 
 PROJECT = PedidosProject(
     id="pedidos",
-    name="Estado y cancelación de pedidos",
+    name="Pedidos e incidencias",
     language="es-ES",
-    greeting="¡Hola! Soy la asistente de Tienda Sur. ¿En qué te ayudo?",
+    # Art. 50 AI Act, same as the clinic: the greeting itself is the disclosure.
+    greeting="¡Hola! Soy la asistente virtual de Tienda Sur. ¿En qué te ayudo?",
     voice="gD1IexrzCvsXPHUuT0s3",  # ElevenLabs "Sara Martin - 3": the shop's own voice
-    tools=ToolCatalog.of(FIND_ORDER, CANCEL_ORDER, RESTORE_ORDER, SEND_SMS),
+    # The incident desk is a different person and sounds like one: ElevenLabs "Ciro",
+    # peninsular male. A caller handed over hears somebody else pick up, which is the
+    # truth of what just happened — the desk is another agent with its own prompt, its
+    # own two tools and now its own voice.
+    stage_voices={"TicketDesk": "ZmOvXLYy49UISWCUznMW"},
+    # `TRANSFER_TO_HUMAN` is declared and `transfer_number` is deliberately unset: this
+    # shop has no switchboard to hand a call to, so the model is never offered the verb and
+    # the console says which of the two halves is missing. Opting in is the catalog line;
+    # turning it on is one field the console owns (`core.telephony.human`).
+    tools=ToolCatalog.of(
+        FIND_ORDER,
+        CANCEL_ORDER,
+        RESTORE_ORDER,
+        SEND_SMS,
+        OPEN_TICKET,
+        TICKET_STATUS,
+        TRANSFER_TO_HUMAN,
+    ),
     messages=MESSAGES,
     knowledge_seed=knowledge.SHOP,
 )

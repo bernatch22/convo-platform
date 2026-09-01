@@ -4,8 +4,9 @@ One definition, built once per job by `core.router.resolve`, carried as the
 session's `userdata` and reachable from every tool as `ctx.userdata`.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, time
 from typing import TYPE_CHECKING, Any
 
 from core.contracts import Channel
@@ -45,15 +46,40 @@ class Project:
     (`core.tools.messages`) in the project's own register and language.
     `backchannels` overrides the murmurs a barge-in filter ignores
     (`core.barge_in.SPANISH_BACKCHANNELS`) — data, so core knows one language.
+    `stt_gate` overrides how much voiced audio a transcript must have behind it
+    to be believed (`core.stt_gate.GateOptions`), for a tenant on a noisier line.
 
     The fields named in `core.state.overrides.OVERRIDABLE` are the ones a
     supervisor may change from the console without a deploy: `core.state.overrides`
     replaces them on the way out of the router (`core.state.store.PipelineOverride`).
+    `llm_model` is which model answers for this project. The LLM is a swappable
+    interface driver, so it is project data like the voice and not a constant in
+    `core/providers`, and an eval can measure a second model on the same goldens
+    (`core.testing.report --model`) without editing one of them.
+    `scoring` is the post-call score's opt-out (ms-13). A project that sets it
+    to False is never judged after a call ends and its sessions show a dash
+    where the others show a chip — which is a business decision (a queue whose
+    calls are two sentences long, a tenant that has not agreed to it), so it
+    lives with the project's data and not in an environment variable.
+    `transfer_number` is where the agent hands a call when the caller asks for a
+    person (ms-20). It is project data and overridable, like the voice: which
+    phone a reception overflows to changes far more often than a deploy does.
+    Empty means the model is never offered `transfer_to_human` at all — the
+    tool that cannot work is not offered, `core.telephony.human`.
+    `recording` is the same shape of decision about the call's AUDIO (ms-17):
+    False and no OGG is ever written for this project, so its sessions show no
+    player. It is deliberately not one flag with `scoring` — a tenant may want
+    its calls judged without keeping a recording of the caller's voice.
     """
 
     id: str
     name: str
     voice: str | None = None
+    # One stage, one voice: {"TicketDesk": "<elevenlabs id>"}. A stage not named here
+    # speaks with `voice`. A handoff to a desk with its own voice is the caller hearing
+    # somebody else pick up, which is what a handoff IS — so the voice belongs to the
+    # project's data like every other one, never to the stage's code.
+    stage_voices: dict[str, str] = field(default_factory=dict)
     tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
     stt_provider: str = "soniox"  # soniox | deepgram; see core/providers/stt.py
     llm_model: str | None = None  # None = the platform default; see core/providers/llm.py
@@ -61,9 +87,13 @@ class Project:
     greeting: str = ""  # spoken verbatim on session start (no LLM turn); "" = the model opens
     keyterms: list[str] = field(default_factory=list)
     backchannels: list[str] = field(default_factory=list)  # [] = the Spanish default
+    stt_gate: dict[str, float] = field(default_factory=dict)  # {} = the platform's thresholds
     tools: ToolCatalog = field(default_factory=ToolCatalog)
     messages: dict[str, str] = field(default_factory=dict)
     knowledge_seed: str = ""
+    transfer_number: str | None = None  # E.164; None/"" = the agent is offered no transfer
+    scoring: bool = True  # False = this project's finished calls are never scored (ms-13)
+    recording: bool = True  # False = this project's calls keep no audio at all (ms-17)
 
     def knowledge(self, tc: "TenantContext") -> str:
         """The stable knowledge block a prompt opens with: the pinned override, else git's seed.
@@ -103,9 +133,20 @@ class TenantContext:
     log: "EventLog | None" = None
     confirmation_token: "ConfirmationToken | None" = None
     knowledge_override: str | None = None
+    date_noted: bool = False  # the session-start date note is written once, by the entry stage
+    clock: "Callable[[], datetime] | None" = None  # tests freeze it; None = the machine's clock
     customer: dict[str, Any] | None = None
     pii_values: set[str] = field(default_factory=set)
     prev_agent: Any = None
+    # The live session's supervision state (`core.security.control.SupervisorControl`),
+    # or None where no second human can reach the call: the console, a harness,
+    # an offline eval. Every stage carries it because every stage may be the one
+    # holding the floor when a human takes the line.
+    supervisor: Any = None
+
+    def now(self) -> time:
+        """The time of day this session believes it is; tests freeze it through `clock`."""
+        return (self.clock() if self.clock else datetime.now()).time()
 
     def label(self) -> str:
         """Short identifier for logs: `tenant/project#session`."""

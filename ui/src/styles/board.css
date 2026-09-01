@@ -1,0 +1,241 @@
+/* The Board. Layout, density and one bar chart — every colour comes from tokens.css.
+ *
+ * The accent is spent exactly twice on this screen: on the bars (what the
+ * platform did) and on a granted yes (what authorised it). Everything else is
+ * ink. A verb gets no colour of its own — there is one accent in this palette
+ * and inventing a second to label a tool would be a lie about how much the
+ * distinction matters — so the verbs are separated by row, not by hue.
+ *
+ * The agenda leads and the counters are a strip, which is a claim about
+ * importance made in layout rather than in colour: the records are a table at
+ * full width, the tallies are one dense line under them, and neither borrows
+ * an accent to argue for itself.
+ */
+
+/* ── the window picker ────────────────────────────────────────────────────── */
+
+.windows {
+  display: flex;
+  gap: var(--s1);
+  margin-top: var(--s4);
+}
+
+.windows__pick {
+  padding: var(--s1) var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+}
+
+.windows__pick:hover {
+  border-color: var(--line-strong);
+  color: var(--text-dim);
+}
+
+.windows__pick.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* ── the agenda: the records themselves, the first thing on the screen ────── */
+
+.table--agenda td.did {
+  color: var(--text-dim);
+  max-width: 360px;
+}
+
+.table--agenda td.id,
+.table--agenda td.mono {
+  white-space: nowrap;
+}
+
+.agenda__who {
+  color: var(--text);
+}
+
+/* A record the business no longer holds is still evidence, and still readable — one step back. */
+.agenda__row.is-gone .agenda__who {
+  color: var(--text-dim);
+}
+
+/* How a record stands, in the business's own word. Three tones and a default: nothing
+ * here knows what the word MEANS, only how loudly the adapter asked for it to be drawn. */
+.state {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.state--new {
+  color: var(--accent);
+}
+
+.state--changed {
+  color: var(--warn);
+}
+
+.state--gone {
+  color: var(--danger);
+}
+
+.state--plain {
+  color: var(--text-faint);
+}
+
+/* ── the counters, demoted to one strip under the records ─────────────────── */
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s5);
+  padding: var(--s3) var(--s5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.strip__cell {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  color: var(--text-faint);
+  font-size: var(--text-xs);
+}
+
+.strip__cell--quiet {
+  margin-left: auto;
+}
+
+.strip__value {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-variant-numeric: tabular-nums;
+}
+
+.strip__name {
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  letter-spacing: 0.04em;
+}
+
+.strip__bad {
+  color: var(--warn);
+}
+
+/* ── bars by day, one strip per verb ──────────────────────────────────────── */
+
+.bars {
+  display: grid;
+  gap: var(--s2);
+  padding: var(--s4) var(--s5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.bars__row,
+.bars__axis {
+  display: grid;
+  grid-template-columns: 140px 1fr 40px;
+  align-items: end;
+  gap: var(--s4);
+}
+
+.bars__name {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bars__track {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 44px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bars__day {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  height: 100%;
+  min-width: 3px;
+}
+
+.bars__fill {
+  width: 100%;
+  border-radius: 1px 1px 0 0;
+  background: var(--accent);
+}
+
+.bars__count {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.bars__axis {
+  align-items: center;
+  padding-top: var(--s1);
+}
+
+.bars__span {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* ── the transactions table ───────────────────────────────────────────────── */
+
+.table--board td.id,
+.table--board td.mono {
+  white-space: nowrap;
+}
+
+.table--board td.did {
+  color: var(--text-dim);
+  max-width: 480px;
+}
+
+.table--board th:last-child,
+.table--board td:last-child {
+  padding-right: var(--s5);
+}
+
+/* The one yes that authorised something irreversible — the second place the accent is spent. */
+.granted {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+}
+
+.granted--yes {
+  color: var(--accent);
+}
+
+.granted--none {
+  color: var(--danger);
+}
+
+/* `outcome--failed` already exists in sessions.css; these are the two this screen adds. */
+.outcome--done {
+  color: var(--text);
+}
+
+.outcome--pending {
+  color: var(--text-faint);
+}

@@ -12,7 +12,9 @@ import { ConsentProof } from "../components/ConsentProof";
 import { EmptyState } from "../components/EmptyState";
 import { EventRow } from "../components/EventRow";
 import { LatencyStrip } from "../components/LatencyStrip";
-import { getSession, type SessionView } from "../lib/api";
+import { ScoreBreakdown } from "../components/ScoreBreakdown";
+import { getSession, recordingUrl, type SessionView } from "../lib/api";
+import { sectionPath } from "../lib/nav";
 import {
   authorisedBy,
   consentLinks,
@@ -29,6 +31,7 @@ import {
 
 interface DetailData {
   tenant: string;
+  project: string;
   id: string;
   view: SessionView | null;
   error: string | null;
@@ -37,21 +40,23 @@ interface DetailData {
 /** Load one session in full — the row, the report and every event in seq order. */
 export async function sessionDetailLoader({ params }: LoaderFunctionArgs): Promise<DetailData> {
   const tenant = params["tenant"] ?? "";
+  const project = params["project"] ?? "";
   const id = params["id"] ?? "";
   try {
-    return { tenant, id, view: await getSession(id), error: null };
+    return { tenant, project, id, view: await getSession(id), error: null };
   } catch (cause) {
-    return { tenant, id, view: null, error: cause instanceof Error ? cause.message : String(cause) };
+    const error = cause instanceof Error ? cause.message : String(cause);
+    return { tenant, project, id, view: null, error };
   }
 }
 
 export function SessionDetail() {
-  const { tenant, id, view, error } = useLoaderData() as DetailData;
+  const { tenant, project, id, view, error } = useLoaderData() as DetailData;
 
   if (!view) {
     return (
       <div className="page">
-        <Head tenant={tenant} id={id} />
+        <Head tenant={tenant} project={project} id={id} />
         <section className="section">
           <EmptyState title="That session did not load" command={`curl -s localhost:8090/sessions/${id}`}>
             <p>
@@ -70,7 +75,7 @@ export function SessionDetail() {
 
   return (
     <div className="page page--wide">
-      <Head tenant={tenant} id={id} />
+      <Head tenant={tenant} project={project} id={id} />
 
       <section className="section">
         <div className="facts">
@@ -80,12 +85,30 @@ export function SessionDetail() {
           <Fact label="duration" value={duration(view) ?? "running"} />
           <Fact label="outcome" value={view.outcome ?? "running"} />
           <Fact label="cost" value={euros(view.cost_eur)} />
+          <Fact label="score" value={view.score ? view.score.score.toFixed(2) : "—"} />
           <Fact label="turns" value={String(view.turns)} />
           <Fact label="events" value={String(view.events)} />
           {endReason(events) && <Fact label="reason" value={endReason(events) ?? ""} />}
           {stages.length > 0 && <Fact label="stages" value={stages.join(" → ")} />}
         </div>
       </section>
+
+      {view.audio && (
+        <section className="section">
+          <h2 className="section__title">Listen to this call</h2>
+          <audio className="player" controls preload="none" src={recordingUrl(id)}>
+            <a href={recordingUrl(id)}>Download the recording</a>
+          </audio>
+          <p className="note">
+            Stereo: the caller on the left channel, the agent on the right, on one absolute
+            timeline whose sample zero is the <code className="mono">audio.start</code> row below.
+            The file never leaves the box except through this authenticated route — it is not in
+            git and it is not a static mount. A supervisor who took the line is audible to the
+            caller but <strong>not</strong> in this recording: the tap hears the caller and the
+            agent, and that is the one thing it does not hear.
+          </p>
+        </section>
+      )}
 
       <section className="section">
         <h2 className="section__title">Latency across this call</h2>
@@ -101,6 +124,17 @@ export function SessionDetail() {
       <section className="section">
         <h2 className="section__title">Consent proof</h2>
         <ConsentProof links={links} />
+      </section>
+
+      <section className="section">
+        <h2 className="section__title">Score</h2>
+        <ScoreBreakdown score={view.score} />
+        <p className="note">
+          Written into the log itself as <code className="mono">session.score</code>, with the next{" "}
+          <code className="mono">seq</code> — the same row{" "}
+          <code className="mono">python -m convo sessions show {id}</code> prints at the bottom of
+          the table below.
+        </p>
       </section>
 
       {costLines(events).length > 0 && (
@@ -180,11 +214,13 @@ export function SessionDetail() {
 }
 
 /** The page's title strip: where you are, and which session you are reading. */
-function Head({ tenant, id }: { tenant: string; id: string }) {
+function Head({ tenant, project, id }: { tenant: string; project: string; id: string }) {
   return (
     <header className="page__head">
       <div className="page__eyebrow">
-        <Link to={`/t/${tenant}/sessions`}>{tenant} / sessions</Link>
+        <Link to={sectionPath(tenant, project, "sessions")}>
+          {tenant} / {project} / sessions
+        </Link>
       </div>
       <h1 className="page__title page__title--mono">{id}</h1>
     </header>

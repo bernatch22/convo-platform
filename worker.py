@@ -5,21 +5,31 @@
 LiveKit server. The VAD is loaded once per process in `prewarm`, inside the
 10 s budget, and handed to every job that process runs.
 
-`--record` (or `RECORD=1`) leaves the stereo OGG of the call on disk and its
-path in the session log's `session.end`.
+Every real job keeps its audio (ms-17): the stereo OGG lands under
+`core.recordings.root()`, keyed by session id, and its path is written into
+the log as `audio.start` while the call is still going. `--record` is still
+the console's own flag, into the framework's `console-recordings/` folder;
+`RECORD=0` switches recording off for a whole deploy, and a project can opt
+out on its own with `Project.recording = False`.
 """
 
 import logging
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 from livekit.agents import AgentServer, JobContext, JobProcess, cli
 from livekit.agents.cli import AgentsConsole
 
+from core import recordings
+from core.context import TenantContext
 from core.providers import vad_for
 from core.router import resolve
+from core.security.control import SupervisorControl
+from core.security.monitor import watch_supervisors
 from core.session import build_session, start_session
 from core.state.attach import close_log
+from core.state.log import record as record_event
 
 load_dotenv()
 
@@ -39,27 +49,50 @@ server.setup_fnc = prewarm
 async def entrypoint(ctx: JobContext) -> None:
     """Resolve the tenant for this job and run its conversation."""
     tc = await resolve(ctx)
+    audio = audio_destination(ctx, tc)
     session = build_session(tc, vad=ctx.proc.userdata.get("vad"))
+    # A supervisor's verbs are aimed at THIS session, so the control is built with
+    # it and hung on the context every stage already carries. The watch stays out
+    # of `build_session` because it is about the ROOM: a console run has no room,
+    # gets no control, and so has no second human to obey. The room is passed too
+    # because `transfer` needs a NAME and a caller identity, and only the room has
+    # those — a console run is refused the verb rather than guessing at them.
+    tc.supervisor = SupervisorControl(tc, session, ctx.room)
+    watch_supervisors(ctx.room, tc, tc.supervisor)
     ctx.add_shutdown_callback(_report_filer(ctx, session, tc))
     await start_session(
         session,
         tc.project.entry_agent(tc),
         room=ctx.room,
-        record=recording(),
+        record=audio is not None,
         channel=tc.channel,
     )
+    if audio is not None:
+        # Written the moment the recorder is up, not at the end: the pointer has
+        # to survive the SIGKILL the audio itself now survives, and its `t_ms`
+        # is what `core.testing.audio` reads as sample 0 of the OGG.
+        record_event(tc, "audio.start", {"path": str(audio)})
 
 
-def recording() -> bool:
-    """Whether this run keeps its audio: `console --record`, or `RECORD=1` anywhere else.
+def audio_destination(ctx: JobContext, tc: TenantContext) -> Path | None:
+    """Where this call's OGG will be written, or None when it keeps no audio.
 
-    The console's own flag is the one a human types, and it already exists
-    upstream — it just does not reach `session.start`, which defaults to the
-    server's `job.enable_recording` and so is False on a laptop. `RECORD=1` is
-    the same switch for `dev` and for a job that has no console at all.
+    A chat session has nothing to record, a project may opt out, and a whole
+    deploy can say `RECORD=0`. A console run is left exactly as it always was —
+    `--record` writes into the framework's own `console-recordings/` folder,
+    because a laptop is not the box and should not quietly fill a recordings
+    tree. Every other job records by default: the tap was already running in
+    every job, and `core.recordings.aim` is the one line that stops the file
+    from dying with the room.
     """
+    if tc.channel != "voice" or os.getenv("RECORD") == "0":
+        return None
+    if not recordings.keep(tc.project):
+        return None
     console = AgentsConsole.get_instance()
-    return bool(console.enabled and console.record) or os.getenv("RECORD") == "1"
+    if console.enabled:
+        return Path(console.session_directory) / recordings.FILENAME if console.record else None
+    return recordings.aim(ctx, tc.session_id)
 
 
 def _report_filer(ctx: JobContext, session, tc):

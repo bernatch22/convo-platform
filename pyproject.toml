@@ -36,7 +36,13 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# A per-project suite lives at tenants/<t>/projects/<p>/evals/, and `tienda-sur`
+# is not a Python identifier: pytest walks up to the first directory without an
+# __init__.py, lands there, and `import core` fails. One line here is what makes
+# `deepeval test run tenants/.../evals/test_ring2.py` work from a bare checkout.
+pythonpath = ["."]
 markers = [
+    "voice: needs the real STT/TTS keys (never run in the unit ring)",
     "unit: fast tests with no external services",
     "evals: tests that call an LLM judge (need provider keys)",
     "voice: tests that build STT/TTS sessions (keys kept in the unit ring)",

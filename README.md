@@ -31,6 +31,80 @@ TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --te
 TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
 ```
 
+The clinic takes five errands. Say you want to change the cita you already have
+and reception finds it by name or phone; say you have none —
+
+> «hola, quería pedir cita, no tengo ninguna» · «Pedro Ramos Gil, teléfono
+> 699000000» · «para traumatología, ¿qué tiene el jueves?» · «la primera» ·
+> «sí, resérvemela»
+
+— and the call goes down the other branch, asks what the cita is for, reads the
+agenda, reads the hour back to you and waits for a yes before writing anything.
+Either way `uv run python -m convo sessions show <id>` prints the log: the yes
+before the write, and one line for the cita the booking system created.
+
+The third errand is not an hour at all: the number the clinic rings you on. Say
+it is wrong and reception validates the one on file the way a bank does — by its
+last digits, never whole — takes the new one and reads it back digit by digit
+before writing anything:
+
+> «quiero cambiar mi teléfono, el que tenéis está mal» · «Ana García Ruiz» →
+> «El teléfono que me consta acaba en 456. ¿Es ese el que quiere cambiar?» ·
+> «sí, el nuevo es el 689 000 111» → «Su nuevo teléfono de contacto sería el
+> 689 000 111. ¿Se lo cambio?» · «sí, cámbiemelo»
+
+Ask it for the old number whole and it will not say it. The log of that call has
+a `confirm.granted` for `update_contact` before the write, and the line the write
+left behind names the record and three digits — «now reachable on a number ending
+111» — which is what an auditor needs and all a leak would get.
+
+The last two are what a caller does with the cita they already have and are not
+moving: drop it, or say they will be there. Both start the same way — reception
+looks the cita up in the booking system and reads it back, never off a note —
+and only the ending differs:
+
+> «buenos días, quería anular la cita que tengo» · «Ana García Ruiz» → «Me
+> consta su cita el jueves 3 a las diez de la mañana con la doctora Campos. ¿Es
+> esa la que quiere anular?» · «sí, esa» → «Jueves 3 de septiembre a las diez de
+> la mañana con Dra. Irene Campos, ¿se la anulo?» · «sí, anúlemela»
+
+The hour goes straight back on the agenda: from the moment that write lands,
+`find_availability` offers the ten o'clock you just gave up to whoever asks for
+that Thursday next, so cancelling does not lose the clinic the half hour — which
+is also why the verb declares no undo. (In the demo that is true for the rest of
+the session: the fake book lives in the process, and only the rows cross to the
+console. A real agenda is one system both processes reach, and has no such
+seam.) You can watch it happen without a phone:
+
+```bash
+uv run pytest -m unit -k "cancelled_hour_goes_back_on_offer or yes_drops_the_cita" -v
+```
+
+On the Board the cita is struck through (`tone: gone`); the confirming call
+
+> «hola, llamo para confirmar que voy a mi cita, soy Ana García Ruiz» · «sí, esa
+> misma, que voy a ir»
+
+leaves the same cita where it was and marks it `confirmed` instead. Cancelling
+is the fourth thing the platform will not do without a yes; confirming is not —
+nothing is taken from a patient who rang to say they are coming.
+
+The shop takes three. Ask where an order is («mi pedido es el TS-10432, ¿por
+dónde va?»), ask to cancel it and it reads the order and the amount back and
+waits for a yes — and if what you have is a problem it cannot fix, say so
+(«quiero poner una reclamación por escrito») and it opens an incident with your
+own words and reads you its number:
+
+> «quiero poner una reclamación por escrito» · «llevo tres correos sin
+> respuesta» → «Te la dejo apuntada con el número TS-T0003.»
+
+Hang up, run the console again and ask for that number («¿cómo va la incidencia
+TS-T0003?»): it is still there, because a helpdesk that forgot its tickets
+between calls would not be one — the rows live in `tmp/business.json`
+(`CONVO_LEDGER`), which is what a customer's real helpdesk would be. Both the orders and the incidents show up on the project's **Board**
+in the console, each as its own table with its own columns and its own words for
+a state.
+
 ### Talking to it out loud
 
 Drop `--text` and the console runs in **audio mode**: it opens the laptop
@@ -129,6 +203,20 @@ uv run python -m convo sessions eval <id>                     # the project's DA
 uv run deepeval test run tests/evals/test_dispatch_ring.py    # the same, as a test
 ```
 
+And every call scores itself without being asked. While `api.py` is up it
+sweeps for calls that have ended and writes a verdict into their own log as
+`session.score` — four checks decided by code (consent, register, cross-tenant
+leakage, provider errors) and at most one Haiku call, about 0.0014 € and only
+when the transcript is worth judging:
+
+```bash
+uv run python -m convo sessions show <id>    # the score is the last row
+uv run python -m convo sessions score <id>   # ask for one by hand (--free skips the judge)
+```
+
+A project opts out with `scoring=False` on its `Project`, and its sessions show
+a dash. The whole design is [`docs/evals.md`](docs/evals.md) §3.13.
+
 `tests/evals/test_dispatch_ring.py` skips itself when no routed session is in
 the store: `scripts/dev_call.py` is its fixture, and a suite that failed
 because nobody started a server would be reporting on the laptop.
@@ -144,19 +232,154 @@ Evals (ring 1, needs `ANTHROPIC_API_KEY`; the judge is Claude Haiku, set
 ```bash
 uv run pytest -m unit                     # includes LLM-judged tests when the key is present
 uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-tenant leakage pair
+
+# the same goldens against the other allowed model — nothing in the suite is edited
+CONVO_EVAL_MODEL=gpt-5.4-mini uv run deepeval test run tests/evals -n 3
+
+# HTML per model plus the metric x model comparison table (needs OPENAI_API_KEY too)
+uv run python -m core.testing.report clinica-norte reagendamiento \
+    --model claude-haiku-4-5 --model gpt-5.4-mini
 ```
 
-[`docs/evals.md`](docs/evals.md) explains every metric and how to add one.
+Ring 2 (live voice) calls the agent out loud with a synthetic caller, so it
+needs the dev stack up in three other terminals (compose, `api.py`,
+`worker.py dev`) plus `ELEVENLABS_API_KEY` and `SONIOX_API_KEY`:
+
+```bash
+uv run deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py -s
+uv run deepeval test run tenants/clinica-norte/projects/reagendamiento/evals/test_ring2.py -s
+```
+
+Two callers phone each project: `apurado`, who talks over the agent, and
+`spanglish`, who switches es↔en mid-sentence. `-s` prints the transcript, the
+latencies, how many answers were interrupted and which languages came back
+transcribed. `CONVO_API` points the caller at another control plane.
+
+The same suites run themselves on the box every night at 04:00 Europe/Madrid
+(`convo-evals.timer`), against the DEPLOYED fleet, capped at eight live
+conversations and killed at twenty minutes. Locally it is one command:
+
+```bash
+uv run python -m core.testing.nightly --dry-run   # what a night would spend
+uv run python -m core.testing.nightly             # run it; --only tenant/project narrows it
+```
+
+A night leaves `tmp/evals/<date>.log`, one page at `tmp/evals/<date>/index.html`
+with every red metric above the transcript that earned it, one line per suite in
+`tmp/evals/index.tsv`, and one row per suite on the console's evals screen. It
+goes red on a failed METRIC and not on pytest's exit code — a ring-2 wire case is
+`flaky=True`, so `deepeval test run` passes a suite whose register just broke.
+
+[`docs/evals.md`](docs/evals.md) explains every metric and how to add one;
+[`infra/box/README.md`](infra/box/README.md) covers the nightly on the box.
+
+A run also has a screen: the console's Evals page lists every run with its
+scores, diffs it against the previous run of the same suite, and can launch one
+on the box (one at a time, killed at fifteen minutes, log tail on screen).
+
+[`docs/evals.md`](docs/evals.md) explains every metric, how to add one, and how
+a project declares the suites the console can run (§8); §9 is the model matrix.
 
 ## The web UI
 
 `ui/` is the operator console: the tenant/project switcher, Talk (the three
-channels — WebRTC voice, web chat, and the phone line on **+1 417 674 3169**),
-Sessions, Pipeline, and the shells for Evals and Supervisor. Vite + React +
+channels — WebRTC voice, web chat, and the SIP trunk), Sessions, Board, Pipeline
+(the three providers, plus the phone line this project answers on, or the fact
+that it has none), Evals (every stored run with its per-metric diff, and the
+button that launches another on the box) and the Supervisor desk. Vite + React +
 TypeScript + react-router; no state library, no CSS framework.
 
+**The Board** (`/t/<tenant>/<project>/board`) reads like an agenda, and it is
+the one screen fed by two different places. It **leads with the reservations
+themselves** — patient, day, hour, professional, state — read off the
+customer's OWN system through the tenant's adapter (`GET /reservations` →
+`core.registry` → the adapter's `list_records` capability). That is where a
+name belongs: our append-only log masks PII on the way in, so it can prove a
+cita was booked and must not be the place the patient is stored. A project
+whose systems offer no such view says so plainly instead of drawing an empty
+agenda, and a project with a different shape answers with its own — Tienda Sur
+gets its orders, with an order's own columns, because nothing in `core` or in
+the console holds a list of shapes, columns or state words.
+
+Under the table, demoted to one strip, is the other reading: every
+*irreversible* thing the platform did, counted straight off the log, by verb
+and by day, each row linking to the call that did it. There is no rollup table:
+a transaction is one `tool.call` whose `side_effect` is `irreversible`, and the
+verb is the tool's own name, so a project that declares a new irreversible tool
+appears here the first time it runs with nothing changed in the console. The
+two halves are joined on the business's own identifier — the one thing that
+crosses the PII mask, because an id is not a person. The window is in the URL
+(`?days=30`).
+
+A laptop that has only ever been talked to has no transactions to show;
+`scripts/seed_board_demo.py` writes three real ones through the real executor,
+with no LLM and no keys:
+
+```bash
+export CONVO_DB=tmp/board-demo.db CONVO_LEDGER=tmp/board-demo.json
+uv run python scripts/seed_board_demo.py
+uv run uvicorn api:app --port 8090
+open http://localhost:8090/t/clinica-norte/reagendamiento/board
+```
+
+`CONVO_LEDGER` is the file the demo adapters record their rows in
+(`core/adapters/ledger.py`): a fake agenda lives in the job process and the
+console is a different one, so the fake needs the property a real booking
+system already has — the rows outlive the call. Point both at throwaway files.
+
+A number belongs to a project, never to the fleet: it is one row of the control
+plane's `routes` table (`python -m convo routes list | seed | add`), the same
+row `core/router.py` reads to decide who answers an inbound call. Today exactly
+one number is registered — **+1 417 674 3169**, clinica-norte/reagendamiento —
+and the console says so per project instead of printing it fleet-wide.
+
+**The Supervisor desk** (`/supervisor`) lists every call live on the fleet,
+phone calls included. Clicking one joins that room with a short-lived,
+subscribe-only ticket from `POST /supervise` and shows the transcript live,
+audio muted until you press *listen in*. The supervisor is `hidden` at the SFU,
+so the caller is never told anybody joined — and the badge on the screen is the
+server's own answer, read back off `list_participants`, not our claim. The
+arrival is written into the caller's own log as `supervisor.join`:
+
+```bash
+uv run python -m convo sessions show <id> | grep supervisor
+```
+
+From that desk a supervisor can also **whisper** to the agent, **take the
+line**, and **transfer the call to a phone** — cold (a SIP REFER: the caller
+leaves for that number and this job ends) or warm (the colleague is dialled
+into the room, briefed where the caller provably cannot hear it, then bridged).
+Every verb is one line in the caller's own log, and a transfer carries its mode
+and its outcome, so a transfer that did NOT happen is as readable as one that
+did. Warm needs an outbound trunk (`SIP_OUTBOUND_TRUNK_ID`) this box does not
+have yet and says so instead of failing mid-call; cold needs only
+`transfer_mode=enable-all` on the Twilio trunk — `infra/box/README.md` has the
+exact toggles, and `scripts/twilio_trunk.py` reports whether they are set.
+
+**The agent transfers too, and it does not need a supervisor to decide.**
+`transfer_to_human` is a tool of every stage of a project that names a
+`transfer_number` — E.164, set from the Pipeline screen's Control panel — and
+the prompt teaches it to announce the handover («le paso con un compañero, un
+momento») before the REFER goes out. A project with the field empty is never
+offered the tool at all: the model cannot reach for a verb it was never shown,
+and the Phone panel greys it out with the control plane's own sentence saying
+which half is missing. Only a phone call can be moved, so a browser call and a
+chat get an honest refusal and the business's own number instead of a promise
+nobody can keep. Every attempt — moved, refused by the carrier, or never
+attempted — is one more `supervisor.transfer` line in the caller's log.
+
+The same three verbs without a browser, for an escalation rule or a terminal:
+
+```bash
+curl -XPOST localhost:8090/supervise/verb -H 'content-type: application/json' \
+  -d '{"room":"call-…","identity":"sup:berna","verb":"transfer",
+       "mode":"cold","to":"+34600111222"}'
+```
+
 Two ways to run it. In development the vite server serves the app and proxies
-`/tenants`, `/token`, `/sessions` and `/pipeline` to the control plane:
+`/tenants`, `/token`, `/sessions`, `/outcomes`, `/reservations`, `/pipeline` and
+`/evals` to the control
+plane:
 
 ```bash
 uv run uvicorn api:app --port 8090        # terminal 1: the control plane
@@ -171,6 +394,36 @@ the SPA.
 cd ui && npm install && npm run build     # writes ui/dist (never committed)
 uv run uvicorn api:app --port 8090        # http://localhost:8090
 ```
+
+### Hearing a call back
+
+Every voice call the fleet answers keeps its audio. Open a session in the
+console and there is a player above the latency strip; the Sessions list marks
+the rows that have one with a `♪` beside the channel. Stereo, on the log's own
+timeline: the caller on the left channel, the agent on the right, sample zero
+at the `audio.start` row.
+
+```bash
+# the same file, without a browser
+curl -sf localhost:8090/sessions/<session_id>/recording -o /tmp/call.ogg && afplay /tmp/call.ogg
+```
+
+The capture is the agent's own audio IO, tapped by the framework's
+`RecorderIO`, which costs one queue push per frame on the call path and encodes
+in a daemon thread — there is no egress container and nothing that needs a GPU.
+What changed for ms-17 is only the destination: outside the console the
+framework aimed it at a temp directory it then deleted, so every real call
+recorded perfectly and lost the file on the way out. Recordings now land under
+`CONVO_RECORDINGS` (`tmp/recordings` locally, `/var/lib/convo/recordings` on the
+box), keyed by session id, and never in git.
+
+They hold PII, so `GET /sessions/{id}/recording` is the only door — a validated
+session id, never a path from a log — and a box reachable from outside its own
+network should set `RECORDINGS_TOKEN`. A project can refuse to be recorded with
+`recording=False` in its own `project.py`, and its sessions then show no
+player at all; `RECORD=0` does the same for a whole deploy. Retention, the
+storage budget and the one thing these recordings do NOT contain (a supervisor
+who took the line) are in `infra/box/README.md`.
 
 ## Layout
 

@@ -53,7 +53,67 @@ export interface ObserverTicket {
   token: string;
 }
 
+/** What a supervisor asked to be allowed to do in a live room. The token is the answer. */
+export type SupervisorCapability = "listen" | "whisper" | "takeover";
+
+/** One supervisor's short-lived ticket into one live call. `identity` is always `sup:<uid>`. */
+export interface SupervisorTicket {
+  url: string;
+  room: string;
+  identity: string;
+  capability: SupervisorCapability;
+  token: string;
+}
+
+/** What the SFU says about a supervisor who is already in the room — not what the ticket said.
+ *
+ * `hidden` is the server's own word for "the caller cannot see this
+ * participant": it is the proof the desk puts on screen, and it comes from
+ * `list_participants`, never from this client. `announced` is whether the
+ * room's agent was told, which is what puts `supervisor.join` in the log.
+ */
+export interface SupervisorPresence {
+  identity: string;
+  capability: SupervisorCapability;
+  hidden: boolean;
+  announced: boolean;
+}
+
 /* ── /sessions ────────────────────────────────────────────────────────────── */
+
+/** One question ring 4 asked of a finished call. `passed: null` = nothing here to check.
+ *
+ * `score` is present only on the judged check and is its raw 0-1; a check code
+ * decided has no number, because consent either happened or it did not.
+ */
+export interface ScoreCheck {
+  name: string;
+  kind: "deterministic" | "judge";
+  passed: boolean | null;
+  score?: number;
+  reason: string;
+}
+
+/** What the one LLM call did, or the sentence saying why it was never made. */
+export interface JudgeRun {
+  ran: boolean;
+  skipped: string | null;
+  model: string;
+  threshold: number;
+  cap_eur: number;
+  cost_eur: number;
+}
+
+/** The payload of a session's `session.score` event: the verdict and everything behind it. */
+export interface SessionScore {
+  version: number;
+  score: number;
+  verdict: "pass" | "fail";
+  failed: string[];
+  turns: number;
+  checks: ScoreCheck[];
+  judge: JudgeRun | null;
+}
 
 /** One line of the call log. `outcome` and `cost_eur` are null while the call runs.
  *
@@ -61,6 +121,10 @@ export interface ObserverTicket {
  * session never came in over the telephone: `channel` says "voice" for a
  * browser call and a PSTN call alike, so this is the only field that tells
  * the two apart in the log.
+ *
+ * `score` is null in three different situations and none of them is a bad
+ * call: not scored yet, too short to judge, or a project that opted out. The
+ * screen shows a dash, never a zero.
  */
 export interface SessionLine {
   id: string;
@@ -74,6 +138,9 @@ export interface SessionLine {
   turns: number;
   cost_eur: number | null;
   phone: string | null;
+  score: SessionScore | null;
+  /** Whether this call left an OGG the console can play — a look on disk, not in the log. */
+  audio: boolean;
 }
 
 /** One fact in the append-only log. A turn's latencies live in `payload.metrics`. */
@@ -179,6 +246,43 @@ export interface TtsSnapshot {
   sync_alignment: boolean;
 }
 
+/** One phone line that reaches this project; `serving` is false on another fleet's number. */
+export interface PhoneLine {
+  number: string;
+  fleet: string;
+  channel: string;
+  serving: boolean;
+}
+
+/** Where the AGENT may hand a call when the caller asks for a person.
+ *
+ * `offered` false means the model is never shown the verb at all — a tool that
+ * cannot work is not offered — and `unavailable_reasons` carries the control
+ * plane's own sentence saying which half is missing: the project's opt-in
+ * (`declared`) or the number.
+ */
+export interface TransferSnapshot {
+  /** The tool name the model would call, and the key `unavailable_reasons` is keyed by. */
+  tool: string;
+  /** E.164, or "" for a project the agent may not hand a call away from. */
+  number: string;
+  declared: boolean;
+  offered: boolean;
+  unavailable_reasons: Record<string, string>;
+  note: string;
+}
+
+/** The project's own telephony: its lines, and the sentence the screen prints under them. */
+export interface PhoneSnapshot {
+  /** The agent_name this deploy dispatches to — the fleet a line has to be on to be answered. */
+  fleet: string;
+  /** Empty for a project nobody can call: a number is a route, not a property of a project. */
+  lines: PhoneLine[];
+  note: string;
+  /** The outbound half: the number the agent itself may hand a live call to. */
+  transfer: TransferSnapshot;
+}
+
 /** One field the console changed, and when. */
 export interface PipelineOverrideRow {
   field: string;
@@ -205,6 +309,7 @@ export interface PipelineSnapshot {
   stt: SttSnapshot;
   llm: LlmSnapshot;
   tts: TtsSnapshot;
+  phone: PhoneSnapshot;
   overrides: PipelineOverrideRow[];
   overridable: string[];
   latency: {
@@ -221,6 +326,248 @@ export interface PipelineUpdate {
   greeting?: string;
   stt_provider?: string;
   llm_model?: string;
+  /** E.164, or "" to take the handover verb away from the agent entirely. */
+  transfer_number?: string;
+}
+
+/* ── /evals ───────────────────────────────────────────────────────────────── */
+
+/** One metric's verdict over a whole run, and what it gained or lost since the last one. */
+export interface MetricScore {
+  metric: string;
+  /** Mean over the run's cases, 0..1. */
+  score: number;
+  passed: number;
+  failed: number;
+  /** This score minus the previous run's of the same suite; null when there was no previous. */
+  delta: number | null;
+}
+
+export type EvalStatus = "running" | "done" | "failed";
+
+/** One `deepeval` run of one project's suite: what it scored and where its evidence is. */
+export interface EvalRun {
+  id: string;
+  tenant: string;
+  project: string;
+  suite: string;
+  status: EvalStatus;
+  started_at: number;
+  finished_at: number | null;
+  git_sha: string | null;
+  milestone: string | null;
+  report_html: string | null;
+  log_path: string | null;
+  detail: string | null;
+  metrics: MetricScore[];
+  /** The run this one is diffed against, or null when it is the first of its suite. */
+  previous: string | null;
+}
+
+/** A run being polled: the same line, plus the tail of what the subprocess is writing. */
+export interface EvalRunStatus extends EvalRun {
+  log: string[];
+  /** Is the box still holding its single eval slot? */
+  busy: boolean;
+}
+
+/** What one project can be asked to run. The suite ids are the project's own data. */
+export interface ProjectSuites {
+  tenant: string;
+  project: string;
+  name: string;
+  suites: string[];
+}
+
+/** One ring-1 case: the caller's line, the behaviour expected back, the tools that must run. */
+export interface TurnGolden {
+  input: string;
+  turn: string | null;
+  expected_behaviour: string;
+  expected_tools: string[];
+}
+
+/** One ring-2 case: who calls, what they want, and the hard policies the call must survive. */
+export interface CallGolden {
+  name: string;
+  persona: string;
+  objective: string;
+  turns: string[];
+  policies: string[];
+  max_turns: number | null;
+}
+
+/** Where a suite's cases come from: JSON on disk (`turn`, `call`) or python (`code`). */
+export type GoldenKind = "turn" | "call" | "code";
+
+/** One suite and everything it asks: the dataset it reads and every case in it. */
+export interface SuiteGoldens {
+  suite: string;
+  target: string;
+  dataset: string | null;
+  kind: GoldenKind;
+  /** How many cases a run of this suite scores; null when they are written in code. */
+  count: number | null;
+  goldens: Array<TurnGolden | CallGolden>;
+}
+
+/** Every suite of one project, with the goldens it runs — the Datasets view's only source. */
+export interface ProjectGoldens {
+  tenant: string;
+  project: string;
+  suites: SuiteGoldens[];
+}
+
+/** What the console must name before the box spends minutes of paid LLM traffic. */
+export interface EvalRunRequest {
+  tenant: string;
+  project: string;
+  suite: string;
+}
+
+/* ── /outcomes ────────────────────────────────────────────────────────────── */
+
+/** How one transaction ended. `pending` is a call whose result never landed — a killed job. */
+export type OutcomeStatus = "done" | "failed" | "pending";
+
+/** One irreversible thing the platform did to the business, and the call it happened in.
+ *
+ * `verb` is the tool's own name, whatever a project chose to call it: nothing
+ * in this console holds a list of verbs, so a new irreversible tool shows up
+ * the first time it runs. `summary` is the line the tool's `result_summary`
+ * rendered and the session's PII mask scrubbed — reused verbatim, null for a
+ * tool that declares no renderer and for one that failed.
+ */
+export interface OutcomeRow {
+  session: string;
+  tenant: string;
+  project: string;
+  channel: Channel;
+  seq: number;
+  at: number;
+  day: string;
+  verb: string;
+  /** Whether a `confirm.granted` for this tool stood unspent before the call: the caller's yes. */
+  confirmed: boolean;
+  status: OutcomeStatus;
+  summary: string | null;
+}
+
+/** One verb's tally over the whole window. */
+export interface OutcomeVerb {
+  verb: string;
+  count: number;
+  confirmed: number;
+  failed: number;
+  pending: number;
+}
+
+/** One day of the window. Every day is present, empty ones included, so the bars keep an axis. */
+export interface OutcomeDay {
+  day: string;
+  total: number;
+  /** verb -> how many times it ran that day. */
+  verbs: Record<string, number>;
+}
+
+/** The four numbers across the top of the board. */
+export interface OutcomeTotals {
+  transactions: number;
+  confirmed: number;
+  failed: number;
+  sessions: number;
+}
+
+/** Everything the Board screen reads: the tallies, the days, and the recent transactions. */
+export interface OutcomeBoard {
+  tenant: string | null;
+  project: string | null;
+  days: number;
+  since: number;
+  until: number;
+  totals: OutcomeTotals;
+  verbs: OutcomeVerb[];
+  series: OutcomeDay[];
+  rows: OutcomeRow[];
+}
+
+/* ── /reservations ────────────────────────────────────────────────────────── */
+
+/* The business view, types and call together, because it is one idea.
+ *
+ * `/outcomes` above is what the PLATFORM did, counted off the append-only log
+ * whose summaries are PII-filtered by design. This is the other reading and
+ * the one the Board leads with: the reservations themselves, read off the
+ * customer's own system through its adapter.
+ *
+ * Nothing in this file holds a list of shapes, columns or state words. The
+ * business names its records (`shape`), heads its own columns (`labels`) and
+ * chooses its own word for how one stands (`state`); the only field this
+ * console interprets is `tone`, which is the adapter saying how to draw the
+ * row and nothing more.
+ */
+
+/** How a record should be drawn: the adapter's call, because it knows what its words mean. */
+export type RecordTone = "new" | "changed" | "gone" | "plain";
+
+/** One record of the customer's own system, with the call that last touched it when there was one. */
+export interface BusinessRecord {
+  /** The business system's own identifier — also the key the log join is made on. */
+  id: string;
+  who: string;
+  contact: string | null;
+  /** ISO moment or date the record is FOR; the business decides which. */
+  when: string | null;
+  handled_by: string | null;
+  /** How it stands, in the business's own word — rendered verbatim, never translated. */
+  state: string;
+  tone: RecordTone;
+  detail: string | null;
+  /** When the business last touched it, epoch seconds; null for a record no call has changed. */
+  at: number | null;
+  session: string | null;
+  verb: string | null;
+  confirmed: boolean;
+  channel: Channel | null;
+}
+
+/** The column headings the business chose. A key that is absent or null is not rendered. */
+export interface RecordLabels {
+  who?: string | null;
+  contact?: string | null;
+  when?: string | null;
+  handled_by?: string | null;
+  detail?: string | null;
+}
+
+/** One system's table: its own shape, its own column headings, its own words for a state. */
+export interface RecordTable {
+  shape: string | null;
+  labels: RecordLabels;
+  /** Which of the tenant's systems answered, by the name its factory gave it. */
+  systems: string[];
+  rows: BusinessRecord[];
+}
+
+/** Everything the Board reads. `shape` null = this project's systems offer no such view.
+ *
+ * `views` is one table per system that offers a record view — a shop keeps its orders in
+ * one and its incidents in another — and the flat `shape`/`labels`/`systems`/`rows` are
+ * the first of them, which is what this endpoint has always meant by "the records".
+ */
+export interface BusinessView extends RecordTable {
+  tenant: string;
+  project: string;
+  days: number;
+  views: RecordTable[];
+}
+
+/** The reservations themselves, read off the customer's own system — not off our log. */
+export async function getReservations(
+  params: { tenant: string; project: string; days?: number; limit?: number },
+  signal?: AbortSignal,
+): Promise<BusinessView> {
+  return request<BusinessView>(`/reservations${query(params)}`, signal ? { signal } : {});
 }
 
 /* ── errors ───────────────────────────────────────────────────────────────── */
@@ -256,12 +603,40 @@ export async function observe(room: string): Promise<ObserverTicket> {
   return request<ObserverTicket>("/observe", json("POST", { room }));
 }
 
+/** Mint a supervisor's short-lived, role-scoped ticket into one live room. */
+export async function supervise(
+  room: string,
+  capability: SupervisorCapability = "listen",
+  userId = "",
+): Promise<SupervisorTicket> {
+  return request<SupervisorTicket>(
+    "/supervise",
+    json("POST", { room, capability, user_id: userId }),
+  );
+}
+
+/** Tell the control plane the supervisor is through the door, and get the SFU's own view back. */
+export async function superviseEntered(
+  room: string,
+  identity: string,
+): Promise<SupervisorPresence> {
+  return request<SupervisorPresence>("/supervise/entered", json("POST", { room, identity }));
+}
+
 /** The call log, newest first, optionally narrowed to one tenant or project. */
 export async function listSessions(
   params: { tenant?: string; project?: string; limit?: number } = {},
   signal?: AbortSignal,
 ): Promise<SessionLine[]> {
   return request<SessionLine[]>(`/sessions${query(params)}`, signal ? { signal } : {});
+}
+
+/** What the platform DID to the business over a window: counts by verb by day, recent rows. */
+export async function getOutcomes(
+  params: { tenant?: string; project?: string; days?: number; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<OutcomeBoard> {
+  return request<OutcomeBoard>(`/outcomes${query(params)}`, signal ? { signal } : {});
 }
 
 /** One session in full. `events` is split into the count and the log so both keep their names. */
@@ -272,6 +647,16 @@ export async function getSession(id: string, signal?: AbortSignal): Promise<Sess
   );
   const { events, ...line } = body;
   return { ...line, events: events.length, events_log: events };
+}
+
+/** Where this session's recording is served from — an `<audio src>`, never a fetch.
+ *
+ * The control plane composes the path from the session id on its side; nothing
+ * here knows where an OGG lives on the box, which is the point. A session whose
+ * `audio` is false has no such file and the screen must not ask for one.
+ */
+export function recordingUrl(id: string): string {
+  return `/sessions/${encodeURIComponent(id)}/recording`;
 }
 
 /** Calls in progress on the SFU, phone calls included. Throws ApiError(503) when it is down. */
@@ -337,6 +722,39 @@ export async function probe(signal?: AbortSignal): Promise<{ up: boolean; ms: nu
   } catch {
     return { up: false, ms: Math.round(performance.now() - started) };
   }
+}
+
+/** Every routable project and the eval suites it declares — the Run buttons' only source. */
+export async function listEvalSuites(signal?: AbortSignal): Promise<ProjectSuites[]> {
+  return request<ProjectSuites[]>("/evals/suites", signal ? { signal } : {});
+}
+
+/** What one project's suites actually ask of the agent, read off disk. Throws ApiError(404). */
+export async function getProjectGoldens(
+  tenant: string,
+  project: string,
+  signal?: AbortSignal,
+): Promise<ProjectGoldens> {
+  const path = `/evals/goldens/${encodeURIComponent(tenant)}/${encodeURIComponent(project)}`;
+  return request<ProjectGoldens>(path, signal ? { signal } : {});
+}
+
+/** Stored eval runs, newest first, each already diffed against the previous run of its suite. */
+export async function listEvalRuns(
+  params: { tenant?: string; project?: string; suite?: string; limit?: number } = {},
+  signal?: AbortSignal,
+): Promise<EvalRun[]> {
+  return request<EvalRun[]>(`/evals/runs${query(params)}`, signal ? { signal } : {});
+}
+
+/** Spend money: run one project's suite on the box. Throws ApiError(409) while one is going. */
+export async function launchEvalRun(req: EvalRunRequest): Promise<EvalRun> {
+  return request<EvalRun>("/evals/run", json("POST", req));
+}
+
+/** One run's standing while it happens, with the tail of its log. */
+export async function getEvalRun(id: string, signal?: AbortSignal): Promise<EvalRunStatus> {
+  return request<EvalRunStatus>(`/evals/run/${encodeURIComponent(id)}`, signal ? { signal } : {});
 }
 
 function pipelinePath(tenant: string, project: string): string {

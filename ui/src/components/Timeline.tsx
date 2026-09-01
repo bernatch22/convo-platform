@@ -14,6 +14,7 @@
 import { Link } from "react-router";
 
 import type { SessionEvent } from "../lib/api";
+import { sectionPath } from "../lib/nav";
 import type { Timeline as Log } from "../lib/useTimeline";
 
 /** The framework's metric names, in the order a turn spends its time, with the label shown. */
@@ -28,14 +29,22 @@ const METRICS: Array<[string, string]> = [
 // `state` fires on every listening/thinking/speaking flip: true, and far too loud for a column.
 const NOISE = new Set(["state", "tts.word"]);
 
-export function Timeline({ log, tenant }: { log: Log; tenant: string }) {
+export function Timeline({
+  log,
+  tenant,
+  project,
+}: {
+  log: Log;
+  tenant: string;
+  project: string;
+}) {
   const rows = log.events.filter((event) => !NOISE.has(event.kind));
 
   return (
     <aside className="timeline">
       <div className="timeline__head">
         <span className="section__title">Timeline</span>
-        <Status log={log} tenant={tenant} />
+        <Status log={log} tenant={tenant} project={project} />
       </div>
       {rows.length === 0 ? (
         <p className="note">{waiting(log)}</p>
@@ -50,10 +59,18 @@ export function Timeline({ log, tenant }: { log: Log; tenant: string }) {
   );
 }
 
-function Status({ log, tenant }: { log: Log; tenant: string }) {
+function Status({ log, tenant, project }: { log: Log; tenant: string; project: string }) {
   if (!log.session) return <span className="badge">{log.status}</span>;
+
+  // The supervisor watches calls the SFU has not named a project for; without one
+  // there is no session URL to build, so the id is shown and not linked.
+  if (!tenant || !project) return <span className="timeline__id">{log.session}</span>;
+
   return (
-    <Link className="timeline__id" to={`/t/${tenant}/sessions/${log.session}`}>
+    <Link
+      className="timeline__id"
+      to={`${sectionPath(tenant, project, "sessions")}/${log.session}`}
+    >
       {log.session}
     </Link>
   );
@@ -113,6 +130,8 @@ function describe(event: SessionEvent): string {
       return `${text(payload["tenant"])} / ${text(payload["project"])} · ${text(payload["channel"])}`;
     case "session.end":
       return text(payload["outcome"]);
+    case "supervisor.join":
+      return `${text(payload["identity"])} is on the line · ${text(payload["capability"])}`;
     case "error":
       return text(payload["error"]);
     default:

@@ -76,6 +76,85 @@ is what re-syncs the production file once the key is rotated.
 Termination (our side dialling out through Twilio) needs a `domain_name` on
 the trunk and credentials; this card is inbound only, so neither exists yet.
 
+## Call transfer — the toggles that decide whether a REFER is carried
+
+A **cold transfer** is `livekit-sip` sending a SIP REFER on the caller's own
+leg. Whether that REFER is honoured is entirely the carrier's decision, and on
+an Elastic SIP Trunk it is two properties on the Trunk resource. Neither is set
+by anything in this repo — `scripts/twilio_trunk.py` **reads and reports** them
+and prints the command below, because switching them on costs money on every
+transfer and a script that mutates a trunk's call settings is exactly the shape
+of the 2026 fraud incident.
+
+| what | property | values | default |
+|---|---|---|---|
+| carry a REFER at all, and to the PSTN | `transfer_mode` | `disable-all` · `sip-only` · `enable-all` | undocumented; every doc example shows `disable-all` |
+| whose number the transferee sees | `transfer_caller_id` | `from-transferee` · `from-transferor` | `from-transferee` (documented) |
+
+`sip-only` is not enough for us: the destination is a mobile, so it must be
+`enable-all`. (Twilio never writes down which enum value corresponds to the
+console's PSTN checkbox — this is the only reading consistent with both, and
+it is the value LiveKit's own docs tell you to set.)
+
+```bash
+# read — this is what the script prints for you on every run
+twilio api trunking v1 trunks fetch --sid TKxxxxxxxx
+curl -s -u $TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN \
+  https://trunking.twilio.com/v1/Trunks/TKxxxxxxxx | jq '.transfer_mode, .transfer_caller_id'
+
+# write — a human runs this, deliberately, once
+twilio api trunking v1 trunks update --sid TKxxxxxxxx \
+  --transfer-mode enable-all --transfer-caller-id from-transferee
+curl -X POST https://trunking.twilio.com/v1/Trunks/TKxxxxxxxx \
+  --data-urlencode "TransferMode=enable-all" \
+  --data-urlencode "TransferCallerId=from-transferee" \
+  -u $TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN
+```
+
+The same thing in the console: **Elastic SIP Trunking → Manage → Trunks →**
+*the trunk* **→ Features → Call Transfer (SIP REFER) → Enabled**, then the
+**Caller ID for Transfer Target** dropdown, then **Enable PSTN Transfer**, then
+save. (Twilio's own docs describe the PSTN checkbox in prose without naming it;
+those labels are LiveKit's, and they match the console as it stands.)
+
+What Twilio documents about the SIP conversation, and what it does not:
+
+- **Accepted:** *"Upon receiving the SIP REFER, Twilio returns a `202 Accepted`
+  response"*, then `NOTIFY`s carrying `100 Trying` / `200 OK`. The transferor
+  hangs up the original leg once the new one answers.
+- **Refused: no documented response code.** The whole `call-transfer` page
+  contains exactly two status codes and both are `202`. That a refused REFER
+  comes back `603 Declined` is field evidence (livekit/sip#234 — same Twilio
+  elastic trunk, closed with no published diagnosis), which is why
+  `core/telephony/transfer.py` maps 603 to `rejected` and attaches a hint
+  pointing here rather than asserting a cause.
+- **Refer-To:** `tel:+34600111222` or `sip:+34600111222@<trunk>.pstn.twilio.com`
+  — for PSTN the `sip:` form *must* use your Termination domain. We send the
+  `tel:` form.
+- **Not supported:** early media, and transfers to emergency numbers (911/933).
+- **Billing:** the transferred leg is a **child call**. For an inbound
+  (Origination) call transferred to the PSTN you are billed
+  `Origination (A→B) × child duration` **plus** `Termination (B→C) × child
+  duration` — i.e. double, for as long as the transferred call lasts.
+- **Termination is very probably a requirement**, not just for warm. Twilio
+  never says so outright, but the child leg is billed as Termination and the
+  `sip:` Refer-To form needs the Termination domain. Treat a trunk with only
+  Origination as untested for cold transfer, and read the SIP status the box
+  reports rather than assuming.
+
+**Warm transfer needs more than this.** It dials the colleague INTO the room
+with `CreateSIPParticipant`, which is an *outbound* call and therefore needs a
+Termination domain, credentials and a LiveKit `SIPOutboundTrunk` whose id goes
+in `SIP_OUTBOUND_TRUNK_ID`. None of those exist on this box, so the warm verb
+is refused at the door with a message naming the variable — never halfway
+through a live call. Cold needs none of it.
+
+```
+TRANSFER_TO=+34600111222        # where a transfer goes when the desk names no number
+TRANSFER_RINGING_S=25           # how long the far end rings (LiveKit's own default is 30)
+SIP_OUTBOUND_TRUNK_ID=ST_…      # warm only; unset means warm is refused
+```
+
 ## Verifying without a phone
 
 Every layer can be checked from the laptop, and only the last one needs a human:
@@ -130,6 +209,128 @@ atiende recepción."* — €0.008 per probe.
   rather than shipped untested into a self-hosted media path, and it cannot be
   turned off with `update_inbound_trunk_fields`: the trunk has to be deleted
   and recreated, which changes its id and orphans the dispatch rule.
+- **A server-side unsubscribe is invisible to the client that was cut off.**
+  The warm transfer needs the caller not to hear the briefing, and both ways of
+  arranging that — `RoomService.UpdateSubscriptions(subscribe=False)` and the
+  publisher's own `set_track_subscription_permissions` — **work** on
+  livekit-server v1.9.1, even against a subscriber that joined with
+  `autoSubscribe`. The first probe said neither worked, because it watched
+  `track_subscribed` / `track_unsubscribed` on the cut-off participant: the
+  Python SDK fires neither for a server-side revocation, the `AudioStream` just
+  goes quiet, and the SFU logged `revoking subscription` the whole time.
+  `scripts/isolation_probe.py` counts received audio frames instead, which is
+  the only measurement that answers the question — run it against the dev
+  compose and read the table. It also measures what the events could never
+  have told you: **the cut takes about 220 ms per stream to bite**, which is
+  the warm transfer's one remaining leak and is documented as such in
+  `core/telephony/transfer.py`.
 - **The routes table is a file.** `CONVO_DB` (default `tmp/convo.db`) is
   relative to the working directory: add the route and run the worker from
   the same directory, or the number has no route.
+
+## The nightly: ring 2 as a habit
+
+The box calls its own fleet every night at **04:00 Europe/Madrid** and writes
+down what it heard. Nothing in it touches Twilio, a trunk or a phone number: an
+eval room is minted at `POST /evals/rooms` and lives entirely inside the SFU,
+which is the carrier-quiet-hours lesson applied to something that is not a
+carrier.
+
+```
+convo-evals.timer     OnCalendar=*-*-* 04:00:00 Europe/Madrid   (the box runs UTC;
+                      the zone is spelled out so DST cannot move the run)
+   └─ convo-evals.service   Type=oneshot, WorkingDirectory=/home/berna/convo-app
+        └─ uv run python -m core.testing.nightly
+             ├─ discovers every tenants/*/projects/*/evals/test_ring2.py
+             ├─ counts its goldens = the number of LIVE CALLS = the bill
+             ├─ takes whole suites while they fit the 8-call budget
+             ├─ deepeval test run <suite>, killed at 20 minutes
+             └─ leaves tmp/evals/<date>.log · <date>/index.html · index.tsv
+                and POSTs each suite to /evals/runs, so it lands on the console
+```
+
+Both units are installed by `deploy_api.sh`; the run needs `uv sync --extra dev`
+(deepeval), which that script already does.
+
+```bash
+ssh convo-box 'systemctl list-timers convo-evals.timer --no-pager'      # armed?
+ssh convo-box 'sudo systemctl start convo-evals.service'               # one night, by hand
+ssh convo-box 'cd convo-app && ~/.local/bin/uv run python -m core.testing.nightly --dry-run'
+ssh convo-box 'column -t -s"\t" convo-app/tmp/evals/index.tsv'          # the whole history
+ssh convo-box 'journalctl -u convo-evals -n 40 --no-pager'              # last night, narrated
+```
+
+`/etc/default/convo-evals` is read last and optionally, so one night can be
+retargeted (`CONVO_API=…`) without editing the unit.
+
+### Gotchas paid for once, here
+
+- **`Persistent=` is off on purpose.** This unit spends provider money. A box
+  that reboots at noon must not decide by itself to spend it at noon; a missed
+  night is missed, and `systemctl start` is how a person asks for the catch-up.
+- **`deepeval test run` exits 0 over a failed metric.** A ring-2 wire case is
+  `flaky=True` by design, and DeepEval will not let a flaky metric fail a case.
+  The runner therefore reads the scores, not the exit code — see
+  `core.testing.nightly.status_of`. Measured on this box on 2026-08-31: a tuteo
+  greeting scored `Keeps the register` 0.00 and pytest passed the suite.
+- **Port 8091 is `livekit-sip`**, not a free port. Anything ad hoc goes higher.
+
+## Call recordings — where they live, and when they go away
+
+Every voice call the fleet answers leaves a stereo OGG: the caller on the left
+channel, the agent on the right, on one absolute timeline whose sample zero is
+the `audio.start` row of that session's log. There is no egress container and
+no second recorder — the capture is the agent's own audio IO, tapped by
+livekit-agents' `RecorderIO`, which costs one `queue.put_nowait` per frame on
+the call path and does its Opus encoding in a daemon thread. Nothing about it
+touches the SFU, and nothing about it needs a GPU.
+
+```
+CONVO_RECORDINGS=/var/lib/convo/recordings        # in /etc/default/convo-worker
+   /var/lib/convo/recordings/<session_id>/audio.ogg
+```
+
+Read one back through the control plane and nowhere else:
+
+```bash
+curl -sf localhost:8090/sessions/<session_id>/recording -o /tmp/call.ogg
+# on a box that sets RECORDINGS_TOKEN:
+curl -sf -H "Authorization: Bearer $RECORDINGS_TOKEN" \
+     localhost:8090/sessions/<session_id>/recording -o /tmp/call.ogg
+```
+
+### The rules, in order of how much they matter
+
+- **A recording is PII.** It is a customer's voice, their name, and often their
+  telephone number spoken out loud. It never enters git (`recordings/`, `*.ogg`
+  and `tmp/` are all ignored), it is never a static mount, and `api.py` is the
+  only door: `GET /sessions/{id}/recording`, which composes the path from a
+  validated session id and refuses one it has no session row for.
+- **Set `RECORDINGS_TOKEN` on any box reachable from outside its own network.**
+  With it set the route wants `Authorization: Bearer <token>` (or `?t=<token>`,
+  because an `<audio src>` cannot send a header) and answers 401 otherwise.
+  Unset, the route is exactly as open as every other read on this API — which is
+  fine behind Caddy on a box only the operator reaches, and is not fine anywhere
+  else.
+- **Retention is thirty days, not forever.** Nothing rotates them yet; that is a
+  named follow-up, not a thing this milestone shipped. Until it exists, the
+  sweep is one line and it is safe to run by hand or from a timer:
+
+  ```bash
+  ssh convo-box 'find /var/lib/convo/recordings -type f -name audio.ogg \
+      -mtime +30 -delete && find /var/lib/convo/recordings -type d -empty -delete'
+  ```
+
+  Budget roughly 0.5 MB per minute of call (Opus, stereo, 24 kHz), so a
+  thousand five-minute calls a month is about 2.5 GB standing.
+- **A tenant can refuse to be recorded.** `Project.recording = False` in the
+  project's own `project.py` and that project's calls write no OGG at all — the
+  console then shows no player on its sessions, which is the visible proof.
+  `RECORD=0` in the worker's environment does the same for a whole deploy.
+- **A supervisor takeover is NOT in the recording.** The tap wraps the agent
+  session's audio IO, and `RoomIO` links exactly one remote participant, so the
+  OGG holds the caller and the agent and nobody else. A human who takes the line
+  is heard by the caller and is silent in the file. The day that has to change,
+  the answer is self-hosted `livekit-egress` composing the whole room — a new
+  container and a new keying problem (egress knows a room, the console knows a
+  session), which is a milestone of its own and not a patch to this one.

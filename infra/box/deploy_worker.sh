@@ -14,17 +14,32 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 echo "── uv + repo"
 ssh "$BOX" 'command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh -s -- -q'
 ssh "$BOX" "if [ -d $APP/.git ]; then git -C $APP fetch -q origin && git -C $APP reset -q --hard origin/master; else git clone -q https://github.com/bernatch22/convo-platform.git $APP; fi"
-ssh "$BOX" "cd $APP && ~/.local/bin/uv sync -q"
+# `--extra dev` even though the worker needs none of it: both services share ONE venv
+# and `uv sync` makes that venv match its arguments EXACTLY, so a bare sync here uninstalls
+# what deploy_api.sh installed. The control plane's scoring path imports deepeval
+# (core/scoring/runner.py → core.testing.replay), so a worker deploy that ran second left
+# every finished call unscored with `ModuleNotFoundError: No module named 'deepeval'` in
+# the api's log and nothing at all in the console. Found 2026-09-01, after a call showed
+# no score. The two scripts must ask for the same environment or the second one wins.
+ssh "$BOX" "cd $APP && ~/.local/bin/uv sync -q --extra dev"
 
 echo "── env (provider keys from the laptop; LIVEKIT_* rewritten to the box's own)"
 scp -q "$HERE/../../.env" "$BOX:$APP/.env"
 ssh "$BOX" "cd $APP && chmod 600 .env && set -a && . /home/berna/convo/livekit.env && set +a && python3 - <<'PY'
 import os
 lines = [l for l in open('.env').read().splitlines()
-         if not l.startswith(('LIVEKIT_URL=', 'LIVEKIT_API_KEY=', 'LIVEKIT_API_SECRET=', 'TENANT=', 'PROJECT='))]
+         if not l.startswith(('LIVEKIT_URL=', 'LIVEKIT_PUBLIC_URL=', 'LIVEKIT_API_KEY=',
+                              'LIVEKIT_API_SECRET=', 'TENANT=', 'PROJECT='))]
 lines += ['LIVEKIT_URL=ws://127.0.0.1:7880',
           'LIVEKIT_API_KEY=' + os.environ['LIVEKIT_API_KEY'],
-          'LIVEKIT_API_SECRET=' + os.environ['LIVEKIT_API_SECRET']]
+          'LIVEKIT_API_SECRET=' + os.environ['LIVEKIT_API_SECRET'],
+          # The laptop's .env has no PUBLIC url — it has no public host — so copying it
+          # over the box's DELETES this line, and every ticket the control plane mints
+          # then carries the loopback the WORKER uses. A browser handed that connects to
+          # its own machine: 'invalid API key', with the box's key in the message, from a
+          # server that never signed it. It is written here, next to the two keys, because
+          # this is the script that overwrites the file.
+          'LIVEKIT_PUBLIC_URL=wss://lk.bernardocastro.dev']
 open('.env', 'w').write('\n'.join(lines) + '\n')
 print('env written (values not shown)')
 PY"

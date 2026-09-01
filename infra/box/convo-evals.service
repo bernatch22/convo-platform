@@ -1,0 +1,34 @@
+# The nightly ring-2 run on convo-box: the fleet phones itself and writes down what it heard.
+# Installed by infra/box/deploy_api.sh into /etc/systemd/system/; fired by convo-evals.timer.
+#
+# It shares WorkingDirectory (and therefore .env, tmp/convo.db and tmp/evals/) with the api
+# and the worker, which is the point: the calls it makes are calls on the DEPLOYED fleet,
+# minted at the same control plane the console reads, and the runs it files land on the
+# console's own evals screen.
+[Unit]
+Description=convo-platform ring-2 evals (nightly, against the deployed fleet)
+After=network-online.target convo-api.service convo-worker.service
+Wants=network-online.target
+# Nothing here touches Twilio, a trunk or a phone number: an eval room is minted
+# at POST /evals/rooms and lives entirely inside the SFU.
+
+[Service]
+Type=oneshot
+User=berna
+WorkingDirectory=/home/berna/convo-app
+# The provider keys the suites need; nothing in the run ever writes one to disk.
+EnvironmentFile=/home/berna/convo-app/.env
+Environment=CONVO_API=http://127.0.0.1:8090
+Environment=DEEPEVAL_TELEMETRY_OPT_OUT=YES
+# Optional and last, so an operator can retarget one night without editing the unit.
+EnvironmentFile=-/etc/default/convo-evals
+ExecStart=/home/berna/.local/bin/uv run python -m core.testing.nightly
+# The runner kills its own children at 20 minutes and still writes its page and its
+# index line; this is the backstop for a run that never reached that code.
+TimeoutStartSec=1500
+# An eval is never more urgent than a call in progress.
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target

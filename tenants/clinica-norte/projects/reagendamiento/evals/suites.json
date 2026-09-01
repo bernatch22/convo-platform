@@ -1,0 +1,5 @@
+{
+  "ring1": "tests/evals/test_reception_deepeval.py",
+  "tools": "tests/evals/test_reception_tools_deepeval.py",
+  "grounding": "tests/evals/test_reagendamiento_dag.py"
+}

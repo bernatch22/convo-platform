@@ -23,11 +23,19 @@ for the wrong reason:
   just its name. A judge shown a bare call has to guess what the tool wanted
   and cannot tell an hour read off the agenda from an hour invented — and it
   guesses wrong, confidently, in both directions.
+- `expected_tools` is about the BUSINESS's tools, so the case ToolCorrectness
+  reads carries the business's calls. A golden that expects nothing expects the
+  agenda to be left alone; it does not expect the agent to be struck dumb, and
+  the platform's own clock is not a name any golden should have to list. The
+  filter is `business_calls`, it is driven by `ToolSpec.infrastructure`, and it
+  applies to `test_case_for` alone: `turn_tool_calls` and the conversational
+  case keep every call, because the grounding metric reads a tool's OUTPUT as
+  evidence and the clock reading is the evidence for what day it is.
 """
 
 import importlib
 import json
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from types import ModuleType
 from typing import Any
 
@@ -38,8 +46,13 @@ from livekit.agents.voice.run_result import RunResult
 
 from core.context import TenantContext
 from core.testing.harness import Conversation, Exchange, PlatformCall, text_of
+from core.tools.catalog import infrastructure_names
 
 GREETING_TURN = "greeting"
+
+# The three lines DeepEval writes per node into a DAG metric's verbose log; the rest of
+# that log is the criteria and the rendered blocks, which nobody reads in a failure message.
+NODE_LINES = ("Label:", "Verdict:", "Reason:")
 
 PLATFORM_TOOL = (
     "Run by the platform itself against the customer's own systems — this is the call their "
@@ -114,6 +127,40 @@ def tool_calls_of(
     ]
 
 
+def business_calls(calls: Sequence[ToolCall]) -> list[ToolCall]:
+    """The calls a golden is about: everything except the platform's own infrastructure.
+
+    `expected_tools` names the tools of the BUSINESS — the agenda, the order
+    book — and a golden that lists none of them is saying "this turn must not
+    touch the business", not "this turn must call nothing at all". Until this
+    filter existed, a model that asked what day it is before answering scored
+    0.0 on such a golden while a GEval judge, reading the same turn, wrote that
+    the tool was "correctly not invoked" (docs/evals.md §9): two goldens of the
+    clinic's ms-18 matrix on gpt-5.4-mini, a divergence that was never a
+    behaviour difference.
+
+    What counts as infrastructure is DECLARED, never matched: a `ToolSpec` with
+    `infrastructure=True`, which today is `core.tools.catalog.CLOCK` and
+    tomorrow is whatever a project marks. Nothing here knows a tool name.
+    """
+    platform = infrastructure_names()
+    return [call for call in calls if call.name not in platform]
+
+
+def call_named(calls: Sequence[ToolCall], name: str) -> ToolCall | None:
+    """The first call to a NAMED tool in a turn, or None — never `tools_called[0]`.
+
+    Index is not identity, and it stopped being a usable stand-in the day every
+    stage inherited the clock (`TenantAgent.fecha_y_hora_actual`). A turn that
+    asks the agenda about "mañana" now often calls the clock first to find out
+    what "mañana" is, so an assertion reading the first call was reading the
+    clock's arguments — no `date` in them at all — and failing a turn that had
+    asked exactly the right question. A suite that wants the agenda asks for the
+    agenda; the ORDER of the calls, when it matters, is ToolCorrectness's job.
+    """
+    return next((call for call in calls if call.name == name), None)
+
+
 def test_case_for(
     golden: dict[str, Any],
     conversation: Conversation,
@@ -127,10 +174,21 @@ def test_case_for(
     which to call anything. Every other golden is one user input and the turn
     that answered it.
 
+    The case is NAMED after the golden that drove it. DeepEval falls back to
+    `test_case_<n>` otherwise, and the eval matrix joins two models' runs on
+    that name: a table whose findings read «test_case_0» tells a reviewer which
+    position diverged, not which golden.
+
     `expected_tools` is a list of tool names in the golden — names only, never
     arguments: what the model should pass is judged by ArgumentCorrectness or
     by an assertion the project writes itself, and an expected argument written
     here would show up in the report as a value the model never had to produce.
+
+    `tools_called` is what the turn called MINUS the platform's infrastructure
+    (`business_calls`), because this is the case ToolCorrectness scores against
+    a list of the business's tools. Nothing is hidden from the graders that want
+    the clock: the whole-call case keeps every call, and so does
+    `turn_tool_calls`.
     """
     expected = [ToolCall(name=name) for name in golden.get("expected_tools", [])]
     context = [f"Expected behaviour: {golden['expected_behaviour']}"]
@@ -141,6 +199,7 @@ def test_case_for(
         context.append("Earlier in the call the patient said: " + " / ".join(golden["before"]))
     if golden.get("turn") == GREETING_TURN:
         return LLMTestCase(
+            name=golden["input"],
             input=golden["input"],
             actual_output=conversation.greeting,
             tools_called=[],
@@ -149,9 +208,10 @@ def test_case_for(
         )
     result = conversation.results[-1]  # the judged turn; `before` turns only get the call there
     return LLMTestCase(
+        name=golden["input"],
         input=golden["input"],
         actual_output=text_of(result),
-        tools_called=tool_calls_of(result, descriptions),
+        tools_called=business_calls(tool_calls_of(result, descriptions)),
         expected_tools=expected,
         context=context,
     )
@@ -233,6 +293,23 @@ def project_metrics(tenant_id: str, project_id: str) -> ModuleType:
     desk.
     """
     return project_evals(tenant_id, project_id, "metrics")
+
+
+def node_chain(metric: Any) -> list[str]:
+    """Why a DAG metric scored what it scored: each node's label, verdict and one-line reason.
+
+    A metric whose nodes are computed is built with `include_reason=False` —
+    DeepEval's summary is generated, and it would be the only model call left in
+    a graph that has none. What such a metric still has is its chain, buried in
+    a verbose log that also contains every criterion and every rendered block.
+    These are the lines a person reads; the rest is for `deepeval test run -v`.
+
+    `convo/sessions.py` keeps its own copy of the filter on purpose: the CLI
+    must list and show sessions with no judge stack installed, so it never
+    imports this module at the top.
+    """
+    lines = str(getattr(metric, "verbose_logs", "") or "").splitlines()
+    return [line.strip() for line in lines if line.strip().startswith(NODE_LINES)]
 
 
 def _platform_call(call: PlatformCall) -> ToolCall:

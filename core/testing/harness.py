@@ -17,6 +17,8 @@ module only decides when to switch it on.
 """
 
 import asyncio
+import dataclasses
+import os
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -32,6 +34,7 @@ from livekit.agents.voice import Agent
 from livekit.agents.voice.run_result import ChatMessageAssert, RunResult
 
 from core.context import TenantContext
+from core.providers import llm
 from core.registry import load_registry
 from core.session import build_session
 from core.state.attach import attach_log
@@ -43,21 +46,56 @@ from core.tools.executor import ToolExecutor, attach_local_tools
 GREETING_WAIT_S = 6.0
 TODAY = date(2026, 9, 1)  # a Tuesday: "el jueves" is always two days out in tests
 
+# The model the whole run measures, for a suite nobody wants to edit per model:
+# `CONVO_EVAL_MODEL=gpt-5.4-mini deepeval test run tests/evals` moves every golden
+# of every project onto the other model, and unset means the project's own.
+MODEL_ENV = "CONVO_EVAL_MODEL"
+
+
+def model_under_test(explicit: str | None = None) -> str | None:
+    """Which LLM this run measures: the argument, else $CONVO_EVAL_MODEL, else the project's.
+
+    A name the platform will not run RAISES here, and does not fall back the way
+    `core.providers.llm.llm_model` does for a running call. The fallback is right
+    on the phone — a typo in a stored override must not take a project off the
+    air — and wrong in an eval, where it would quietly measure Haiku, write
+    `gpt-5.4-mini` at the top of the report and leave nobody any the wiser.
+    """
+    wanted = explicit or os.getenv(MODEL_ENV) or None
+    if wanted is None:
+        return None
+    if wanted not in llm.ALLOWED_MODELS:
+        raise ValueError(
+            f"{wanted!r} is not a model the platform runs: {', '.join(llm.ALLOWED_MODELS)}"
+        )
+    return wanted
+
 
 def fake_context(
     tenant_id: str,
     project_id: str,
     channel: str = "chat",
     today: date = TODAY,
+    llm_model: str | None = None,
 ) -> TenantContext:
     """A TenantContext for tests: real tenant and project, synthetic ids, a frozen calendar.
 
     `today` is fixed so a test can name the date it expects ("el jueves" is
     2026-09-03) without the assertion rotting overnight; wired with the tenant's
     adapters and a local executor exactly as `core.router.resolve` wires one.
+
+    `llm_model` (or `$CONVO_EVAL_MODEL`) puts the run on another allowed model.
+    It travels as project data through the same field a console override writes,
+    so the eval measures the road a real call takes and not a second wiring of
+    its own — and it is set on a COPY, because the registry hands out one
+    `Project` instance per process and a suite must not leave the next test on a
+    model it never asked for.
     """
     tenant = load_registry()[tenant_id]
     project = tenant.projects[project_id]
+    model = model_under_test(llm_model)
+    if model is not None:
+        project = dataclasses.replace(project, llm_model=model)
     tc = TenantContext(
         tenant=tenant,
         project=project,
@@ -141,6 +179,31 @@ class LiveCall:
             Exchange(input=text, result=result, platform_calls=self.recorder.take())
         )
         return result
+
+    def lines_said(self) -> list[str]:
+        """Everything the agent has said so far, greeting included, in order."""
+        return [
+            item.text_content or ""
+            for item in self.session.history.items
+            if getattr(item, "role", None) == "assistant" and (item.text_content or "").strip()
+        ]
+
+    async def next_line(self, after: int, timeout: float = 25.0) -> str:
+        """Wait for a line the agent speaks on its OWN — nobody said anything to it.
+
+        `after` is `len(call.lines_said())` from before whatever triggered it: a
+        supervisor's `inject_and_speak`, a release, a timeout prompt. Those lines
+        never come back through `say`, because there is no turn to attach them
+        to. Empty string when the agent stayed silent for `timeout` seconds,
+        which is an answer too — the assertion belongs to the test.
+        """
+        deadline = asyncio.get_event_loop().time() + timeout
+        while asyncio.get_event_loop().time() < deadline:
+            if len(self.lines_said()) > after:
+                await asyncio.sleep(1.0)  # let the rest of the turn land
+                return " ".join(self.lines_said()[after:])
+            await asyncio.sleep(0.25)
+        return ""
 
 
 class RecordingExecutor:

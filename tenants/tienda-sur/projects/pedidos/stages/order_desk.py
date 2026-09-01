@@ -26,15 +26,45 @@ class OrderDesk(TenantAgent):
     def __init__(self, tc: TenantContext) -> None:
         super().__init__(tc, instructions=prompts.order_desk_prompt(tc))
         self.cancelled: dict[str, str] | None = None
+        self.problem: str | None = None
 
     def summary(self) -> str:
-        """What Farewell needs: the cancellation that now exists, in the words to read out."""
-        if not self.cancelled:
-            return "Todavía no se ha cancelado nada."
+        """What the next stage needs: the cancellation if there is one, the order if there is not.
+
+        Two stages read this now and they need different halves of it. Farewell
+        arrives only after a cancellation and needs it in the words to read out.
+        TicketDesk arrives from a customer with a problem and needs the ORDER,
+        so that nobody is asked twice for a number they have already given.
+
+        The not-cancelled branch used to answer "todavía no se ha cancelado
+        nada", which was harmless while Farewell was the only reader and became
+        a defect the moment it was not: a summary reaches the model as a turn to
+        ANSWER (a system message added mid-conversation is rewritten as a user
+        one — see CLAUDE.md), so a customer who had just asked to file a written
+        complaint was greeted with «el pedido sigue en pie, no se ha cancelado
+        nada. ¿Qué prefieres hacer?» — every word true, about something nobody
+        had raised. Measured at 0.4 on the line metric before this was written.
+        """
+        if self.cancelled:
+            return (
+                f"Pedido {self.cancelled['order_id']} cancelado. El importe de "
+                f"{self.cancelled['total']} vuelve por donde se pagó en tres a cinco días "
+                "laborables y el SMS de confirmación ya se ha enviado."
+            )
+        order = self.tc.customer or {}
+        if not order:
+            return "Todavía no se ha localizado ningún pedido."
+        said = (
+            f" El cliente YA ha contado qué le pasa: «{self.problem}». No se lo preguntes otra "
+            "vez —acaba de decirlo— y abre la incidencia con eso."
+            if self.problem
+            else ""
+        )
         return (
-            f"Pedido {self.cancelled['order_id']} cancelado. El importe de "
-            f"{self.cancelled['total']} vuelve por donde se pagó en tres a cinco días "
-            "laborables y el SMS de confirmación ya se ha enviado."
+            f"Pedido localizado: {order['order_id']}, a nombre de {order['name']}. Es el pedido "
+            "del que va esta llamada, así que no vuelvas a pedir el número ni el móvil. Nada se "
+            f"ha cancelado.{said} Esta nota es para ti: no se lee en voz alta ni se resume al "
+            "cliente."
         )
 
     @function_tool
@@ -94,6 +124,38 @@ class OrderDesk(TenantAgent):
             return tools.NOTICE_FAILED if failure.step == SMS_STEP else tools.CANCEL_FAILED
         self.cancelled = order
         return self.hand_off(Farewell(tc))
+
+    @function_tool
+    async def start_ticket_desk(
+        self, ctx: RunContext[TenantContext], problema: str
+    ) -> "TenantAgent":
+        """Pasa la llamada al mostrador de incidencias, con el pedido que ya tienes localizado.
+
+        En `problema` pones lo que el cliente ha dicho que le pasa, en sus palabras y en una
+        frase —«me ha llegado la pantalla partida», «consta entregado y no lo tengo»—, para
+        que el mostrador no se lo vuelva a preguntar. Si aún no te lo ha contado, pregúntaselo
+        antes de llamar a esta herramienta.
+
+        Llámala cuando lo que le pasa al cliente no se arregla mirando ni cancelando el pedido
+        y hay que dejarlo por escrito para que un compañero lo siga: el paquete consta
+        entregado y no lo tiene, ha llegado roto o cambiado, falta una prenda, el transportista
+        no aparece, o pide poner una reclamación. Llámala también si pregunta por una
+        incidencia suya que ya está abierta.
+
+        No la llames para lo que sí sabes hacer aquí: decir por dónde va el pedido, decir
+        cuándo llega o cancelarlo mientras esté en el almacén.
+
+        El pedido localizado viaja solo con la llamada; lo único que le tienes que dar es
+        el problema.
+        """
+        tc = ctx.userdata
+        from .ticket_desk import TicketDesk
+
+        # What the customer already said travels in `summary()`, the platform's own channel
+        # for it: a handoff copies no history, so a problem told here and not carried across
+        # is a problem the customer is asked to tell twice.
+        self.problem = problema.strip() or None
+        return self.hand_off(TicketDesk(tc))
 
     async def _reload(self, tc: TenantContext) -> dict[str, str] | None:
         """The order as the system holds it right now, kept on the context for the next turn."""

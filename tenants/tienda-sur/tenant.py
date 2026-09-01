@@ -21,15 +21,23 @@ class TiendaSurTenant(Tenant):
     def build_adapters(self) -> dict[str, Adapter]:
         """One adapter per system the shop owns, built fresh for each session.
 
-        Two of them: the order system and the SMS gateway. The executor picks
-        whichever one declares the capability a tool asks for, so adding a
-        system (a payment gateway, a returns portal) is adding a line here — no
-        stage and no tool changes.
+        Three of them: the order system, the helpdesk and the SMS gateway. The
+        executor picks whichever one declares the capability a tool asks for, so
+        adding a system (a payment gateway, a returns portal) is adding a line
+        here — no stage and no tool changes. The helpdesk is the proof: it
+        arrived a whole milestone later and this is the only line of wiring it
+        needed.
+
+        Order matters for exactly one reader. The console asks every system that
+        offers a record view for it (`core.business`), and it draws them in this
+        order, so the orders the shop lives on lead and the incident queue
+        follows.
         """
         from .adapters.orders import FakeOrders
         from .adapters.sms import FakeSms
+        from .adapters.tickets import FakeTickets
 
-        return {"orders": FakeOrders(), "sms": FakeSms()}
+        return {"orders": FakeOrders(), "tickets": FakeTickets(), "sms": FakeSms()}
 
 
 TENANT = TiendaSurTenant(

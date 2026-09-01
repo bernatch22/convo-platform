@@ -5,38 +5,80 @@ history across a handoff, so the stage that enters writes a one-line summary of
 the stage it replaces into its own chat context before saying anything: what
 the caller already told us travels, the whole transcript does not.
 
-Two of the framework's nodes are overridden here, once, for every project:
-`transcription_node` reads the agent's words on their way out and times them in
-the log, and `on_user_turn_completed` drops a murmur that landed on the agent's
-voice. Both are audit and turn-taking, not business, so no stage overrides them.
+Three of the framework's nodes are overridden here, once, for every project:
+`stt_node` refuses a transcript no audio can account for, `transcription_node`
+reads the agent's words on their way out and times them in the log, and
+`on_user_turn_completed` is the turn boundary — where a supervisor's whisper is
+applied, where a human holding the line cancels the reply, and where a murmur
+that landed on the agent's voice is dropped. All of it is audit and turn-taking,
+not business, so no stage overrides them.
+
+The platform's own verbs reach a stage two different ways, and the difference
+is whether they can be ABSENT. The clock is a method: every stage of every
+project has it, forever. The transfer is layered into `tools=` at construction
+(`core.agents.human`), because a project that names no `transfer_number` must
+never be shown a tool it cannot run — the model cannot reach for a verb it was
+never given.
 """
 
 import logging
 from collections.abc import AsyncGenerator, AsyncIterable
 
-from livekit.agents import Agent, StopResponse
-from livekit.agents.llm import ChatContext, ChatMessage
+from livekit import rtc
+from livekit.agents import Agent, RunContext, StopResponse, stt
+from livekit.agents.llm import ChatContext, ChatMessage, function_tool
 from livekit.agents.voice.agent import ModelSettings
 
+from core.agents.human import transfer_tools
 from core.barge_in import backchannels_of, holds_the_floor, is_backchannel
 from core.context import TenantContext
+from core.dates_note import clock_reading, date_note
 from core.observability.voice import TimedWords
+from core.providers.tts import tts_for
 from core.state.log import record
+from core.stt_gate import TranscriptGate, gate_options_for
 
 log = logging.getLogger("platform.agents")
 
 SUMMARY_ROLE = "system"
 
+# The first line of every inherited summary, and the only one the platform writes.
+# A stage's prompt teaches it to open a call, because for the first stage that is
+# exactly right; reached by a handoff, the same prompt greets a caller who has been
+# talking for two minutes, and a call that says "Tienda Sur, buenos días" for the
+# third time sounds like it restarted (real session, 2026-09-01: a customer bounced
+# between the order desk and the incident desk was greeted at every arrival). Only
+# the platform knows whether this stage is the beginning, so this sentence is the
+# platform's and not a rule each project has to remember to write.
+MID_CALL = (
+    "La llamada ya viene de antes y tú no eres el principio: no saludes, no te presentes, "
+    "no digas el nombre del negocio otra vez y no vuelvas a preguntar lo que ya te han dicho. "
+    "Sigue donde se quedó. Lo que va detrás de esta frase es una nota interna para ti: no la "
+    "leas en voz alta, no la resumas, no la comentes y no hables del cliente en tercera "
+    "persona. Le hablas a él, directamente, de lo que te acaba de decir."
+)
+
 
 class TenantAgent(Agent):
     """One conversation stage of a project, with its own prompt and tools."""
 
-    def __init__(self, tc: TenantContext, *, instructions: str, **kwargs) -> None:
-        super().__init__(instructions=instructions, **kwargs)
+    def __init__(
+        self, tc: TenantContext, *, instructions: str, tools: list | None = None, **kwargs
+    ) -> None:
+        # The platform's own verbs are layered here, not declared as methods, so
+        # that one of them can be ABSENT: a project with no `transfer_number`
+        # must never be shown a transfer tool it cannot run (`core.agents.human`).
+        platform = transfer_tools(tc)
+        super().__init__(
+            instructions=instructions,
+            tools=[*(tools or []), *platform],
+            **self._own_voice(tc),
+            **kwargs,
+        )
         self.tc = tc
 
     async def on_enter(self) -> None:
-        """Inherit the previous stage's summary, announce the stage, open the turn.
+        """Read the clock, inherit the previous stage's summary, announce the stage, open the turn.
 
         The very first stage of a session speaks the project's `greeting`
         verbatim when one is set: a caller hears the business immediately
@@ -45,8 +87,10 @@ class TenantAgent(Agent):
         sentence a supervisor edits from the console — a paraphrasing model
         would make it uneditable. `say` puts the line in the chat history so
         the model knows what was said. Later stages, and a project with no
-        greeting, still open with `generate_reply`.
+        greeting, still open with `generate_reply` — and that is the shape the
+        date reaches the model in front of, so `_read_the_clock` runs first.
         """
+        await self._read_the_clock()
         await self._inherit_summary()
         log.info("stage.enter %s agent=%s", self.tc.label(), self.stage_name())
         record(self.tc, "stage.enter", {"stage": self.stage_name()})
@@ -56,6 +100,35 @@ class TenantAgent(Agent):
             self.session.say(opener, allow_interruptions=True)
         else:
             self.session.generate_reply()
+
+    async def stt_node(
+        self, audio: AsyncIterable[rtc.AudioFrame], model_settings: ModelSettings
+    ) -> AsyncGenerator[stt.SpeechEvent, None]:
+        """Transcribe as the framework does, dropping any transcript the audio cannot account for.
+
+        A streaming STT invents sentences over a silent line — Soniox put a
+        final "Thank you." into the human's call AJ_rt86KogpPxDa while nobody
+        had spoken, and the agent answered it. `core.stt_gate` measures the very
+        frames going into the STT and refuses a transcript with no voiced audio
+        behind it; the refusal is a `stt.phantom` line in the log, never a
+        silent drop, because a gate nobody can audit is worse than the bug.
+
+        This is the last seam where a transcript can still be stopped: one node
+        later it is an interruption, a user turn and a reply. The price of
+        standing here is the framework's STT-pipeline reuse across a handoff
+        (`AgentActivity._detach_reusable_resources` reuses it only for the
+        DEFAULT `stt_node`), so each stage opens its own STT stream. Frames
+        queue while it connects and none are lost — a handoff is the moment the
+        agent takes the floor, not the caller.
+        """
+        gate = TranscriptGate(gate_options_for(self.tc.project))
+        async for event in super().stt_node(gate.hear(audio), model_settings):
+            if gate.accepts(event):
+                yield event
+                continue
+            evidence = gate.evidence(event)
+            log.warning("stt.phantom %s %s", self.tc.label(), evidence)
+            record(self.tc, "stt.phantom", evidence)
 
     async def transcription_node(
         self, text: AsyncIterable[str], model_settings: ModelSettings
@@ -78,17 +151,30 @@ class TenantAgent(Agent):
             words.flush()
 
     async def on_user_turn_completed(self, turn_ctx: ChatContext, new_message: ChatMessage) -> None:
-        """Answer the caller — unless the turn was a murmur over the agent's own voice.
+        """Answer the caller — unless a human holds the line, or the turn was a murmur.
 
-        "vale" while the agent is mid-sentence is agreement, not a question,
-        and a reply to it is a filler the caller hears as a mistake. The turn is
-        recorded as `turn.backchannel` and `StopResponse` cancels the reply.
+        This is the framework's turn boundary, which makes it the one safe
+        moment to swap the agent's chat context: a whisper queued while the
+        agent was mid-sentence is applied here, before the reply is built and
+        never during one. Then, while a supervisor holds the line,
+        `StopResponse` cancels every reply — the turn still lands in the
+        history, which is what `release` reads back to the model, but the
+        caller hears the human and not the agent (agents#3645).
 
-        It cannot cancel the interruption: `core.barge_in` documents where each
-        of the two filters sits in the framework's turn pipeline, and why
-        `InterruptionOptions.min_words` is the one that saves the audio.
+        The last filter is the old one: "vale" while the agent is mid-sentence
+        is agreement, not a question, and a reply to it is a filler the caller
+        hears as a mistake. It cannot cancel the interruption —
+        `core.barge_in` documents where each of the two filters sits in the
+        framework's turn pipeline, and why `InterruptionOptions.min_words` is
+        the one that saves the audio.
         """
         text = new_message.text_content or ""
+        control = self.tc.supervisor
+        if control is not None:
+            await control.flush(self)
+            if control.muted:
+                log.info("turn.muted %s (a human holds the line) %r", self.tc.label(), text)
+                raise StopResponse()
         if not holds_the_floor(self.session):
             return
         if not is_backchannel(text, backchannels_of(self.tc.project)):
@@ -96,6 +182,18 @@ class TenantAgent(Agent):
         log.info("turn.backchannel %s %r", self.tc.label(), text)
         record(self.tc, "turn.backchannel", {"text": text})
         raise StopResponse()
+
+    @function_tool
+    async def fecha_y_hora_actual(self, ctx: RunContext) -> str:
+        """Consulta la fecha y la hora actuales, exactas, en este momento.
+
+        Llámala siempre que el interlocutor pregunte qué día es, qué hora es, o
+        cuando necesites la hora presente para responder. No calcules ni
+        recuerdes la hora tú: cambia durante la llamada y esta herramienta la
+        lee del reloj cada vez.
+        """
+        tc = self.tc
+        return date_note(tc.today, tc.now())
 
     def summary(self) -> str:
         """One prose line the next stage reads about what happened here; stages override it."""
@@ -131,10 +229,45 @@ class TenantAgent(Agent):
         """The stage as it appears in logs and, from ms-4, in the event log."""
         return type(self).__name__
 
+    def _own_voice(self, tc: TenantContext) -> dict:
+        """This stage's own TTS when the project gave it one, or nothing at all.
+
+        Nothing at all is the important half: with no key in
+        `Project.stage_voices` the agent is built without a `tts=`, so the
+        session's own TTS is used and a project that never asked for a second
+        voice is byte for byte where it was. The framework builds one TTS per
+        agent that names one, at construction — a stage is built when the
+        conversation reaches it, so a voice nobody is handed to is never
+        connected.
+        """
+        voice = tc.project.stage_voices.get(type(self).__name__)
+        if not voice:
+            return {}
+        speaker = tts_for(tc.tenant, tc.project, voice=voice)
+        return {"tts": speaker} if speaker else {}
+
+    async def _read_the_clock(self) -> None:
+        """Once per session, put the day in front of the model — as evidence, not as a turn.
+
+        The system prompt cannot carry the date (the cached prefix must stay
+        byte-identical) and a model with no calendar invents one when asked
+        "¿hoy qué día es?" — it said "viernes" on a Saturday, on a real call.
+        It cannot be a system message either: the framework rewrites every
+        system item after the first into a USER message, and Haiku then opened
+        the call by answering it. `core.dates_note` carries the measurement and
+        the why; here it is two paired tool items, written before the greeting.
+        """
+        if self.tc.date_noted:
+            return
+        self.tc.date_noted = True
+        chat_ctx: ChatContext = self.chat_ctx.copy()
+        chat_ctx.insert(clock_reading(self.tc.today))
+        await self.update_chat_ctx(chat_ctx)
+
     async def _inherit_summary(self) -> None:
         previous = self.tc.prev_agent
         if previous is None or previous is self or not hasattr(previous, "summary"):
             return
         chat_ctx: ChatContext = self.chat_ctx.copy()
-        chat_ctx.add_message(role=SUMMARY_ROLE, content=previous.summary())
+        chat_ctx.add_message(role=SUMMARY_ROLE, content=f"{MID_CALL} {previous.summary()}")
         await self.update_chat_ctx(chat_ctx)

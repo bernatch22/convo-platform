@@ -15,22 +15,25 @@
  * A phone call is watched, not joined: POST /observe mints a hidden,
  * publish-nothing ticket, and the listen-in audio starts MUTED — a supervisor
  * reads a call by default and only chooses to hear it.
+ *
+ * The third door has an address, and this is where a human looks for it: the
+ * project's own page. It used to live only on Pipeline, one navigation away,
+ * which is one navigation too many for the number you are about to dial.
  */
 
-import { useState, type FormEvent } from "react";
-import { useParams } from "react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useParams } from "react-router";
 
 import { LiveCalls } from "../components/LiveCalls";
+import { PhoneLines } from "../components/PhoneLines";
 import { Timeline } from "../components/Timeline";
 import { Transcript } from "../components/Transcript";
-import type { LiveCall } from "../lib/api";
+import { getPipeline, type LiveCall, type PhoneSnapshot } from "../lib/api";
+import { sectionPath } from "../lib/nav";
 import { useRoom, type Live, type Mode } from "../lib/useRoom";
 import { useTimeline } from "../lib/useTimeline";
 
 import { useShellData } from "./Shell";
-
-/** The public number of the Twilio Elastic SIP trunk pointed at this deploy. */
-const PHONE_NUMBER = "+1 417 674 3169";
 
 export function Talk() {
   const { tenant = "", project = "" } = useParams();
@@ -39,6 +42,7 @@ export function Talk() {
 
   const live = useRoom(tenant, project);
   const log = useTimeline(live.phase === "live" ? live.room : null);
+  const phone = usePhone(tenant, project);
   const [caller, setCaller] = useState<string | null>(null);
 
   const watch = (call: LiveCall) => {
@@ -49,13 +53,20 @@ export function Talk() {
   return (
     <div className="page page--wide">
       <header className="page__head">
-        <div className="page__eyebrow">{tenant}</div>
+        <div className="page__eyebrow">
+          {tenant} / {project}
+        </div>
         <h1 className="page__title">{known?.name ?? project}</h1>
         <p className="page__lede">
           One runtime, three ways in — the microphone in this tab, a text session with no audio at
-          all, or the trunk on <span className="accent mono">{PHONE_NUMBER}</span>. The transcript
-          and the log below do not know which one you used.
+          all, or the SIP trunk on the line below, when this project has one of its own (
+          <Link className="accent" to={sectionPath(tenant, project, "pipeline")}>
+            Pipeline
+          </Link>{" "}
+          says which routing row puts it there). The transcript and the log below do not know which
+          one you used.
         </p>
+        {phone && <PhoneLines phone={phone} frame="header" />}
       </header>
 
       <section className="section">
@@ -67,13 +78,40 @@ export function Talk() {
             {live.mode === "chat" && <Composer live={live} />}
             {live.error && <p className="note note--warn">{live.error}</p>}
           </div>
-          <Timeline log={log} tenant={tenant} />
+          <Timeline log={log} tenant={tenant} project={project} />
         </div>
       </section>
 
       <LiveCalls onObserve={watch} watching={live.mode === "observe" ? live.room : null} />
     </div>
   );
+}
+
+/** The project's inbound line, read once per project. Null until it arrives, and if it never does.
+ *
+ * This is a fetch and not a route loader on purpose: the line is context, not
+ * the screen. Talk is the one lazily-loaded route, and a lazy route's loader
+ * runs only after its chunk resolves — so a loader here would hold the whole
+ * conversation behind a second round trip for a number nobody is waiting on.
+ * A blinking control plane therefore hides the line and takes nothing else
+ * with it; Pipeline, which loads the same snapshot properly, still says why.
+ */
+function usePhone(tenant: string, project: string): PhoneSnapshot | null {
+  const [phone, setPhone] = useState<PhoneSnapshot | null>(null);
+
+  useEffect(() => {
+    setPhone(null);
+    if (!tenant || !project) return;
+
+    const controller = new AbortController();
+    getPipeline(tenant, project, controller.signal)
+      .then((snapshot) => setPhone(snapshot.phone))
+      .catch(() => setPhone(null));
+
+    return () => controller.abort();
+  }, [tenant, project]);
+
+  return phone;
 }
 
 /** The bar above the transcript: which door, whether it is open, and what the agent is doing. */

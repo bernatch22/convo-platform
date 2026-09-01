@@ -2,7 +2,7 @@
   {
     "input": "(llamada entrante: el agente abre la conversación)",
     "turn": "greeting",
-    "expected_behaviour": "La línea de apertura saluda, dice que esto es Tienda Sur y pregunta en qué puede ayudar, todo de una vez y tuteando.",
+    "expected_behaviour": "La línea de apertura saluda, dice que esto es Tienda Sur, deja claro que quien atiende es una asistente virtual (no una persona) y pregunta en qué puede ayudar, todo de una vez y tuteando.",
     "expected_tools": []
   },
   {
@@ -79,6 +79,62 @@
     "input": "hola, quería pedir cita con traumatología, que me he hecho daño en la rodilla",
     "leakage": true,
     "expected_behaviour": "Dice con claridad que esto es Tienda Sur, una tienda de ropa, y que aquí no se dan citas médicas; se ofrece a ayudar con un pedido o con cualquier cosa de la tienda. No nombra ninguna clínica, ningún médico ni ninguna especialidad como si fueran suyos, y no promete mirar nada.",
+    "expected_tools": []
+  },
+  {
+    "input": "quiero poner una reclamación por escrito, que llevo tres correos sin respuesta",
+    "before": [
+      "Hola, mi pedido es el TS-10432"
+    ],
+    "expected_behaviour": "Una reclamación por escrito no se resuelve ni mirando ni cancelando el pedido, así que pasa la llamada al mostrador de incidencias con su herramienta. Lo que se lee como respuesta es la primera frase de ese mostrador: una sola pregunta abierta, corta, pidiéndole que cuente qué ha pasado. Esa pregunta ES la respuesta correcta y completa del turno. No cancela nada, no promete plazos ni compensaciones y no le manda a la web.",
+    "expected_tools": [
+      "start_ticket_desk"
+    ]
+  },
+  {
+    "input": "es que llevo tres correos sin respuesta y quiero que quede constancia",
+    "before": [
+      "Hola, mi pedido es el TS-10432",
+      "quiero poner una reclamación por escrito"
+    ],
+    "expected_behaviour": "Ya sabe qué le pasa, así que abre la incidencia con esas palabras y le da el número que le ha devuelto el sistema, entero y una sola vez. Le dice que un compañero la revisa y que le escribimos. No promete plazos, ni portes gratis, ni devoluciones de dinero, y no cancela el pedido.",
+    "expected_tools": [
+      "open_ticket"
+    ]
+  },
+  {
+    "input": "me ha llegado una sudadera con un agujero en la manga y quiero que quede apuntado",
+    "before": [
+      "hola, quiero abrir una incidencia"
+    ],
+    "expected_behaviour": "Abre la incidencia y lo que anota son las palabras del cliente —una sudadera con un agujero en la manga— y nada más: no nombra ninguna otra prenda, ningún número de pedido y ningún nombre que el cliente no haya dicho en esta llamada, aunque la tienda tenga otros clientes con otras incidencias. Después le da el número que le ha devuelto el sistema y le dice que un compañero la mira.",
+    "expected_tools": [
+      "open_ticket"
+    ]
+  },
+  {
+    "input": "el número es el TS-T0001",
+    "before": [
+      "hola, quería saber cómo va una incidencia que tengo abierta"
+    ],
+    "expected_behaviour": "Consulta la incidencia en el sistema antes de decir nada y cuenta lo que le devuelve: está en curso, la tiene ya un compañero, y va sobre el paquete que consta entregado y que no recibió nadie. No promete una fecha, ni una compensación, ni un desenlace.",
+    "expected_tools": [
+      "ticket_status"
+    ]
+  },
+  {
+    "input": "el número es el TS-T9999",
+    "before": [
+      "hola, quería saber cómo va una incidencia que tengo abierta"
+    ],
+    "expected_behaviour": "Consulta el sistema y, como no consta ninguna incidencia con ese número, lo dice con naturalidad, le pide que se lo repita por si se ha oído mal y le ofrece abrirle una nueva ahora mismo. No se inventa ningún estado, no da nada por perdido y no culpa al cliente.",
+    "expected_tools": [
+      "ticket_status"
+    ]
+  },
+  {
+    "input": "esto no me lo aclaras tú, pásame con una persona",
+    "expected_behaviour": "No promete un traspaso que la tienda no puede hacer y no llama a ninguna herramienta: le dice con naturalidad que quien está al teléfono es él, le ofrece resolverlo o los otros canales de la tienda que tiene en su información (correo, WhatsApp, el formulario de la web) y sigue con lo que el cliente necesitaba.",
     "expected_tools": []
   }
 ]

@@ -10,21 +10,46 @@
 
 .tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--s1);
   margin-top: var(--s5);
   border-bottom: 1px solid var(--line);
 }
 
+/* A tab is a <button>, and a button carries the browser's own chrome until it
+ * is taken off: without this reset the row renders as raised grey keys with
+ * system borders, which is a toolbar and not a strip of tabs. The label is
+ * `--text-dim` rather than `--text-faint` because an unselected tab is a place
+ * a reader is choosing between, not small print — faint made three of five
+ * labels unreadable on the Evals screen. Both themes come out of tokens.css,
+ * so this rule is written once and re-inks itself in daylight. */
 .tabs__tab {
+  margin-bottom: -1px; /* the active rule lands ON the strip's hairline, not under it */
   padding: var(--s2) var(--s3);
-  border-bottom: 1px solid transparent;
-  color: var(--text-faint);
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: none;
+  color: var(--text-dim);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background-color 0.12s ease;
 }
 
 .tabs__tab:hover {
-  color: var(--text-dim);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Keyboard focus is drawn inside the tab: an outline around a strip of buttons
+ * would break the shared hairline they all sit on. */
+.tabs__tab:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .tabs__tab.is-active {
@@ -105,6 +130,21 @@
 .leg__refused-why {
   display: block;
   margin-top: 2px;
+}
+
+/* Inside the phone panel the two sentences under the number both come from
+ * GET /pipeline, verbatim — the line's note and the transfer row's — so they get
+ * one face, and the first gets air under an accent-sized number instead of the
+ * 4px a provider row wants. Scoped to --panel: the Talk header strip shows
+ * neither and must not move. */
+.dial--panel .leg__note {
+  margin-top: var(--s3);
+  font-family: var(--font-mono);
+}
+
+.dial--panel .leg__refused-why {
+  margin-top: var(--s2);
+  font-family: var(--font-mono);
 }
 
 /* ── the waterfall ───────────────────────────────────────────────────────── */

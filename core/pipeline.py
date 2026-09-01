@@ -7,9 +7,11 @@ greeting, and the latencies its last calls actually measured — into one dict
 the console renders and a test can assert on.
 
 It is a READ of the platform's own configuration: every value here is either a
-constant from `core.providers`, project data, or a median over stored events.
-Nothing is invented and nothing is defaulted silently — a project that has
-never run answers with `null` medians, never with a zero.
+constant from `core.providers`, project data, a row of the store, or a median
+over stored events. Nothing is invented and nothing is defaulted silently — a
+project that has never run answers with `null` medians, never with a zero, and
+a project nobody can phone says so instead of borrowing the fleet's number
+(`core.telephony.lines`).
 
 The write half is `overridable`: the fields the console may set, and the rules
 that refuse a value the platform will not run.
@@ -23,6 +25,7 @@ from core.observability.observers import TURN_METRICS
 from core.providers import llm, stt, tts
 from core.state.overrides import OVERRIDABLE
 from core.state.store import Store
+from core.telephony import human, lines
 
 # How many of a project's stored voice sessions the medians are measured over.
 LATENCY_SESSIONS = 20
@@ -59,6 +62,7 @@ def snapshot(tenant: Tenant, project: Project, store: Store) -> dict[str, Any]:
         "stt": stt_view(project),
         "llm": llm_view(project),
         "tts": tts_view(project),
+        "phone": {**lines.view(store, tenant.id, project.id), "transfer": human.view(project)},
         "overrides": [
             {"field": o.field, "value": o.value, "updated_at": o.updated_at}
             for o in store.pipeline_overrides(tenant.id, project.id)
@@ -80,15 +84,20 @@ def stt_view(project: Project) -> dict[str, Any]:
     view = _soniox_view(project) if chosen == stt.SONIOX else _deepgram_view(project)
     view["requested_provider"] = project.stt_provider
     view["providers"] = list(stt.PROVIDERS)
+    view["unavailable_reasons"] = _unavailable("stt_provider", stt.PROVIDERS)
     return view
 
 
 def llm_view(project: Project) -> dict[str, Any]:
     """The model the next session will really build, its family's caching story, the whole menu.
 
-    `requested_model` is what the project asked for and `model` is what runs:
-    they differ only when git names a model outside `ALLOWED_MODELS`, which
-    `llm_model()` falls back on rather than opening a connection nobody priced.
+    `requested_model` is what the project asked for and `model` is what runs.
+    They differ for two reasons: git names a model outside `ALLOWED_MODELS`,
+    which `llm_model()` falls back on rather than opening a connection nobody
+    priced, or this host carries no key for the vendor, which it falls back on
+    rather than dying mid-job. `unavailable_reasons` is the second case said in
+    the server's own words — the very sentence a PUT would be refused with —
+    so the console greys a model out before somebody chooses it.
     """
     model = llm.llm_model(project)
     kind = llm.family(model)
@@ -102,6 +111,7 @@ def llm_view(project: Project) -> dict[str, Any]:
         "max_tokens": llm.MAX_TOKENS,
         "cache_minimum_tokens": llm.CACHE_FLOOR[kind],
         "cache_note": CACHE_NOTES[kind],
+        "unavailable_reasons": _unavailable("llm_model", llm.ALLOWED_MODELS),
     }
 
 
@@ -154,10 +164,57 @@ def latency(store: Store, tenant: str, project: str, limit: int = LATENCY_SESSIO
     return {"sessions": len(rows), "turns": turns, "medians": medians}
 
 
+def running(project: Project, channel: str) -> dict[str, Any]:
+    """The four provider choices this session really runs on, small enough for one event.
+
+    Written onto `session.start` so a call can be traced back to the voice it
+    spoke with: the console may change any of these between two calls, and
+    without them on the log there is no artefact tying a supervisor's pick to
+    what the caller heard. A chat session builds neither STT nor TTS
+    (`core.session.build_session` gates both on the channel), so the audio half
+    is null there rather than a voice nobody was ever spoken to in.
+    """
+    audible = channel == "voice"
+    return {
+        "voice": project.voice if audible else None,
+        "tts_model": tts.tts_model(project) if audible else None,
+        "stt_provider": stt.provider_for(project) if audible else None,
+        "llm_model": llm.llm_model(project),
+    }
+
+
+def cleaned(field: str, value: str) -> str:
+    """The value as it will be stored: an id loses its stray whitespace, a greeting keeps it.
+
+    A pasted voice id arrives with a trailing space often enough to matter, and
+    a value that is only whitespace has to reach `overridable` as the empty
+    string it is, or the refusal below never fires.
+    """
+    return value if field == "greeting" else value.strip()
+
+
 def overridable(field: str, value: str) -> str | None:
     """Why this override is refused, or None when the platform will run it.
 
-    Two rules. The TTS one the platform has always enforced: `eleven_v3` is not
+    Five rules about the value, and one about the box.
+
+    The box one is the youngest and it was bought at full price: on 2026-08-31
+    the console stored `llm_model=gpt-5.4-mini` — legal, priced, on the
+    allow-list — onto a host with no `OPENAI_API_KEY`, and every job of that
+    project died building its LLM until somebody went and read a worker log.
+    `api.py` runs ON the box the worker runs on, so the one question a console
+    somewhere else cannot answer, this function can: is the key here? A
+    provider slot the host cannot open is refused with the variable that would
+    have to exist, never with anything read out of it. The worker no longer
+    crashes either (`llm_model`, `provider_for`), but that is the net, not the
+    door: an operator who asks for an ear the box cannot open deserves the
+    answer now, not a project quietly running on the other one.
+
+    The five value rules. The voice one exists because an empty id is not refused
+    anywhere downstream — it is *absorbed*: `tts_for` reads it as "no voice
+    configured", builds no TTS, and the call is silent with a log line blaming
+    a missing API key. A rule that only the store can enforce belongs here.
+    The TTS one the platform has always enforced: `eleven_v3` is not
     realtime and `eleven_turbo_v2_5` is deprecated, so neither may be stored —
     `tts_model()` would silently ignore them at build time and the console would
     show a model the caller never hears. The LLM one is an allow-list rather
@@ -166,9 +223,20 @@ def overridable(field: str, value: str) -> str | None:
     refusal names them both. The STT one is the same shape: only the providers
     in `core.providers.stt.PROVIDERS` have a factory, so any other name would
     fall back to Soniox and the console would show an ear the caller is not on.
+    The transfer one is the youngest of the five and the only one whose EMPTY
+    value is legal: clearing `transfer_number` is how a console takes the
+    handover verb away from the agent, and anything else has to be a number a
+    SIP REFER can carry (`core.telephony.human.refusal`).
     """
     if field not in OVERRIDABLE:
         return f"{field!r} is not overridable; the console may set {list(OVERRIDABLE)}"
+    if field == "voice" and not value:
+        return (
+            "an empty voice id is not a voice: `tts_for` cannot tell one from a missing "
+            "ELEVENLABS_API_KEY, so it builds no TTS at all and the next call comes up mute "
+            "while the worker log blames a key that is present. Name an ElevenLabs voice id — "
+            "the console's escape hatch stores whatever you type, but not nothing."
+        )
     if field == "llm_model" and value not in llm.ALLOWED_MODELS:
         return (
             f"{value!r} is not a model this platform runs: the allowed models are "
@@ -182,12 +250,46 @@ def overridable(field: str, value: str) -> str | None:
             "(eleven_v3 is not realtime, eleven_turbo_v2_5 is deprecated). "
             f"Use {tts.DEFAULT_MODEL!r} or {tts.LATENCY_MODEL!r}."
         )
+    if field == human.FIELD:
+        return human.refusal(value)
     if field == "stt_provider" and value not in stt.PROVIDERS:
         return (
             f"{value!r} is not an STT provider this platform runs: "
             f"the console may choose {list(stt.PROVIDERS)}."
         )
+    if field == "llm_model" and not llm.runnable(value):
+        other = f"the default model {llm.DEFAULT_MODEL!r}" if value != llm.DEFAULT_MODEL else None
+        return _absent(value, llm.key_env(value), other)
+    if field == "stt_provider" and not stt.runnable(value):
+        other = f"the default ear {stt.SONIOX!r}" if value != stt.SONIOX else None
+        return _absent(value, stt.key_env(value), other)
     return None
+
+
+def _unavailable(field: str, values: tuple[str, ...]) -> dict[str, str]:
+    """The choices this host cannot open, each with the sentence a PUT would be refused with."""
+    refusals = {value: overridable(field, value) for value in values}
+    return {value: why for value, why in refusals.items() if why}
+
+
+def _absent(value: str, variable: str, fallback: str | None) -> str:
+    """The refusal for a provider this host has no key for — the variable, never its value.
+
+    `fallback` is what the worker would run instead, and None when the value IS
+    the platform default: there is nothing under it, so the sentence has to ask
+    for the variable rather than offer an alternative.
+    """
+    said = (
+        f"{value!r} needs {variable} on this host and the box carries none: the variable is "
+        f"not set in the worker's environment. Nothing here reads its contents."
+    )
+    if fallback is None:
+        return f"{said} It is the platform default, so put it in the fleet's env and restart."
+    return (
+        f"{said} Put it there and restart the fleet, or leave this project on {fallback}: "
+        f"stored now, every session would quietly fall back to it anyway, with a warning "
+        f"nobody reading this console would ever see."
+    )
 
 
 def _soniox_view(project: Project) -> dict[str, Any]:
