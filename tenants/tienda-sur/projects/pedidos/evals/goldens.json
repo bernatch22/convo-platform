@@ -2,7 +2,7 @@
   {
     "input": "(llamada entrante: el agente abre la conversación)",
     "turn": "greeting",
-    "expected_behaviour": "La línea de apertura saluda, dice que esto es Tienda Sur y pregunta en qué puede ayudar, todo de una vez y tuteando.",
+    "expected_behaviour": "La línea de apertura saluda, dice que esto es Tienda Sur, deja claro que quien atiende es una asistente virtual (no una persona) y pregunta en qué puede ayudar, todo de una vez y tuteando.",
     "expected_tools": []
   },
   {

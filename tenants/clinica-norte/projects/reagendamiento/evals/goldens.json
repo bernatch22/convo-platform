@@ -2,7 +2,7 @@
   {
     "input": "(llamada entrante: el agente abre la conversación)",
     "turn": "greeting",
-    "expected_behaviour": "La línea de apertura saluda, dice que es la recepción de Clínica Norte y pregunta en qué puede ayudar, todo de una vez.",
+    "expected_behaviour": "La línea de apertura saluda, dice que es la recepción de Clínica Norte, deja claro que quien atiende es un asistente virtual (no una persona) y pregunta en qué puede ayudar, todo de una vez.",
     "expected_tools": []
   },
   {

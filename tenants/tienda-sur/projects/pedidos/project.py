@@ -112,7 +112,8 @@ PROJECT = PedidosProject(
     id="pedidos",
     name="Pedidos e incidencias",
     language="es-ES",
-    greeting="¡Hola! Soy la asistente de Tienda Sur. ¿En qué te ayudo?",
+    # Art. 50 AI Act, same as the clinic: the greeting itself is the disclosure.
+    greeting="¡Hola! Soy la asistente virtual de Tienda Sur. ¿En qué te ayudo?",
     voice="gD1IexrzCvsXPHUuT0s3",  # ElevenLabs "Sara Martin - 3": the shop's own voice
     # The incident desk is a different person and sounds like one: ElevenLabs "Ciro",
     # peninsular male. A caller handed over hears somebody else pick up, which is the

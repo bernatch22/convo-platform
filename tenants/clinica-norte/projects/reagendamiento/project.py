@@ -214,7 +214,11 @@ PROJECT = ReagendamientoProject(
     id="reagendamiento",
     name="Reagendamiento de citas",
     language="es-ES",
-    greeting="Clínica Norte, buenos días, le atiende recepción. ¿En qué puedo ayudarle?",
+    # Art. 50 AI Act: the very first sentence says a machine answered — before the caller
+    # has told it anything. "Asistente virtual" over "inteligencia artificial": the duty is
+    # disclosure a person understands, not vocabulary.
+    greeting="Clínica Norte, buenos días, le atiende el asistente virtual de recepción. "
+    "¿En qué puedo ayudarle?",
     voice="UOIqAnmS11Reiei1Ytkc",  # ElevenLabs "Carolina - Spanish woman - es_ES" (used from ms-6)
     tts_model="eleven_flash_v2_5",  # latency profile: ~100ms ttfb vs ~700ms measured on v3 (PSTN)
     # The clinic's own switchboard, the number the SMS already tells patients to ring.
