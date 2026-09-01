@@ -13,39 +13,117 @@
     }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 28px 64px; }
+    .wrap { max-width: 1060px; margin: 0 auto; padding: 52px 28px 72px; }
     .eyebrow { font: 500 11px var(--mono); letter-spacing: .09em; text-transform: uppercase;
                color: var(--accent); margin-bottom: 14px; }
-    h1 { font: 600 34px/1.15 var(--sans); letter-spacing: -.015em; margin: 0 0 8px; }
-    .sub { font: 400 16px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 28px; max-width: 70ch; }
+    h1 { font: 600 38px/1.12 var(--sans); letter-spacing: -.015em; margin: 0 0 10px; }
+    .sub { font: 400 16.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 34px; max-width: 72ch; }
+
+    .doors { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 44px; }
+    .door { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--rule);
+            border-radius: 14px; background: #fff; padding: 22px 24px; text-decoration: none;
+            color: var(--ink); transition: border-color .15s ease, transform .15s ease; }
+    .door:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .door.hot { border: 1.5px solid var(--accent); background: var(--accent-soft); }
+    .door .k { font: 500 10.5px var(--mono); letter-spacing: .09em; text-transform: uppercase;
+               color: var(--accent); }
+    .door h2 { font: 600 19px/1.25 var(--sans); margin: 0; }
+    .door p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0; }
+    .door .go { margin-top: auto; padding-top: 10px; font: 600 13px var(--mono); color: var(--accent);
+                text-decoration: none; }
+    .door .go:hover { text-decoration: underline; }
+    .door .alt { font: 400 12px var(--sans); color: var(--muted); }
+    .door .alt a { color: var(--accent); text-decoration: none; }
+    .door .alt a:hover { text-decoration: underline; }
+
+    .videos { border-top: 1px solid var(--rule); padding-top: 34px; }
+    .videos .head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; }
+    .videos h2 { font: 600 24px/1.2 var(--sans); margin: 0; }
+    .badge { font: 600 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+             color: var(--paper); background: var(--accent); border-radius: 999px; padding: 5px 13px; }
+    .videos .note { font: 400 14.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 22px; max-width: 70ch; }
     .player { border: 1.5px solid var(--accent); border-radius: 14px; overflow: hidden;
-              background: #000; aspect-ratio: 16 / 9; }
+              background: #101010; aspect-ratio: 16 / 9; position: relative; }
     .player video { display: block; width: 100%; height: 100%; }
-    .links { display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 24px; padding-top: 18px;
-             border-top: 1px solid var(--rule); font: 400 14px/1.5 var(--sans); color: var(--ink-2); }
-    .links a { color: var(--accent); font: 500 14px var(--mono); text-decoration: none; }
-    .links a:hover { text-decoration: underline; }
-    .links strong { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+    .player .soon { position: absolute; inset: 0; display: flex; flex-direction: column;
+                    align-items: center; justify-content: center; gap: 10px; color: #cfcabb;
+                    background: linear-gradient(160deg, #161613, #0e0e0c); }
+    .player .soon .big { font: 600 26px var(--sans); color: #FBFAF7; }
+    .player .soon .small { font: 400 14px var(--mono); }
+    .player[data-ready] .soon { display: none; }
+
+    .foot { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--rule);
+            display: flex; flex-wrap: wrap; gap: 10px 30px;
+            font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); }
+    .foot a { color: var(--accent); font-family: var(--mono); font-size: 13px; text-decoration: none; }
+    .foot a:hover { text-decoration: underline; }
+    .foot strong { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+    @media (max-width: 760px) { .doors { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="eyebrow">Prueba técnica · Principal Platform Architect · ABAI</div>
-    <h1>Plataforma conversacional transaccional con IA — demo</h1>
-    <p class="sub">Una llamada real de punta a punta: el agente identifica, ejecuta acciones
-    de negocio con consentimiento, y la operación lo ve todo — supervisión en vivo,
-    grabación, coste y nota de calidad.</p>
+    <h1>Plataforma conversacional transaccional con IA</h1>
+    <p class="sub">Un cliente llama o escribe, un agente de IA ejecuta acciones reales de negocio,
+    y la operación lo gobierna todo. Tres puertas: la propuesta, el sistema en vivo, y la demo
+    en vídeo.</p>
 
-    <div class="player">
-      <!-- Drop the video as ui/public/demo.mp4 (or replace src). -->
-      <video controls preload="metadata" src="/demo.mp4"></video>
+    <div class="doors">
+      <div class="door">
+        <span class="k">La propuesta</span>
+        <h2>Presentación</h2>
+        <p>Quince láminas: arquitectura, orquestación transaccional, evaluación continua,
+        seguridad, trade-offs. Navegable con las flechas del teclado.</p>
+        <a class="go" href="/deck.html">Abrir en el navegador →</a>
+        <span class="alt">también como <a href="/deck.pptx">PowerPoint (.pptx)</a></span>
+      </div>
+      <div class="door hot">
+        <span class="k">El sistema, en vivo</span>
+        <h2>La app real</h2>
+        <p>Habla con los agentes por voz o chat, mira el tablero de transacciones, las sesiones
+        con su grabación y su nota, la supervisión y las evaluaciones. No es una maqueta.</p>
+        <a class="go" href="https://lk.bernardocastro.dev">Entrar a la consola →</a>
+        <span class="alt">o por teléfono: <strong style="font-family:var(--mono)">+1 417 674 3169</strong> — atiende la clínica</span>
+      </div>
+      <div class="door">
+        <span class="k">Cómo se construyó</span>
+        <h2>El board público</h2>
+        <p>Veinte hitos incrementales, más de cien tarjetas con sus commits y un reporte de
+        aprendizaje por hito. La metodología como evidencia, no como relato.</p>
+        <a class="go" href="https://taskops.bernardocastro.dev/convo/">Ver el board →</a>
+      </div>
     </div>
 
-    <div class="links">
-      <span>Consola en vivo: <a href="https://lk.bernardocastro.dev">lk.bernardocastro.dev</a></span>
-      <span>Por teléfono: <strong>+1 417 674 3169</strong> — atiende la clínica</span>
-      <span>Cómo se construyó: <a href="https://taskops.bernardocastro.dev/convo">taskops.bernardocastro.dev/convo</a></span>
+    <div class="videos">
+      <div class="head">
+        <h2>La demo en vídeo</h2>
+        <span class="badge">Próximamente</span>
+      </div>
+      <p class="note">Una llamada real de punta a punta: el agente identifica, ejecuta con
+      consentimiento, y la operación lo ve todo — supervisión en vivo, grabación, coste y nota
+      de calidad. Los vídeos aparecen aquí en cuanto estén subidos.</p>
+      <div class="player" id="player">
+        <video controls preload="metadata" src="/demo.mp4"></video>
+        <div class="soon">
+          <span class="big">El vídeo llega en un momento</span>
+          <span class="small">mientras tanto, la app real está abierta — la puerta del medio</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="foot">
+      <span>Consola: <a href="https://lk.bernardocastro.dev">lk.bernardocastro.dev</a></span>
+      <span>Teléfono: <strong>+1 417 674 3169</strong></span>
+      <span>Board: <a href="https://taskops.bernardocastro.dev/convo/">taskops.bernardocastro.dev/convo</a></span>
     </div>
   </div>
+
+  <script>
+    // The curtain lifts itself the moment /demo.mp4 exists — no redeploy, no edit.
+    const player = document.getElementById("player");
+    const video = player.querySelector("video");
+    video.addEventListener("loadedmetadata", () => player.setAttribute("data-ready", ""));
+  </script>
 </body>
 </html>

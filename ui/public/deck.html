@@ -1,0 +1,1763 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plataforma conversacional transaccional — arquitectura</title>
+<style>
+/* The deck's visual identity and slide chassis.
+ *
+ * Sober paper/ink: this is an architecture document that happens to advance,
+ * not a sales deck. One accent (the console's olive), one signal green, one
+ * amber for trade-offs. No brand, no gradients, no photography.
+ *
+ * The slide is a FIXED 1600x900 box. On screen it is scaled to fit the
+ * viewport; in print it is rendered at its natural size on a page of exactly
+ * those dimensions. Screen and PDF are therefore the same pixels, which is the
+ * whole reason the deck and the document can be one source.
+ *
+ * Fonts are system stacks on purpose: `npm run build` and `npm run pdf` must
+ * work with no network, and deck.html must be a single file you can email.
+ */
+
+:root {
+  --w: 1600px;
+  --h: 900px;
+
+  --desk: #EDEBE4;
+  --paper: #FBFAF7;
+  --card: #FFFFFF;
+  --ink: #14161A;
+  --ink-2: #454B52;
+  --muted: #8B9099;
+  --line: #E7E4DC;
+  --rule: #D6D2C7;
+  --accent: #5C6B22;
+  --accent-soft: #F0F2E5;
+  --ok: #3F6B3A;
+  --warn: #8A5A1E;
+  --danger: #8C3A2E;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%; overflow: hidden;
+  background: var(--desk); color: var(--ink);
+  font-family: var(--sans); font-weight: 400;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  letter-spacing: -0.006em;
+}
+
+::selection { background: var(--accent-soft); }
+
+
+/* ── chassis ──────────────────────────────────────────────────────────── */
+
+.deck { position: fixed; inset: 0; display: grid; place-items: center; overflow: hidden; }
+
+.stage {
+  width: var(--w); height: var(--h); position: relative;
+  transform: scale(var(--scale, 1)); transform-origin: center center;
+  background: var(--paper);
+  box-shadow: 0 1px 2px rgba(0,0,0,.07), 0 22px 60px rgba(0,0,0,.10);
+}
+
+.slide {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  padding: 58px 84px 46px; background: var(--paper);
+  opacity: 0; pointer-events: none; transform: translateX(26px);
+  transition: opacity .3s ease, transform .48s cubic-bezier(.22,.61,.36,1);
+}
+.slide.is-active { opacity: 1; pointer-events: auto; transform: none; }
+.slide.is-past { transform: translateX(-26px); }
+
+/* Staggered entrance. data-anim="1".."7" is the order, not the delay. */
+.slide [data-anim] { opacity: 0; transform: translateY(10px); transition: opacity .5s ease, transform .6s cubic-bezier(.22,.61,.36,1); }
+.slide.is-active [data-anim] { opacity: 1; transform: none; }
+.slide.is-active [data-anim="1"] { transition-delay: .04s; }
+.slide.is-active [data-anim="2"] { transition-delay: .12s; }
+.slide.is-active [data-anim="3"] { transition-delay: .21s; }
+.slide.is-active [data-anim="4"] { transition-delay: .30s; }
+.slide.is-active [data-anim="5"] { transition-delay: .39s; }
+.slide.is-active [data-anim="6"] { transition-delay: .48s; }
+.slide.is-active [data-anim="7"] { transition-delay: .57s; }
+
+.slide-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 26px; }
+
+.slide-foot {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-top: 18px; margin-top: auto; border-top: 1px solid var(--line);
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  color: var(--muted); text-transform: uppercase;
+}
+.slide-foot .num { color: var(--ink-2); }
+
+
+/* ── screen chrome (never printed) ────────────────────────────────────── */
+
+.chrome { position: fixed; inset: 0; pointer-events: none; z-index: 40; }
+.progress { position: absolute; top: 0; left: 0; height: 2px; background: var(--accent); width: 0; transition: width .45s cubic-bezier(.22,.61,.36,1); }
+.dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; pointer-events: auto; }
+.dots button {
+  width: 22px; height: 3px; border: 0; padding: 0; cursor: pointer;
+  background: var(--rule); transition: background .2s ease;
+}
+.dots button:hover { background: var(--muted); }
+.dots button[aria-current="true"] { background: var(--accent); }
+.hint {
+  position: absolute; bottom: 12px; right: 18px;
+  font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+  color: var(--muted); text-transform: uppercase;
+}
+
+
+/* ── the writer's kit ─────────────────────────────────────────────────── */
+
+.eyebrow {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--accent);
+}
+.sep { color: var(--rule); margin: 0 8px; }
+
+h1.title { font-size: 66px; line-height: 1.03; letter-spacing: -0.032em; font-weight: 500; max-width: 20ch; }
+h2.head { font-size: 42px; line-height: 1.06; letter-spacing: -0.028em; font-weight: 500; max-width: 24ch; }
+h3.sub { font-size: 20px; line-height: 1.35; font-weight: 500; color: var(--ink); }
+.lede { font-size: 19px; line-height: 1.5; color: var(--ink-2); max-width: 74ch; font-weight: 400; }
+p + p { margin-top: 12px; }
+b, strong { font-weight: 600; color: var(--ink); }
+code, .mono { font-family: var(--mono); font-size: .92em; }
+code { color: var(--accent); }
+
+.head-block { display: flex; flex-direction: column; gap: 14px; }
+
+/* The validation line every slide owes the reader: what proves it. */
+.proof {
+  border-left: 2px solid var(--accent); padding: 8px 0 8px 14px;
+  font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--ink-2);
+}
+.proof b { color: var(--ink); font-weight: 500; }
+.proof .n { color: var(--accent); }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+.grid-7-5 { display: grid; grid-template-columns: 7fr 5fr; gap: 48px; }
+.grid-5-7 { display: grid; grid-template-columns: 5fr 7fr; gap: 48px; }
+/* Take the leftover height, but never be squeezed below your own content:
+ * a compressed track does not look broken, it just quietly sits on top of
+ * whatever is under it. Let it push instead, and audit.mjs will catch it. */
+.fill { flex: 1 1 auto; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line); padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.card .label { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.card .value { font-size: 26px; letter-spacing: -0.02em; }
+.card .desc { font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+
+.rows { display: flex; flex-direction: column; }
+.rows .row { display: grid; grid-template-columns: 30px 1fr; gap: 18px; padding: var(--row-pad, 15px) 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.rows .row:last-child { border-bottom: none; }
+.rows .idx { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.rows .txt { font-size: 17px; line-height: 1.45; }
+.rows .txt .why { display: block; margin-top: 4px; font-size: 14px; color: var(--ink-2); }
+
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 8px 22px; align-items: baseline; }
+.kv dt { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+.kv dd { font-size: 15px; line-height: 1.45; color: var(--ink-2); }
+
+table.plain { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.plain th {
+  text-align: left; font-family: var(--mono); font-size: 11px; font-weight: 400;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--muted);
+  padding: 0 14px 10px 0; border-bottom: 1px solid var(--rule);
+}
+table.plain td { padding: 12px 14px 12px 0; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+table.plain tr:last-child td { border-bottom: none; }
+
+.tag {
+  display: inline-block; font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; padding: 3px 8px; border: 1px solid var(--rule); color: var(--ink-2);
+}
+.tag.ok { color: var(--ok); border-color: #C9D6BF; background: #F2F6EF; }
+.tag.warn { color: var(--warn); border-color: #E0D0B4; background: #FAF4E9; }
+.tag.off { color: var(--muted); }
+
+pre.code {
+  font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink-2);
+  background: var(--card); border: 1px solid var(--line); padding: 18px 20px;
+  white-space: pre; overflow: hidden;
+}
+pre.code b { color: var(--ink); font-weight: 500; }
+
+.note { font-size: 13px; line-height: 1.5; color: var(--muted); }
+
+/* Today | tomorrow, side by side — the shape slide 09 needs. */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid var(--line); }
+.compare > div { padding: 24px 26px; display: flex; flex-direction: column; gap: 12px; }
+.compare > div + div { border-left: 1px solid var(--line); background: var(--card); }
+.compare .when { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+
+/* Figures: an inline SVG diagram or a console screenshot. */
+.fig { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.fig > svg { width: 100%; height: auto; display: block; }
+.fig figcaption, .figcaption { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; color: var(--muted); text-transform: uppercase; }
+.shot { width: 100%; height: auto; display: block; border: 1px solid var(--rule); background: var(--card); }
+.shot-frame { min-height: 0; overflow: hidden; border: 1px solid var(--rule); }
+.shot-frame img { width: 100%; height: auto; display: block; }
+
+/* Diagram primitives, so every writer's SVG looks like the same hand. */
+svg .box { fill: var(--card); stroke: var(--rule); stroke-width: 1; }
+svg .box-accent { fill: var(--accent-soft); stroke: #C4CDA2; stroke-width: 1; }
+svg .edge { stroke: var(--rule); stroke-width: 1.25; fill: none; }
+svg .edge-accent { stroke: var(--accent); stroke-width: 1.25; fill: none; }
+svg .lbl { font-family: var(--sans); font-size: 14px; fill: var(--ink); }
+svg .lbl-sm { font-family: var(--mono); font-size: 11px; fill: var(--muted); letter-spacing: .06em; }
+
+/* The placeholder an unwritten slide wears. Deliberately loud on screen and
+ * in the PDF: a fragment nobody filled must be impossible to ship by accident. */
+.todo {
+  flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  border: 1px dashed var(--rule); padding: 30px 40px; background: var(--card);
+}
+.todo .who { font-family: var(--mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--warn); }
+.todo ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.todo li { font-size: 15px; line-height: 1.45; color: var(--ink-2); padding-left: 18px; position: relative; }
+.todo li::before { content: "—"; position: absolute; left: 0; color: var(--rule); }
+
+/* A screenshot the writers may reference but nobody captured yet. */
+.shot-missing {
+  border: 1px dashed var(--rule); background: var(--card); padding: 26px;
+  display: flex; flex-direction: column; gap: 8px; font-family: var(--mono);
+  font-size: 12px; line-height: 1.6; color: var(--muted);
+}
+.shot-missing b { color: var(--warn); font-weight: 400; }
+
+
+/* ── print: the same pixels, one slide per page ───────────────────────── */
+
+@page { size: 1600px 900px; margin: 0; }
+
+@media print {
+  html, body { height: auto; overflow: visible; background: #fff; }
+  .chrome, .hint { display: none !important; }
+  .deck { position: static; display: block; overflow: visible; }
+  .stage { width: 1600px; height: auto; transform: none; box-shadow: none; }
+  .slide {
+    position: relative; inset: auto; width: 1600px; height: 900px;
+    opacity: 1 !important; transform: none !important; pointer-events: auto;
+    transition: none; break-after: page; page-break-after: always;
+  }
+  .slide:last-child { break-after: auto; page-break-after: auto; }
+  .slide [data-anim] { opacity: 1 !important; transform: none !important; transition: none; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+</style>
+</head>
+<body>
+<div class="deck">
+  <div class="stage" id="stage">
+
+<section data-idx="0" class="slide" data-title="Introducción" data-entregable="0">
+  <style>
+    .p1-title { font: 600 50px/1.1 var(--sans); color: var(--ink); letter-spacing: -.015em; margin: 0 0 10px; }
+    .p1-sub   { font: 400 18px/1.4 var(--sans); color: var(--ink-2); margin: 0 0 26px; }
+    .p1-intro { font: 400 19.5px/1.6 var(--sans); color: var(--ink); max-width: 92ch; margin: 0 0 30px; }
+    .p1-intro strong { font-weight: 600; }
+    .p1-intro .shield { color: var(--ink-2); }
+    .p1-live { display: flex; align-items: baseline; gap: 26px; border: 1.5px solid var(--accent);
+               border-radius: 12px; background: var(--accent-soft); padding: 16px 26px; flex: none; }
+    .p1-live .lbl { font: 500 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); flex: none; }
+    .p1-live .url { font: 600 23px var(--mono); color: var(--ink); letter-spacing: -.01em; }
+    .p1-live .demo { display: inline-flex; align-items: center; gap: 8px; background: var(--accent);
+                     color: #FBFAF7; border-radius: 999px; padding: 7px 18px;
+                     font: 600 13.5px var(--sans); align-self: center; white-space: nowrap; }
+    .p1-live .demo strong { font-family: var(--mono); font-weight: 600; color: #FBFAF7; opacity: .85; }
+    .p1-live .tel { font: 400 15px var(--sans); color: var(--ink-2); margin-left: auto; }
+    .p1-live .tel strong { font-family: var(--mono); color: var(--ink); font-weight: 600; }
+    .p1-cards { display: grid; grid-template-columns: 1fr 1fr 1.15fr; gap: 18px; margin-top: 20px; }
+    .p1-cards .c { border: 1px solid var(--rule); border-radius: 12px; background: var(--paper);
+                   padding: 18px 22px; display: flex; flex-direction: column; gap: 9px; }
+    .p1-cards .c.metodo { border: 1.5px solid var(--accent); }
+    .p1-cards .k { font: 500 11px var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--accent); }
+    .p1-cards h3 { font: 600 17px/1.3 var(--sans); color: var(--ink); margin: 0; }
+    .p1-cards p { font: 400 13.5px/1.6 var(--sans); color: var(--ink-2); margin: 0; }
+    .p1-cards p strong { color: var(--ink); font-weight: 600; }
+    .p1-cards .board { font: 500 13px var(--mono); color: var(--accent); }
+  </style>
+  <div class="slide-body">
+
+    <div data-anim="1">
+      <div class="eyebrow" style="margin-bottom:20px">Prueba técnica <span class="sep">·</span> Principal Platform Architect <span class="sep">·</span> ABAI</div>
+      <h1 class="p1-title">Plataforma conversacional transaccional con IA</h1>
+      <p class="p1-sub">Propuesta de arquitectura</p>
+    </div>
+
+    <p class="p1-intro" data-anim="2">
+      Un cliente llama por teléfono o escribe por chat. Un agente de IA lo atiende y
+      <strong>ejecuta acciones reales de negocio</strong>. Este documento presenta la
+      arquitectura de una plataforma que lo hace <strong>para múltiples clientes sobre un único
+      despliegue</strong> — y que está construida y en operación.
+      <span class="shield">El sistema en vivo no es el entregable: es la verificación —
+      ninguna decisión se sostiene por estar implementada, sino por su justificación.</span>
+    </p>
+
+    <div class="p1-live" data-anim="3">
+      <span class="lbl">Plataforma en vivo</span>
+      <span class="url">https://lk.bernardocastro.dev</span>
+      <span class="demo">▶ Ver demo <strong>/demo.html</strong></span>
+      <span class="tel">y por teléfono: <strong>+1 417 674 3169</strong> — atiende la clínica</span>
+    </div>
+
+    <div class="p1-cards" data-anim="4">
+      <div class="c">
+        <span class="k">El agente, hoy</span>
+        <h3>Diez encargos reales por voz o chat</h3>
+        <p><strong>Clínica</strong> — identifica al paciente, reserva, mueve y cancela citas,
+        confirma asistencia, actualiza el teléfono, envía SMS.
+        <strong>Comercio</strong> — estado del pedido, cancelación, tickets. Toda acción
+        definitiva, solo tras el «sí» explícito del cliente.</p>
+      </div>
+      <div class="c">
+        <span class="k">La operación</span>
+        <h3>Cada llamada, gobernada y auditada</h3>
+        <p>Llamadas en vivo con supervisión — escuchar, susurrar, tomar la línea. Cada sesión
+        con grabación, transcripción, coste y nota de calidad automática. El tablero de citas,
+        pedidos y tickets, y las evaluaciones ejecutables desde la consola.</p>
+      </div>
+      <div class="c metodo">
+        <span class="k">Cómo se construyó</span>
+        <h3>Veinte hitos incrementales, ninguno a ciegas</h3>
+        <p>Desarrollo incremental con <strong>agentes de Claude Code en paralelo</strong>, cada
+        tarea en su rama aislada — y <strong>yo en el bucle</strong>: leyendo el código,
+        probándolo y aprobando personalmente el cierre de cada hito, con su reporte de
+        aprendizaje. Stack elegido con criterio: <strong>LiveKit autoalojado, no Vapi ni
+        Pipecat</strong> — un agente transaccional no se configura en un panel: exige poseer el
+        bucle (el porqué completo, lámina 15). El board es público:</p>
+        <span class="board">https://taskops.bernardocastro.dev/convo</span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">01 / 15</span></footer>
+</section>
+
+<section data-idx="1" class="slide" data-title="Arquitectura de alto nivel" data-entregable="1">
+  <style>
+    .a02-t   { font: 600 19px/1.2 var(--sans); fill: var(--ink); }
+    .a02-b   { font: 400 14.5px/1.35 var(--sans); fill: var(--ink-2); }
+    .a02-m   { font: 400 11px var(--mono); fill: var(--muted); }
+    .a02-arr { font: 500 13px var(--sans); fill: var(--accent); }
+    .a02-cap { font: 500 11px var(--mono); fill: var(--muted); letter-spacing: .08em; }
+    .a02-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+    .a02-hot { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">02 <span class="sep">·</span> Arquitectura de alto nivel</div>
+      <h2 class="head" style="max-width:52ch">Cuatro piezas: canales, conversación, control de negocio y sistemas del cliente</h2>
+      <p class="lede" style="max-width:100ch">
+        La plataforma separa la <strong>conversación</strong> (tiempo real, donde opera la IA) del
+        <strong>control de negocio</strong> (donde se valida, se autoriza y se registra). Esa
+        frontera es la garantía central del diseño: el modelo de IA genera lenguaje — las
+        operaciones las ejecuta y audita el backend.
+      </p>
+    </div>
+
+    <figure class="fig" data-anim="2">
+      <svg viewBox="0 0 1420 470" role="img" aria-label="Diagrama de arquitectura: canales, conversación en tiempo real, control de negocio, sistemas del cliente y consola de operación.">
+        <defs>
+          <marker id="f02" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" style="fill:var(--accent)"/>
+          </marker>
+        </defs>
+
+        <text class="a02-cap" x="4" y="34">EL MODELO DE IA GENERA LENGUAJE — NINGUNA OPERACIÓN DE NEGOCIO SE EJECUTA FUERA DEL CONTROL DE NEGOCIO</text>
+
+        <!-- CANALES -->
+        <rect class="a02-box" x="4" y="60" width="230" height="200" rx="10"/>
+        <text class="a02-t" x="28" y="102">Canales</text>
+        <text class="a02-b" x="28" y="136">teléfono, voz web y chat —</text>
+        <text class="a02-b" x="28" y="158">el cliente usa el canal</text>
+        <text class="a02-b" x="28" y="180">que prefiera</text>
+        <text class="a02-m" x="28" y="238">PSTN · WebRTC · texto</text>
+
+        <!-- flecha 1 -->
+        <line x1="238" y1="150" x2="320" y2="150" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="243" y="138">audio / texto</text>
+
+        <!-- CONVERSACIÓN -->
+        <rect class="a02-box" x="326" y="60" width="330" height="200" rx="10"/>
+        <text class="a02-t" x="348" y="102">Conversación en tiempo real</text>
+        <text class="a02-b" x="348" y="136">convierte voz en texto, genera la</text>
+        <text class="a02-b" x="348" y="158">respuesta con el modelo de IA y</text>
+        <text class="a02-b" x="348" y="180">la devuelve como voz</text>
+        <text class="a02-m" x="348" y="216">un proceso aislado por llamada</text>
+        <text class="a02-m" x="348" y="238">STT · LLM · TTS — proveedores intercambiables</text>
+
+        <!-- flechas 2 (ida y vuelta) -->
+        <line x1="660" y1="128" x2="782" y2="128" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="662" y="116">solicita autorización</text>
+        <line x1="782" y1="188" x2="660" y2="188" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="662" y="214">autoriza y responde</text>
+
+        <!-- CONTROL DE NEGOCIO -->
+        <rect class="a02-hot" x="790" y="60" width="330" height="200" rx="10"/>
+        <text class="a02-t" x="812" y="102">Control de negocio</text>
+        <text class="a02-b" x="812" y="136">valida cada acción, exige confirmación</text>
+        <text class="a02-b" x="812" y="158">explícita antes de operaciones definitivas</text>
+        <text class="a02-b" x="812" y="180">y registra cada paso de la llamada</text>
+        <text class="a02-m" x="812" y="216">contratos de tools · confirmación en dos fases</text>
+        <text class="a02-m" x="812" y="238">historial de auditoría inmutable</text>
+
+        <!-- flecha 3 -->
+        <line x1="1124" y1="150" x2="1204" y2="150" style="stroke:var(--accent);stroke-width:2" marker-end="url(#f02)"/>
+        <text class="a02-arr" x="1130" y="138">opera</text>
+
+        <!-- SISTEMAS DEL CLIENTE -->
+        <rect class="a02-box" x="1210" y="60" width="206" height="200" rx="10"/>
+        <text class="a02-t" x="1232" y="102">Sistemas</text>
+        <text class="a02-t" x="1232" y="126">del cliente</text>
+        <text class="a02-b" x="1232" y="160">agenda, pedidos,</text>
+        <text class="a02-b" x="1232" y="182">ticketing</text>
+        <text class="a02-m" x="1232" y="238">adapters por cliente</text>
+
+        <!-- CONSOLA -->
+        <line x1="491" y1="260" x2="491" y2="336" style="stroke:var(--rule);stroke-width:1.5;stroke-dasharray:5 5"/>
+        <line x1="955" y1="260" x2="955" y2="336" style="stroke:var(--rule);stroke-width:1.5;stroke-dasharray:5 5"/>
+        <rect class="a02-box" x="326" y="340" width="792" height="106" rx="10"/>
+        <text class="a02-t" x="350" y="380">Consola de operación</text>
+        <text class="a02-b" x="350" y="412">supervisión en tiempo real — escuchar, intervenir, transferir a un agente humano —</text>
+        <text class="a02-b" x="350" y="434">y auditoría posterior: transcripción, grabación, resultado, coste y calidad de cada llamada</text>
+      </svg>
+    </figure>
+
+    <div data-anim="3" style="border:1px solid var(--rule);border-radius:8px;padding:12px 20px;margin-top:4px;background:var(--card)">
+      <span style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)">La pata telefónica, propia</span>
+      <span style="font:400 13.5px/1.5 var(--sans);color:var(--ink-2);margin-left:12px">
+        número público → operador (troncal SIP) → puente SIP y servidor de medios <strong>propios,
+        autoalojados</strong> → el número marcado decide qué negocio atiende (una fila de configuración,
+        no un despliegue) → y la transferencia a un humano es una operación SIP estándar.
+        La señalización solo se acepta desde las IP publicadas del operador.
+      </span>
+    </div>
+
+    <p class="proof" data-anim="4">
+      En operación: dos negocios sobre un único despliegue — telefonía, voz web y chat —
+      verificable en https://lk.bernardocastro.dev
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">02 / 15</span></footer>
+</section>
+
+<section data-idx="2" class="slide" data-title="Evaluación continua" data-entregable="9">
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">03 <span class="sep">·</span> Evaluación continua — DeepEval</div>
+      <h2 class="head" style="max-width:52ch">La calidad no se promete: se mide en cada cambio, cada noche y cada llamada</h2>
+      <p class="lede" style="max-width:100ch">
+        Un agente de IA se degrada en silencio: un cambio de prompt, de proveedor o de modelo
+        rompe una regla sin que nadie lo note. La respuesta: <strong>cuatro niveles de evaluación
+        automática</strong> — del laboratorio a la llamada real.
+      </p>
+    </div>
+
+    <div class="grid-7-5 fill" data-anim="2">
+      <div class="rows" style="--row-pad: 17px">
+        <div class="row">
+          <span class="idx">01</span>
+          <span class="txt">En cada cambio de código
+            <span class="why">Decenas de conversaciones de prueba juzgan al agente antes de desplegar.
+            Las reglas de negocio no son opiniones: «nunca reservar sin un sí explícito» se
+            verifica con código y da 1 o 0.</span>
+          </span>
+        </div>
+        <div class="row">
+          <span class="idx">02</span>
+          <span class="txt">Cada noche, con voz real
+            <span class="why">Un cliente sintético llama de verdad a la plataforma desplegada — habla,
+            interrumpe, mezcla idiomas — con presupuesto acotado. Un resultado en rojo detiene la
+            noche en rojo, nunca en un falso verde.</span>
+          </span>
+        </div>
+        <div class="row">
+          <span class="idx">03</span>
+          <span class="txt">Cualquier llamada real, bajo demanda
+            <span class="why">El historial de una llamada almacenada se reevalúa con las mismas
+            métricas — el replay no necesita el audio, le basta la evidencia.</span>
+          </span>
+        </div>
+        <div class="row">
+          <span class="idx">04</span>
+          <span class="txt">Cada llamada, automáticamente al terminar
+            <span class="why">Cuatro verificaciones de código (consentimiento, trato, privacidad,
+            errores) más un juez de IA. Coste medido: entre 0,0014 y 0,0018 € por llamada; la nota aparece
+            en la consola junto a la grabación.</span>
+          </span>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card">
+          <span class="label">El examen es un dataset versionado</span>
+          <span class="value">Goldens por proyecto, junto al código del negocio</span>
+          <span class="desc">Cada proyecto lleva su <strong>dataset de goldens</strong> — casos
+          reales convertidos en escenarios con resultado esperado — versionado en git, creciendo
+          con cada hito y ejecutado por <strong>DeepEval</strong> en cada integración: la regla
+          que rompió una llamada ayer es un caso del examen hoy. Y el mismo dataset examina a
+          <strong>Claude y a GPT lado a lado</strong> — las políticas duras puntúan 100% en ambos;
+          cambiar de proveedor es una decisión con datos, no una migración a ciegas.</span>
+        </div>
+        <div class="card">
+          <span class="label">Qué se mide</span>
+          <span class="desc" style="display:flex;flex-direction:column;gap:5px;font-size:13.5px">
+            <span><strong>Consentimiento</strong> — nunca operar sin un «sí» explícito (verdicto 1/0)</span>
+            <span><strong>Veracidad</strong> — todo dato tiene fuente; nada inventado</span>
+            <span><strong>Trato</strong> — usted y tono profesional, siempre</span>
+            <span><strong>Privacidad</strong> — ninguna fuga de datos entre clientes</span>
+            <span><strong>Herramientas</strong> — la correcta, con los argumentos que dijo el cliente</span>
+            <span><strong>Latencia y coste</strong> — por turno, en segundos y céntimos</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+        <p class="proof" data-anim="3">
+      Las evaluaciones se ven y se ejecutan desde la consola (sección Evals), con la
+      comparación entre corridas — https://lk.bernardocastro.dev
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">03 / 15</span></footer>
+</section>
+
+<section data-idx="3" class="slide" data-title="Ejecución de una conversación" data-entregable="3">
+  <style>
+    .e04-h   { font: 600 16px var(--sans); fill: var(--ink); }
+    .e04-l   { font: 400 14px var(--sans); fill: var(--ink-2); }
+    .e04-n   { font: 600 11px var(--mono); fill: var(--paper); }
+    .e04-m   { font: 400 11.5px var(--mono); fill: var(--muted); }
+    .e04-box { fill: var(--paper); stroke: var(--rule); stroke-width: 1.5; }
+    .e04-hot { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+    .e04-life{ stroke: var(--rule); stroke-width: 1.5; stroke-dasharray: 4 5; }
+    .e04-arr { stroke: var(--ink-2); stroke-width: 1.6; }
+    .e04-chip{ fill: var(--accent); }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">04 <span class="sep">·</span> Modelo de ejecución de una conversación</div>
+      <h2 class="head" style="max-width:52ch">Una llamada real, paso a paso: leer es libre, operar exige un sí</h2>
+      <p class="lede" style="max-width:100ch">
+        Cada llamada vive en un proceso aislado que muere con ella. El historial se escribe
+        <strong>mientras la llamada ocurre</strong>, paso a paso — si el proceso cae a mitad,
+        la evidencia ya está guardada.
+      </p>
+    </div>
+
+    <figure class="fig" data-anim="2">
+      <svg viewBox="0 0 1420 520" role="img" aria-label="Diagrama de secuencia de una llamada: el cliente pide mover su cita, la IA consulta, el cliente confirma, el control de negocio autoriza y ejecuta, y todo queda en el historial.">
+        <defs>
+          <marker id="e04a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" style="fill:var(--ink-2)"/>
+          </marker>
+        </defs>
+
+        <!-- cabeceras -->
+        <rect class="e04-box" x="40" y="4" width="200" height="44" rx="8"/>
+        <text class="e04-h" x="140" y="31" text-anchor="middle">Cliente</text>
+        <rect class="e04-box" x="440" y="4" width="200" height="44" rx="8"/>
+        <text class="e04-h" x="540" y="31" text-anchor="middle">Agente de IA</text>
+        <rect class="e04-hot" x="840" y="4" width="220" height="44" rx="8"/>
+        <text class="e04-h" x="950" y="31" text-anchor="middle">Control de negocio</text>
+
+        <!-- líneas de vida -->
+        <line class="e04-life" x1="140" y1="48" x2="140" y2="470"/>
+        <line class="e04-life" x1="540" y1="48" x2="540" y2="470"/>
+        <line class="e04-life" x1="950" y1="48" x2="950" y2="470"/>
+
+        <!-- historial -->
+        <rect class="e04-box" x="1120" y="4" width="296" height="466" rx="10"/>
+        <text class="e04-h" x="1144" y="34">Historial de la llamada</text>
+        <text class="e04-m" x="1144" y="56">inmutable · numerado · en tiempo real</text>
+        <text class="e04-m" x="1144" y="102">07 · el cliente pidió el cambio</text>
+        <text class="e04-m" x="1144" y="138">12 · se consultó la agenda</text>
+        <text class="e04-m" x="1144" y="174">15 · se ofreció jueves 10:00</text>
+        <text class="e04-m" x="1144" y="210">21 · el cliente dijo «sí, confirmo»</text>
+        <text class="e04-m" x="1144" y="246">22 · autorización emitida</text>
+        <text class="e04-m" x="1144" y="282">23 · cambio ejecutado en la agenda</text>
+        <text class="e04-m" x="1144" y="318">24 · SMS de confirmación enviado</text>
+        <text class="e04-m" x="1144" y="354">…</text>
+        <text class="e04-m" x="1144" y="390">al colgar: grabación disponible</text>
+        <text class="e04-m" x="1144" y="412">y nota de calidad automática</text>
+
+        <!-- 1 -->
+        <line class="e04-arr" x1="146" y1="110" x2="532" y2="110" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="93" r="10"/><text class="e04-n" x="160" y="97" text-anchor="middle">1</text>
+        <text class="e04-l" x="180" y="98">«quiero mover mi cita al jueves»</text>
+
+        <!-- 2 -->
+        <line class="e04-arr" x1="546" y1="165" x2="942" y2="165" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="148" r="10"/><text class="e04-n" x="560" y="152" text-anchor="middle">2</text>
+        <text class="e04-l" x="580" y="153">consulta la disponibilidad — leer no requiere permiso</text>
+
+        <!-- 3 -->
+        <line class="e04-arr" x1="942" y1="215" x2="548" y2="215" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="198" r="10"/><text class="e04-n" x="560" y="202" text-anchor="middle">3</text>
+        <text class="e04-l" x="580" y="203">huecos reales del jueves</text>
+
+        <!-- 4 -->
+        <line class="e04-arr" x1="532" y1="265" x2="148" y2="265" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="248" r="10"/><text class="e04-n" x="160" y="252" text-anchor="middle">4</text>
+        <text class="e04-l" x="180" y="253">«puedo ofrecerle el jueves a las 10:00 — ¿se la cambio?»</text>
+
+        <!-- 5 -->
+        <line class="e04-arr" x1="146" y1="315" x2="532" y2="315" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="298" r="10"/><text class="e04-n" x="160" y="302" text-anchor="middle">5</text>
+        <text class="e04-l" x="180" y="303">«sí, confirmo»</text>
+
+        <!-- 6 -->
+        <line class="e04-arr" x1="546" y1="365" x2="942" y2="365" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="560" cy="348" r="10"/><text class="e04-n" x="560" y="352" text-anchor="middle">6</text>
+        <text class="e04-l" x="580" y="353">solicita ejecutar el cambio</text>
+
+        <!-- 7: el control trabaja -->
+        <rect class="e04-hot" x="830" y="390" width="240" height="52" rx="8"/>
+        <circle class="e04-chip" cx="846" cy="382" r="10"/><text class="e04-n" x="846" y="386" text-anchor="middle">7</text>
+        <text class="e04-l" x="850" y="411">verifica el «sí» · autoriza con un</text>
+        <text class="e04-l" x="850" y="431">vale de un solo uso · ejecuta</text>
+
+        <!-- 8 -->
+        <line class="e04-arr" x1="532" y1="465" x2="148" y2="465" marker-end="url(#e04a)"/>
+        <circle class="e04-chip" cx="160" cy="448" r="10"/><text class="e04-n" x="160" y="452" text-anchor="middle">8</text>
+        <text class="e04-l" x="180" y="453">«hecho — le llega un SMS con la nueva hora»</text>
+      </svg>
+    </figure>
+
+    <p class="proof" data-anim="3">
+      La secuencia completa, con sus números de orden y tiempos, es consultable por llamada
+      en la consola (sección Sessions) — https://lk.bernardocastro.dev
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">04 / 15</span></footer>
+</section>
+
+<section data-idx="4" class="slide" data-title="Dominios" data-entregable="2">
+  <style>
+    .d05-dom { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px 22px; }
+    .d05-dom .d { border: 1px solid var(--line); background: var(--card); padding: 15px 18px; }
+    .d05-dom h3 { font: 600 15.5px var(--sans); color: var(--ink); margin: 0 0 5px; }
+    .d05-dom p  { font: 400 13.5px/1.45 var(--sans); color: var(--ink-2); margin: 0; }
+    .d05-pipe   { border: 1.5px solid var(--accent); background: var(--accent-soft);
+                  border-radius: 10px; padding: 18px 24px 16px; margin-top: 24px; }
+    .d05-pipe .t { font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                   color: var(--accent); margin: 0 0 12px; }
+    .d05-steps  { display: flex; align-items: stretch; gap: 0; }
+    .d05-steps .s { flex: 1; text-align: center; padding: 0 6px; }
+    .d05-steps .n { font: 600 15px var(--sans); color: var(--ink); }
+    .d05-steps .w { font: 400 12.5px/1.3 var(--sans); color: var(--ink-2); display: block; margin-top: 3px; }
+    .d05-steps .ms { font: 500 13px var(--mono); color: var(--accent); display: block; margin-top: 7px; }
+    .d05-steps .gt { align-self: center; font: 400 20px var(--sans); color: var(--muted); padding: 0 2px; }
+    .d05-note { font: 400 13px/1.4 var(--sans); color: var(--muted); margin: 12px 0 0; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">05 <span class="sep">·</span> Principales dominios — y la anatomía de un turno</div>
+      <h2 class="head" style="max-width:52ch">Seis dominios con fronteras estrictas; dentro de la conversación, un pipeline medido</h2>
+      <p class="lede" style="max-width:100ch">
+        Cada dominio posee una cosa y se niega al resto. La frontera más importante es la
+        primera: <strong>la conversación no conoce negocios y el control de negocio no conoce
+        audio</strong> — se hablan por un contrato, no por dependencias compartidas.
+      </p>
+    </div>
+
+    <div class="d05-dom" data-anim="2">
+      <div class="d"><h3>Conversación</h3>
+        <p>Tiempo real: audio, turnos, el modelo de IA. Un proceso aislado por llamada.</p></div>
+      <div class="d"><h3>Control de negocio</h3>
+        <p>Contratos de tools, autorización en dos fases, ejecución contra los sistemas del cliente.</p></div>
+      <div class="d"><h3>Evidencia</h3>
+        <p>Historial numerado, grabación, coste y nota de calidad. Solo se añade; nunca se edita.</p></div>
+      <div class="d"><h3>Tenancy</h3>
+        <p>Verticales (el código del rubro: clínica, retail) y negocios (su configuración: voz,
+        número, datos). Un negocio roto queda fuera de ruta — la flota sigue.</p></div>
+      <div class="d"><h3>Evaluación</h3>
+        <p>Los cuatro niveles de la lámina 3. Juzga con las mismas métricas en todos, sin tocar producción.</p></div>
+      <div class="d"><h3>Operación</h3>
+        <p>La consola: supervisar en vivo, configurar sin desplegar, auditar cada llamada.</p></div>
+    </div>
+
+    <div class="d05-pipe" data-anim="3">
+      <p class="t">Anatomía de un turno — medianas de 125 turnos reales de producción</p>
+      <div class="d05-steps">
+        <div class="s"><span class="n">El cliente habla</span><span class="w">audio en vivo</span><span class="ms">&nbsp;</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">Voz a texto</span><span class="w">transcripción en streaming</span><span class="ms">0,35 s</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">¿Terminó de hablar?</span><span class="w">detección semántica de fin de turno</span><span class="ms">0,46 s</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">El modelo responde</span><span class="w">primera palabra generada</span><span class="ms">0,88 s</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">Texto a voz</span><span class="w">primera sílaba sintetizada</span><span class="ms">0,11 s</span></div>
+        <span class="gt">→</span>
+        <div class="s"><span class="n">El cliente oye</span><span class="w">respuesta completa</span><span class="ms">2,25 s extremo a extremo</span></div>
+      </div>
+      <p class="d05-note">Cada eslabón es un proveedor intercambiable (voz a texto, modelo, texto a voz) y cada
+      turno deja sus tiempos en el historial — la latencia se gobierna con datos, no con impresiones.</p>
+    </div>
+
+    <p class="proof" data-anim="4">
+      La frontera conversación / negocio está garantizada por prueba automática: el núcleo no
+      puede importar código de ningún cliente, y el intento rompe la build.
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">05 / 15</span></footer>
+</section>
+
+<section data-idx="5" class="slide" data-title="Una llamada real" data-entregable="9">
+  <style>
+    .l06-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0;
+                 border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+    .l06-strip .c { padding: 14px 18px; border-right: 1px solid var(--line); background: var(--card); }
+    .l06-strip .c:last-child { border-right: none; }
+    .l06-strip .k { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                    color: var(--muted); display: block; margin-bottom: 5px; }
+    .l06-strip .v { font: 600 18px var(--sans); color: var(--ink); }
+    .l06-strip .v.acc { color: var(--accent); }
+    .l06-stages { font: 400 14.5px var(--sans); color: var(--ink-2); margin: 14px 2px 0; }
+    .l06-stages strong { color: var(--ink); font-weight: 600; }
+    .l06-play { display: flex; align-items: center; gap: 16px; border: 1px solid var(--rule);
+                border-radius: 999px; padding: 14px 24px; background: var(--card); margin-top: 26px; }
+    .l06-play .btn { width: 34px; height: 34px; border-radius: 50%; background: var(--accent);
+                     display: flex; align-items: center; justify-content: center; flex: none; }
+    .l06-play .tri { width: 0; height: 0; border-style: solid; border-width: 7px 0 7px 11px;
+                     border-color: transparent transparent transparent var(--paper); margin-left: 3px; }
+    .l06-play .t  { font: 500 13px var(--mono); color: var(--ink-2); flex: none; }
+    .l06-play .bar { flex: 1; height: 4px; border-radius: 2px; background: var(--rule); position: relative; }
+    .l06-play .bar::before { content: ""; position: absolute; inset: 0 78% 0 0; border-radius: 2px; background: var(--accent); }
+    .l06-cap { font: 400 13.5px/1.5 var(--sans); color: var(--muted); margin: 10px 2px 0; }
+    .l06-lat { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-top: 26px; }
+    .l06-lat .c { border: 1px solid var(--line); background: var(--card); padding: 16px 18px; }
+    .l06-lat .n { font: 400 13.5px var(--sans); color: var(--ink-2); display: block; margin-bottom: 6px; }
+    .l06-lat .big { font: 600 27px var(--sans); color: var(--ink); letter-spacing: -.02em; }
+    .l06-lat .mx { font: 400 11.5px var(--mono); color: var(--muted); display: block; margin-top: 5px; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">06 <span class="sep">·</span> Auditoría y trazabilidad — una llamada real, I</div>
+      <h2 class="head" style="max-width:54ch">Lo que queda de una llamada: la sesión completa, en la consola</h2>
+    </div>
+
+    <div data-anim="2">
+      <div class="l06-strip">
+        <div class="c"><span class="k">Canal</span><span class="v">teléfono</span></div>
+        <div class="c"><span class="k">Inicio</span><span class="v">08:24 PM</span></div>
+        <div class="c"><span class="k">Duración</span><span class="v">2m 23s</span></div>
+        <div class="c"><span class="k">Turnos</span><span class="v">19</span></div>
+        <div class="c"><span class="k">Eventos</span><span class="v">109</span></div>
+        <div class="c"><span class="k">Coste total</span><span class="v acc">0,0162 €</span></div>
+        <div class="c"><span class="k">Nota automática</span><span class="v acc">0,98</span></div>
+      </div>
+      <p class="l06-stages">Etapas recorridas: <strong>Identificación → Reserva nueva → Despedida</strong>
+      · resultado: el cliente colgó al terminar</p>
+    </div>
+
+    <div data-anim="3">
+      <div class="l06-play">
+        <span class="btn"><span class="tri"></span></span>
+        <span class="t">0:00</span>
+        <span class="bar"></span>
+        <span class="t">2:23</span>
+      </div>
+      <p class="l06-cap">Grabación estéreo — el cliente en un canal, el agente en el otro, sobre una misma
+      línea de tiempo. El archivo nunca sale del servidor salvo por esta ruta autenticada: no está en
+      un directorio público ni en el repositorio.</p>
+    </div>
+
+    <div class="l06-lat" data-anim="4">
+      <div class="c"><span class="n">Primera palabra del modelo</span><span class="big">0,83 s</span><span class="mx">máx 1,83 s · 8 turnos</span></div>
+      <div class="c"><span class="n">Extremo a extremo</span><span class="big">2,19 s</span><span class="mx">máx 2,52 s · 6 turnos</span></div>
+      <div class="c"><span class="n">Fin de turno detectado</span><span class="big">0,35 s</span><span class="mx">máx 2,50 s · 9 turnos</span></div>
+      <div class="c"><span class="n">Transcripción</span><span class="big">0,29 s</span><span class="mx">máx 0,49 s · 9 turnos</span></div>
+      <div class="c"><span class="n">Primera sílaba de voz</span><span class="big">0,12 s</span><span class="mx">máx 0,28 s · 10 turnos</span></div>
+    </div>
+
+    <p class="proof" data-anim="5">
+      Esta llamada, completa y en vivo:
+      https://lk.bernardocastro.dev/t/clinica-norte/reagendamiento/sessions/AJ_yiCGykqgxwMu
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">06 / 15</span></footer>
+</section>
+
+<section data-idx="6" class="slide" data-title="La nota y el historial" data-entregable="9">
+  <style>
+    .n07-score { display: flex; flex-direction: column; }
+    .n07-score .r { display: grid; grid-template-columns: 22px 128px 1fr; gap: 12px;
+                    padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+    .n07-score .r:last-child { border-bottom: none; }
+    .n07-score .ok { color: var(--accent); font: 600 14px var(--sans); }
+    .n07-score .nm { font: 600 14px var(--sans); color: var(--ink); }
+    .n07-score .nm .how { display: block; font: 500 9.5px var(--mono); letter-spacing: .06em;
+                          text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+    .n07-score .tx { font: 400 13.5px/1.45 var(--sans); color: var(--ink-2); }
+    .n07-judge { border: 1px solid var(--rule); border-radius: 8px; background: var(--card);
+                 padding: 14px 18px; margin-top: 14px; }
+    .n07-judge p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+    .n07-judge .who { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                      color: var(--accent); display: block; margin-bottom: 6px; }
+    .n07-log { border: 1px solid var(--rule); border-radius: 10px; background: var(--card);
+               padding: 16px 20px; }
+    .n07-log .t { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                  color: var(--muted); margin: 0 0 10px; }
+    .n07-log .e { display: grid; grid-template-columns: 34px 118px 1fr; gap: 10px;
+                  padding: 6.5px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+    .n07-log .e:last-child { border-bottom: none; }
+    .n07-log .sq { font: 400 11px var(--mono); color: var(--muted); }
+    .n07-log .k  { font: 500 11px var(--mono); color: var(--accent); }
+    .n07-log .p  { font: 400 12.5px/1.35 var(--sans); color: var(--ink-2); }
+    .n07-log .p em { font-style: normal; color: var(--muted); font-family: var(--mono); font-size: 10.5px; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">07 <span class="sep">·</span> Auditoría y trazabilidad — una llamada real, II</div>
+      <h2 class="head" style="max-width:54ch">La misma llamada, por dentro: cómo se ganó su 0,98 — y el historial que lo prueba</h2>
+    </div>
+
+    <div class="grid-5-7 fill" data-anim="2">
+      <div>
+        <div class="n07-score">
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Consentimiento<span class="how">verificado por código</span></span>
+            <span class="tx">toda operación irreversible tuvo su confirmación concedida antes: crear_cita</span></div>
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Trato<span class="how">verificado por código</span></span>
+            <span class="tx">ninguna forma no permitida en 10 turnos del agente — usted, siempre</span></div>
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Privacidad<span class="how">verificado por código</span></span>
+            <span class="tx">ningún dato de otro negocio mencionado en toda la llamada</span></div>
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Errores<span class="how">verificado por código</span></span>
+            <span class="tx">ningún error de proveedor durante la conversación</span></div>
+          <div class="r"><span class="ok">✓</span>
+            <span class="nm">Calidad · 0,90<span class="how">juez de IA</span></span>
+            <span class="tx">coste del juicio: 0,0018 € — bajo un tope de 0,01 € comprobado antes de llamar</span></div>
+        </div>
+        <div class="n07-judge">
+          <span class="who">El juez, en su propia explicación</span>
+          <p>«La paciente llamó para pedir una cita nueva de fisioterapia. Recepción la agendó
+          para el martes 1 de septiembre a las 09:00 con Eva Durán, la confirmó con la paciente
+          y le informó de que recibiría un SMS. La petición quedó totalmente resuelta.»</p>
+        </div>
+      </div>
+
+      <div class="n07-log">
+        <p class="t">El historial, tal cual — 12 de los 109 eventos</p>
+        <div class="e"><span class="sq">1</span><span class="k">inicio de sesión</span><span class="p">proyecto clínica · canal teléfono · voz Carolina Ruiz</span></div>
+        <div class="e"><span class="sq">2</span><span class="k">etapa</span><span class="p">Identificación</span></div>
+        <div class="e"><span class="sq">4</span><span class="k">grabación</span><span class="p">comienza a escribirse — sobrevive aunque el proceso muera</span></div>
+        <div class="e"><span class="sq">8</span><span class="k">turno · agente</span><span class="p">«Clínica Norte, buenos días, le atiende recepción. ¿En qué puedo ayudarle?» <em>voz en 0,12 s</em></span></div>
+        <div class="e"><span class="sq">11</span><span class="k">turno · cliente</span><span class="p">«Hola.» <em>transcrito en 0,24 s</em></span></div>
+        <div class="e"><span class="sq">27</span><span class="k">turno · cliente</span><span class="p">«Sí, mi nombre completo es Bernardo Castro.»</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">etapa</span><span class="p">Reserva nueva — la agenda se consulta antes de ofrecer</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">turno · cliente</span><span class="p">«Sí, confirmo.»</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">autorización</span><span class="p">vale de un solo uso emitido para crear_cita</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">operación</span><span class="p">cita creada: martes 1/9, 09:00, Eva Durán</span></div>
+        <div class="e"><span class="sq">…</span><span class="k">operación</span><span class="p">SMS de confirmación enviado <em>con los datos personales enmascarados en el registro</em></span></div>
+        <div class="e"><span class="sq">109</span><span class="k">nota</span><span class="p">0,98 — escrita en el mismo historial, con el número de orden siguiente</span></div>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      Esta llamada corrió sobre gpt-5.4-mini — el modelo es un componente intercambiable, y la
+      auditoría es idéntica con cualquiera. Historial completo:
+      https://lk.bernardocastro.dev/t/clinica-norte/reagendamiento/sessions/AJ_yiCGykqgxwMu
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">07 / 15</span></footer>
+</section>
+
+<section data-idx="7" class="slide" data-title="Tools y contratos" data-entregable="4">
+  <style>
+    .t08-lad { display: flex; flex-direction: column; gap: 10px; }
+    .t08-lad .s { border: 1px solid var(--line); background: var(--card); padding: 12px 16px;
+                  display: grid; grid-template-columns: 110px 1fr; gap: 14px; align-items: baseline; }
+    .t08-lad .s.hot { border-color: var(--accent); background: var(--accent-soft); }
+    .t08-lad .lv { font: 600 14.5px var(--sans); color: var(--ink); }
+    .t08-lad .tx { font: 400 13.5px/1.45 var(--sans); color: var(--ink-2); }
+    .t08-err { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+    .t08-err h3 { font: 600 14.5px var(--sans); color: var(--ink); margin: 0 0 8px; }
+    .t08-err p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 6px; }
+    .t08-ctr { border: 1.5px solid var(--accent); border-radius: 10px; background: var(--paper); overflow: hidden; }
+    .t08-ctr .hd { background: var(--accent-soft); padding: 12px 20px; border-bottom: 1px solid var(--accent);
+                   display: flex; justify-content: space-between; align-items: baseline; }
+    .t08-ctr .hd .n { font: 600 16px var(--mono); color: var(--ink); }
+    .t08-ctr .hd .e { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+    .t08-ctr .cl { display: grid; grid-template-columns: 168px 1fr; gap: 12px; padding: 10px 20px;
+                   border-bottom: 1px solid var(--line); align-items: baseline; }
+    .t08-ctr .cl:last-child { border-bottom: none; }
+    .t08-ctr .k { font: 500 11px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+    .t08-ctr .v { font: 400 13.5px/1.45 var(--sans); color: var(--ink-2); }
+    .t08-cat { margin-top: 20px; border: 1px solid var(--rule); border-radius: 10px; padding: 14px 20px; background: var(--card); }
+    .t08-cat .t { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+    .t08-cat .row { font: 400 13px/1.7 var(--sans); color: var(--ink-2); }
+    .t08-cat .row strong { color: var(--ink); font-weight: 600; }
+    .t08-cat em { font-style: normal; font-family: var(--mono); font-size: 10.5px; color: var(--accent); }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">08 <span class="sep">·</span> Diseño de tools y contratos</div>
+      <h2 class="head" style="max-width:54ch">Cada acción de negocio es un contrato declarado, no una función suelta</h2>
+      <p class="lede" style="max-width:100ch">
+        Un <strong>tool</strong> es la única manera en que la IA toca el mundo real. Antes de
+        existir, cada uno declara su contrato: qué efecto tiene, qué se registra, cuánto puede
+        tardar y cómo se deshace. El sistema gobierna por el <strong>efecto declarado</strong>,
+        nunca por el nombre.
+      </p>
+    </div>
+
+    <div class="grid-5-7 fill" data-anim="2">
+      <div>
+        <div class="t08-lad">
+          <div class="s"><span class="lv">Leer</span><span class="tx">consultar la agenda, buscar un pedido — libre: no cambia nada</span></div>
+          <div class="s"><span class="lv">Escribir</span><span class="tx">enviar un SMS, abrir un ticket — se puede compensar si algo sale mal</span></div>
+          <div class="s hot"><span class="lv">Irreversible</span><span class="tx">crear, mover o cancelar una cita — <strong>exige la confirmación explícita del cliente</strong>, con un vale de un solo uso</span></div>
+        </div>
+        <div class="t08-err">
+          <h3>El error tiene dos audiencias</h3>
+          <p><strong>Fallo de negocio</strong> — «esa hora acaba de ocuparse» — llega al agente,
+          que lo explica al cliente y ofrece alternativa.</p>
+          <p><strong>Fallo técnico</strong> — una excepción, un timeout — jamás llega a la
+          conversación: se registra, y el agente sigue con lo que sí puede hacer.</p>
+        </div>
+      </div>
+
+      <div>
+        <div class="t08-ctr">
+          <div class="hd"><span class="n">crear_cita</span><span class="e">efecto: irreversible</span></div>
+          <div class="cl"><span class="k">Confirmación</span><span class="v">solo se ejecuta con un vale emitido tras el «sí» del cliente — el vale sirve para esta operación exacta y caduca en 120 s</span></div>
+          <div class="cl"><span class="k">Privacidad</span><span class="v">nombre y teléfono se enmascaran en el registro — incluso dentro del texto de un SMS</span></div>
+          <div class="cl"><span class="k">Tiempo máximo</span><span class="v">5 s — si el sistema del cliente no responde, el agente lo dice y la llamada continúa</span></div>
+          <div class="cl"><span class="k">Resumen auditable</span><span class="v">la línea que queda en el historial, ya filtrada: «cita ap-…-0900 creada, martes 1/9 09:00»</span></div>
+          <div class="cl"><span class="k">Compensación</span><span class="v">declara qué la deshace (cancelar_cita) — la base de una transacción de varios pasos</span></div>
+          <div class="cl"><span class="k">Idempotencia</span><span class="v">repetir la misma orden no duplica la cita</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="t08-cat" data-anim="3">
+      <p class="t">El catálogo de hoy, por negocio — el efecto gobierna cada uno</p>
+      <p class="row"><strong>Clínica:</strong> buscar paciente <em>leer</em> · disponibilidad <em>leer</em> ·
+      proponer cita <em>leer</em> · crear cita <em>irreversible</em> · mover cita <em>irreversible</em> ·
+      enviar SMS <em>escribir</em> &nbsp;&nbsp; <strong>Tienda:</strong> buscar pedido <em>leer</em> ·
+      pedir cancelación <em>leer</em> · cancelar pedido <em>irreversible</em> · abrir ticket <em>escribir</em> ·
+      estado del ticket <em>leer</em></p>
+    </div>
+
+    <p class="proof" data-anim="4">
+      El rechazo es código en producción: una orden irreversible sin su vale no se ejecuta —
+      verificado por test, y visible como evento en el historial de cualquier llamada que lo intente.
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">08 / 15</span></footer>
+</section>
+
+<section data-idx="8" class="slide" data-title="Handoff a agente humano" data-entregable="8">
+  <style>
+    .s09-caps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+    .s09-caps .c { border: 1px solid var(--line); background: var(--card); padding: 18px 20px; }
+    .s09-caps .c.hot { border-color: var(--accent); background: var(--accent-soft); }
+    .s09-caps h3 { font: 600 17px var(--sans); color: var(--ink); margin: 0 0 8px; }
+    .s09-caps p  { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+    .s09-caps .tag { font: 500 10px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+                     color: var(--accent); display: block; margin-bottom: 8px; }
+    .s09-auth { margin-top: 24px; border: 1.5px solid var(--accent); border-radius: 10px;
+                background: var(--paper); padding: 18px 24px; }
+    .s09-auth .t { font: 500 11px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                   color: var(--accent); margin: 0 0 10px; }
+    .s09-auth .flow { display: flex; align-items: center; gap: 14px; flex-wrap: nowrap; }
+    .s09-auth .st { font: 400 14px/1.4 var(--sans); color: var(--ink-2); }
+    .s09-auth .st strong { color: var(--ink); font-weight: 600; }
+    .s09-auth .gt { font: 400 18px var(--sans); color: var(--muted); flex: none; }
+    .s09-note { font: 400 13.5px/1.5 var(--sans); color: var(--muted); margin: 12px 0 0; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">09 <span class="sep">·</span> Handoff a agente humano — supervisión</div>
+      <h2 class="head" style="max-width:54ch">Un humano siempre puede entrar — y su autoridad viaja firmada</h2>
+      <p class="lede" style="max-width:100ch">
+        La IA atiende sola, pero la operación nunca pierde el control. Un supervisor dispone de
+        cuatro capacidades sobre cualquier llamada en curso — y cada una es un
+        <strong>permiso firmado que caduca en 15 minutos</strong>, no un botón que cualquiera aprieta.
+      </p>
+    </div>
+
+    <div class="s09-caps" data-anim="2">
+      <div class="c">
+        <span class="tag">invisible para el cliente</span>
+        <h3>Escuchar</h3>
+        <p>Oye y lee la llamada en vivo. No puede hablar ni publicar nada: su permiso
+        físicamente no lo permite.</p>
+      </div>
+      <div class="c">
+        <span class="tag">solo el agente la recibe</span>
+        <h3>Susurrar</h3>
+        <p>Una instrucción escrita — «ofrézcale el jueves» — que el agente obedece en su
+        siguiente frase. El cliente jamás la oye ni la ve.</p>
+      </div>
+      <div class="c hot">
+        <span class="tag">la ia calla al instante</span>
+        <h3>Tomar la línea</h3>
+        <p>Habla el humano; la IA escucha en silencio. Al devolver la línea, el agente
+        retoma sabiendo lo que se dijo en su ausencia.</p>
+      </div>
+      <div class="c">
+        <span class="tag">a un teléfono humano</span>
+        <h3>Transferir</h3>
+        <p>La llamada sale hacia el número configurado. Si el destino no contesta, el
+        cliente no se pierde: sigue con el agente, que se lo explica.</p>
+      </div>
+    </div>
+
+    <div class="s09-auth" data-anim="3">
+      <p class="t">Cómo viaja la autoridad</p>
+      <div class="flow">
+        <span class="st"><strong>Capacidad solicitada</strong><br>escuchar, susurrar, tomar o transferir</span>
+        <span class="gt">→</span>
+        <span class="st"><strong>Permiso firmado</strong><br>con los poderes exactos de esa capacidad y caducidad de 15 minutos</span>
+        <span class="gt">→</span>
+        <span class="st"><strong>Una sola puerta</strong><br>la identidad la certifica el servidor de medios — nada escrito en un mensaje puede fingirse supervisor</span>
+        <span class="gt">→</span>
+        <span class="st"><strong>Todo al historial</strong><br>cada intervención queda numerada en el registro de la llamada</span>
+      </div>
+      <p class="s09-note">Verificado contra el servidor real: un oyente oculto es invisible incluso para el
+      agente — por eso el ingreso lo certifica y registra el servidor, no la sala.</p>
+    </div>
+
+    <p class="proof" data-anim="4">
+      Operativo en producción: consola → Supervisor — las llamadas en curso, con los cuatro
+      verbos sobre cada una. https://lk.bernardocastro.dev/supervisor
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">09 / 15</span></footer>
+</section>
+
+<section data-idx="9" class="slide" data-title="Orquestación y estado" data-entregable="5">
+  <style>
+    .o10-steps { display: flex; flex-direction: column; }
+    .o10-steps .r { display: grid; grid-template-columns: 30px 1fr; gap: 16px;
+                    padding: 13px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+    .o10-steps .r:last-child { border-bottom: none; }
+    .o10-steps .n { font: 600 13px var(--mono); color: var(--accent); }
+    .o10-steps .tx { font: 400 14.5px/1.5 var(--sans); color: var(--ink-2); }
+    .o10-steps .tx strong { color: var(--ink); font-weight: 600; }
+    .o10-neg { margin-top: 14px; border: 1px solid var(--rule); border-radius: 8px;
+               background: var(--card); padding: 12px 18px; }
+    .o10-neg p { font: 400 13px/1.55 var(--sans); color: var(--ink-2); margin: 0; }
+    .o10-neg .t { font: 500 10.5px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+                  color: var(--accent); display: block; margin-bottom: 6px; }
+    .o10-st { display: flex; flex-direction: column; gap: 16px; }
+    .o10-st .b { border: 1px solid var(--line); background: var(--card); padding: 15px 20px; }
+    .o10-st .b.hot { border-color: var(--accent); background: var(--accent-soft); }
+    .o10-st h3 { font: 600 15px var(--sans); color: var(--ink); margin: 0 0 5px; }
+    .o10-st p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">10 <span class="sep">·</span> Orquestación transaccional y gestión de estado</div>
+      <h2 class="head" style="max-width:54ch">El modelo propone, la máquina dispone — y ningún fallo deja el sistema a medias</h2>
+      <p class="lede" style="max-width:100ch">
+        Una operación de negocio no es una frase afortunada del modelo: es un procedimiento con
+        pasos verificables. Y el estado que lo respalda está escrito <strong>antes</strong> de
+        que cualquier cosa pueda fallar.
+      </p>
+    </div>
+
+    <div class="grid2 fill" data-anim="2">
+      <div>
+        <div class="o10-steps">
+          <div class="r"><span class="n">01</span><span class="tx"><strong>El modelo propone.</strong>
+            Quiere crear la cita — pero primero la plataforma lee el resumen al cliente, con una
+            frase que redacta la plataforma, no el modelo: lo que se confirma es exacto.</span></div>
+          <div class="r"><span class="n">02</span><span class="tx"><strong>El cliente autoriza.</strong>
+            Su «sí» emite un vale de un solo uso, atado a esa operación exacta con esos datos
+            exactos. Caduca en 120 segundos.</span></div>
+          <div class="r"><span class="n">03</span><span class="tx"><strong>La máquina ejecuta.</strong>
+            Solo con vale válido. La autorización es un paso de código con firma — nunca una
+            interpretación del tono de la conversación.</span></div>
+          <div class="r"><span class="n">04</span><span class="tx"><strong>Varios pasos, una transacción.</strong>
+            Cada paso declara qué lo deshace; si el tercero falla, se compensan el segundo y el
+            primero. El cliente nunca queda con media operación hecha.</span></div>
+        </div>
+        <div class="o10-neg">
+          <span class="t">Las cuatro negativas del ejecutor</span>
+          <p>sin vale · vale de otra operación · vale caducado · vale ya usado — las cuatro se
+          rechazan en código y quedan como evento en el historial de la llamada.</p>
+        </div>
+      </div>
+
+      <div class="o10-st">
+        <div class="b hot">
+          <h3>El historial es la única fuente de verdad</h3>
+          <p>Numerado, solo-añadir, escrito durante la llamada. Todo lo demás — el tablero de
+          transacciones, la nota de calidad, el replay — se calcula leyéndolo, nunca se guarda
+          por segunda vez.</p>
+        </div>
+        <div class="b">
+          <h3>Un corte a mitad pierde la llamada, jamás la evidencia</h3>
+          <p>Si el proceso muere — un fallo, un reinicio, un corte — lo ya escrito está escrito:
+          qué se preguntó, qué se autorizó y qué se ejecutó hasta ese instante.</p>
+        </div>
+        <div class="b">
+          <h3>La sesión se re-engancha, no se congela</h3>
+          <p>Si el cliente vuelve a llamar en minutos, el agente retoma el contexto de la
+          conversación anterior. Diseñado sobre el mismo historial; el re-enganche automático
+          es la siguiente fase del roadmap.</p>
+        </div>
+        <div class="b">
+          <h3>La configuración es estado vivo</h3>
+          <p>Un cambio desde la consola — voz, modelo, saludo, número de derivación — aplica a
+          la siguiente llamada, sin desplegar ni reiniciar nada.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      La prueba de consentimiento de una llamada real, leída de su propio historial: orden 39
+      preguntó · 46 autorizó · 51 escribió (lámina 7).
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">10 / 15</span></footer>
+</section>
+
+<section data-idx="10" class="slide" data-title="Configuración multi-cliente" data-entregable="7">
+  <style>
+    .m11-layers { display: flex; flex-direction: column; gap: 0; }
+    .m11-layers .ly { border: 1.5px solid var(--rule); background: var(--card); padding: 16px 22px;
+                      display: grid; grid-template-columns: 150px 1fr; gap: 18px; }
+    .m11-layers .ly + .ly { border-top: none; }
+    .m11-layers .ly:first-child { border-radius: 10px 10px 0 0; }
+    .m11-layers .ly:last-child { border-radius: 0 0 10px 10px; }
+    .m11-layers .ly.hot { background: var(--accent-soft); border-color: var(--accent); }
+    .m11-layers .nm { font: 600 16px var(--sans); color: var(--ink); }
+    .m11-layers .nm .en { display: block; font: 500 10px var(--mono); letter-spacing: .08em;
+                          text-transform: uppercase; color: var(--accent); margin-top: 3px; }
+    .m11-layers .ds { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); }
+    .m11-layers .ds strong { color: var(--ink); font-weight: 600; }
+    .m11-layers .no { display: block; font: 400 12px var(--mono); color: var(--muted); margin-top: 6px; }
+    .m11-side { display: flex; flex-direction: column; gap: 16px; }
+    .m11-side .b { border: 1px solid var(--line); background: var(--card); padding: 15px 20px; }
+    .m11-side h3 { font: 600 15px var(--sans); color: var(--ink); margin: 0 0 5px; }
+    .m11-side p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">11 <span class="sep">·</span> Modelo de configuración por cliente / proyecto</div>
+      <h2 class="head" style="max-width:54ch">Tres capas: la plataforma, el vertical y el negocio</h2>
+      <p class="lede" style="max-width:100ch">
+        La clave de la reutilización es <strong>qué es código y qué es dato</strong>. La
+        plataforma es una para todos; el vertical es el código de un rubro, reutilizable entre
+        clientes de ese rubro; y el negocio concreto es pura configuración — dar de alta un
+        cliente nuevo no toca una línea de código de la plataforma.
+      </p>
+    </div>
+
+    <div class="grid-7-5 fill" data-anim="2">
+      <div class="m11-layers">
+        <div class="ly">
+          <span class="nm">La plataforma<span class="en">core · una para todos</span></span>
+          <span class="ds">Conversación en tiempo real, control de negocio, historial, evaluación,
+            supervisión y consola. <strong>No sabe qué es una clínica.</strong>
+            <span class="no">no puede importar código de ningún cliente — lo garantiza un test</span></span>
+        </div>
+        <div class="ly">
+          <span class="nm">El vertical<span class="en">business · código del rubro</span></span>
+          <span class="ds">Los flujos, tools y prompts de un tipo de negocio: «clínicas» sabe qué
+            es una cita y cómo se reserva; «comercio» sabe de pedidos y tickets.
+            <strong>Se escribe una vez y sirve a todos los clientes del rubro.</strong>
+            <span class="no">sabe qué es una cita — no sabe de Clínica Norte</span></span>
+        </div>
+        <div class="ly hot">
+          <span class="nm">El negocio<span class="en">tenant · configuración</span></span>
+          <span class="ds">Cada cliente concreto: nombre, voz, teléfono, saludo, horarios y las
+            credenciales de <em>sus</em> sistemas. <strong>Todo cambiable desde la consola, con
+            efecto en la siguiente llamada.</strong>
+            <span class="no">Clínica Norte · Tienda Sur — y el próximo, sin proyecto a medida</span></span>
+        </div>
+      </div>
+
+      <div class="m11-side">
+        <div class="b">
+          <h3>En producción hoy</h3>
+          <p>Dos verticales con un negocio cada uno, sobre un único despliegue: clínicas
+          (Clínica Norte) y comercio (Tienda Sur). Comparten plataforma; no comparten ni
+          prompts, ni tools, ni datos.</p>
+        </div>
+        <div class="b">
+          <h3>Aislamiento de fallos</h3>
+          <p>Un negocio mal configurado queda fuera de ruta y sus llamadas no entran — la
+          flota y los demás clientes siguen operando.</p>
+        </div>
+        <div class="b">
+          <h3>Siguiente fase, dicho honesto</h3>
+          <p>Instanciar el segundo negocio de un vertical existente sin copiar código —
+          la separación vertical/negocio ya está trazada; industrializarla es el primer
+          punto del roadmap.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      Probado en producción durante esta misma prueba: voz, modelo de IA, saludo y proveedor de
+      voz-a-texto de un negocio cambiados desde la consola — efecto en la llamada siguiente,
+      sin desplegar. La llamada de la lámina 6 corrió con esa configuración.
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">11 / 15</span></footer>
+</section>
+
+<section data-idx="11" class="slide" data-title="Integraciones" data-entregable="8">
+  <style>
+    .i12-col h3 { font: 600 16px var(--sans); color: var(--ink); margin: 0 0 4px; }
+    .i12-col .en { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                   color: var(--accent); display: block; margin-bottom: 12px; }
+    .i12-col p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 10px; }
+    .i12-col p strong { color: var(--ink); font-weight: 600; }
+    .i12-box { border: 1px solid var(--line); background: var(--card); padding: 16px 20px; height: 100%; }
+    .i12-box.hot { border: 1.5px solid var(--accent); background: var(--accent-soft); }
+    .i12-frames { font: 400 12px var(--mono); color: var(--ink-2); background: var(--paper);
+                  border: 1px solid var(--rule); border-radius: 6px; padding: 10px 14px; margin: 10px 0; }
+    .i12-keep { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+    .i12-keep .t { font: 500 10.5px var(--mono); letter-spacing: .07em; text-transform: uppercase;
+                   color: var(--accent); display: block; margin-bottom: 5px; }
+    .i12-keep p { font: 400 13px/1.5 var(--sans); }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">12 <span class="sep">·</span> Estrategia de integración con sistemas externos</div>
+      <h2 class="head" style="max-width:54ch">Los sistemas del cliente se conectan por adapters — y mañana, desde su propio proceso</h2>
+      <p class="lede" style="max-width:100ch">
+        La regla es una: <strong>el contrato del tool no cambia según dónde viva el código que lo
+        cumple</strong>. Hoy los adapters viven junto al vertical; el diseño ya contempla que
+        vivan en la infraestructura del propio cliente.
+      </p>
+    </div>
+
+    <div class="grid2 fill" data-anim="2">
+      <div class="i12-box i12-col">
+        <h3>Hoy: adapters por negocio</h3>
+        <span class="en">en producción</span>
+        <p>Un adapter es un módulo pequeño que traduce «crear cita» al sistema real del
+        cliente — su API de agenda, su gestor de pedidos, su ticketing. El vertical define
+        <strong>qué</strong> se hace; el adapter, <strong>contra qué sistema</strong>.</p>
+        <p>La demo opera con sistemas simulados que exponen <strong>la misma interfaz</strong>
+        que tendría el real: cambiar el simulador por la API verdadera del cliente no toca ni
+        los prompts, ni los tools, ni una prueba.</p>
+        <p>Las credenciales de cada negocio son suyas, viven en su configuración y jamás se
+        mezclan entre clientes.</p>
+        <p><strong>Con un contact center existente</strong>, la plataforma entra como un destino
+        SIP más de su ACD: recibe la llamada de la cola, y la transferencia la devuelve a un
+        agente humano de esa misma cola. El estado del agente y el CTI se integran por adapter,
+        como cualquier otro sistema del cliente.</p>
+      </div>
+
+      <div class="i12-box hot i12-col">
+        <h3>Mañana: el agente del cliente vive en su proyecto</h3>
+        <span class="en">diseño trazado — siguiente fase</span>
+        <p><strong>«Su agente vive en su proyecto; nuestra plataforma le da vida a todos.»</strong>
+        El proceso del cliente mantiene sus tools y sus prompts, y se conecta
+        <strong>saliente</strong> por WebSocket — nadie abre puertos entrantes, no hay webhooks
+        que firmar.</p>
+        <div class="i12-frames">hello → register { catálogo de tools + contratos } → invoke / result / fail → ping</div>
+        <div class="i12-keep">
+          <span class="t">Lo que no se muda con el código</span>
+          <p>La autorización, el consentimiento, el historial y la máscara de datos personales
+          quedan en la plataforma. Un tool remoto pasa por el mismo control que uno local —
+          <strong>la autoridad no viaja</strong>.</p>
+        </div>
+        <div class="i12-keep">
+          <span class="t">El enchufe ya existe</span>
+          <p>El ejecutor de tools es un contrato con una sola implementación (local) hoy —
+          la segunda implementación (remota) entra sin tocar al resto del sistema.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      El catálogo de tools viaja con sus contratos: el mismo control gobierna un tool local y
+      uno remoto, y el historial no distingue dónde corrió el código — solo qué se autorizó y
+      qué se ejecutó.
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">12 / 15</span></footer>
+</section>
+
+<section data-idx="12" class="slide" data-title="Observabilidad y operación" data-entregable="9">
+  <style>
+    .o13-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+    .o13-grid .b { border: 1px solid var(--line); background: var(--card); padding: 17px 20px; }
+    .o13-grid .b.hot { border-color: var(--accent); background: var(--accent-soft); }
+    .o13-grid h3 { font: 600 16px var(--sans); color: var(--ink); margin: 0 0 6px; }
+    .o13-grid p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+    .o13-grid .n { font: 500 11px var(--mono); color: var(--accent); display: block; margin-top: 8px; }
+    .o13-bill { margin-top: 22px; border: 1.5px solid var(--accent); border-radius: 10px;
+                background: var(--paper); padding: 16px 24px; display: grid;
+                grid-template-columns: 200px 1fr; gap: 20px; align-items: center; }
+    .o13-bill .big { font: 600 30px var(--sans); color: var(--ink); letter-spacing: -.02em; }
+    .o13-bill .big span { display: block; font: 500 11px var(--mono); letter-spacing: .07em;
+                          text-transform: uppercase; color: var(--accent); margin-top: 2px; }
+    .o13-bill p { font: 400 13.5px/1.5 var(--sans); color: var(--ink-2); margin: 0; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">13 <span class="sep">·</span> Observabilidad, analítica operativa y billing</div>
+      <h2 class="head" style="max-width:54ch">La operación diaria: todo lo que un responsable mira, en una consola</h2>
+      <p class="lede" style="max-width:100ch">
+        La auditoría de cada llamada ya quedó demostrada (láminas 6 y 7) y la evaluación
+        continua también (lámina 3). Esta es la vista de <strong>flota</strong>: lo que la
+        operación consulta cada mañana, calculado siempre desde el mismo historial.
+      </p>
+    </div>
+
+    <div class="o13-grid fill" data-anim="2">
+      <div class="b hot">
+        <h3>El tablero del negocio</h3>
+        <p>Las transacciones reales, no las conversaciones: citas creadas, movidas y canceladas;
+        pedidos y tickets con sus estados — cada fila enlaza a la llamada que la produjo.</p>
+        <span class="n">consola → Board, por negocio y por día</span>
+      </div>
+      <div class="b">
+        <h3>El registro de llamadas</h3>
+        <p>Cada sesión con su resultado, coste, nota de calidad, turnos y duración —
+        y dentro, la grabación, la transcripción y el historial completo.</p>
+        <span class="n">consola → Sessions</span>
+      </div>
+      <div class="b">
+        <h3>Las llamadas en vivo</h3>
+        <p>Qué está sonando ahora mismo, con la puerta de supervisión al lado: escuchar,
+        susurrar, tomar la línea.</p>
+        <span class="n">consola → Supervisor</span>
+      </div>
+      <div class="b">
+        <h3>La calidad, corrida a corrida</h3>
+        <p>Cada batería de evaluación con su score por métrica y la diferencia contra la
+        corrida anterior — y el botón para lanzar otra, acotada y con registro.</p>
+        <span class="n">consola → Evals, con los datasets a la vista</span>
+      </div>
+      <div class="b">
+        <h3>El replay como QA</h3>
+        <p>Cualquier llamada almacenada se reevalúa bajo demanda con las mismas métricas —
+        la evidencia basta, no hace falta el audio.</p>
+        <span class="n">también por línea de comandos, para el equipo técnico</span>
+      </div>
+      <div class="b">
+        <h3>La noche vigila sola</h3>
+        <p>Cada madrugada, un cliente sintético llama a la plataforma desplegada con
+        presupuesto acotado; un rojo se ve como rojo, con el transcript adjunto.</p>
+        <span class="n">programado a las 04:00, resultado en la consola</span>
+      </div>
+    </div>
+
+    <div class="o13-bill" data-anim="3">
+      <span class="big">0,0162 €<span>una llamada real completa</span></span>
+      <p><strong>Billing preparado desde el primer día:</strong> cada llamada cierra con su coste
+      en euros por proveedor y por modelo, escrito en su propio historial al tipo del día — la
+      factura por cliente es una suma sobre datos ya auditados, no una estimación. Tarifas por
+      cliente, topes de consumo y alertas son un umbral sobre estos mismos datos — primera
+      fase del roadmap.</p>
+    </div>
+
+    <p class="proof" data-anim="4">
+      Todas las vistas se calculan del historial append-only — no existe una segunda base de
+      datos que pueda discrepar de la evidencia.
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">13 / 15</span></footer>
+</section>
+
+<section data-idx="13" class="slide" data-title="Seguridad y privacidad" data-entregable="10">
+  <style>
+    .s14-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 18px; }
+    .s14-grid .b { border: 1px solid var(--line); background: var(--card); padding: 14px 20px; }
+    .s14-grid h3 { font: 600 16px var(--sans); color: var(--ink); margin: 0 0 6px; }
+    .s14-grid p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0; }
+    .s14-grid p strong { color: var(--ink); font-weight: 600; }
+    .s14-mask { flex: none; margin-top: 16px; border: 1.5px solid var(--accent); border-radius: 10px;
+                overflow: hidden; }
+    .s14-mask .t { background: var(--accent-soft); padding: 10px 20px; font: 500 11px var(--mono);
+                   letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+    .s14-mask .cmp { display: grid; grid-template-columns: 1fr 1fr; }
+    .s14-mask .half { padding: 12px 20px; }
+    .s14-mask .half + .half { border-left: 1px solid var(--line); }
+    .s14-mask .lbl { font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase;
+                     color: var(--muted); display: block; margin-bottom: 5px; }
+    .s14-mask .vv { font: 400 13px var(--mono); color: var(--ink-2); }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">14 <span class="sep">·</span> Seguridad, privacidad y segregación de datos</div>
+      <h2 class="head" style="max-width:54ch">Cada permiso es una concesión firmada que dice exactamente qué alcanza</h2>
+      <p class="lede" style="max-width:100ch">
+        Nada opera por convención: todo lo que entra, escucha, escribe o interviene lo hace
+        con un permiso explícito, acotado y con caducidad.
+      </p>
+    </div>
+
+    <div class="s14-grid" data-anim="2">
+      <div class="b">
+        <h3>Identidad y autoridad firmadas</h3>
+        <p>Cada participante — cliente, agente, supervisor, evaluador — entra con un permiso
+        firmado que enumera sus poderes exactos y caduca solo. La identidad la certifica el
+        servidor de medios: <strong>nada escrito en un mensaje puede fingir autoridad</strong>.</p>
+      </div>
+      <div class="b">
+        <h3>Segregación total por cliente</h3>
+        <p>Un negocio no puede ver, nombrar ni rozar los datos de otro — y la evaluación lo
+        vigila como métrica en cada llamada (lámina 3: privacidad, ninguna fuga). Sus
+        credenciales viven en su configuración, nunca en código ni en repositorio.</p>
+      </div>
+      <div class="b">
+        <h3>Telefonía con superficie mínima</h3>
+        <p>Cuatro capas antes de aceptar una llamada: la red solo admite los rangos publicados
+        del operador (denegación explícita — el resto del mundo nunca llega al servidor); el
+        puente descarta sin respuesta cualquier intento que no presente la troncal correcta
+        — un escáner no aprende nada; la troncal verifica número y origen por segunda vez;
+        y solo entonces el número marcado resuelve a un negocio.</p>
+      </div>
+      <div class="b">
+        <h3>Las grabaciones, tras una puerta</h3>
+        <p>El audio de una llamada nunca está en un directorio público ni en el repositorio:
+        se sirve solo por una ruta autenticada que valida la sesión — y cada proyecto puede
+        optar por no grabar.</p>
+      </div>
+    </div>
+
+    <div class="s14-mask" data-anim="3">
+      <div class="t">Datos personales enmascarados por valor — no solo por nombre de campo</div>
+      <div class="cmp">
+        <div class="half">
+          <span class="lbl">Lo que recibe el sistema del cliente</span>
+          <span class="vv">«Clínica Norte: Ana García Ruiz, su cita queda el martes 1/9 a las 09:00»</span>
+        </div>
+        <div class="half">
+          <span class="lbl">Lo que queda en el historial</span>
+          <span class="vv">«Clínica Norte: An*************, su cita queda el martes 1/9 a las 09:00»</span>
+        </div>
+      </div>
+    </div>
+
+    <div data-anim="4" style="border:1px solid var(--rule);border-radius:8px;padding:10px 18px;margin-top:14px;background:var(--card)">
+      <span style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)">Marco regulatorio — AI Act (UE 2024/1689) y RGPD</span>
+      <span style="font:400 13px/1.55 var(--sans);color:var(--ink-2);display:block;margin-top:6px">
+        La atención al cliente conversacional es <strong>riesgo limitado</strong>: sin evaluación de
+        conformidad, con obligación de transparencia (art. 50) — el agente se presenta como IA en el
+        saludo, configurable por negocio, y la voz sintética es marcable como generada. Ninguna
+        práctica prohibida: sin biometría, sin reconocimiento de emociones, sin scoring. La
+        supervisión humana (lámina 9) y el historial inmutable exceden lo exigido para esta
+        categoría; la máscara por valor, la retención declarada y el acceso autenticado a
+        grabaciones cubren el RGPD.
+      </span>
+    </div>
+
+    <p class="proof" data-anim="5">
+      El enmascarado aprende los valores del propio resultado — un nombre que ninguna orden
+      mencionó queda cubierto igual, hasta dentro de un SMS. Verificado por test.
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">14 / 15</span></footer>
+</section>
+
+<section data-idx="14" class="slide" data-title="Infraestructura, despliegue y roadmap" data-entregable="11">
+  <style>
+    .f15-sec { font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+               color: var(--accent); margin: 0 0 8px; }
+    .f15-gap { margin-top: 16px; }
+    .f15-stack { border: 1.5px solid var(--accent); border-radius: 10px; background: var(--accent-soft);
+                 padding: 15px 20px; }
+    .f15-stack p { font: 400 13.5px/1.55 var(--sans); color: var(--ink-2); margin: 0 0 8px; }
+    .f15-stack p:last-child { margin-bottom: 0; }
+    .f15-stack p strong { color: var(--ink); font-weight: 600; }
+    .f15-dep { border: 1px solid var(--line); border-radius: 10px; background: var(--card); padding: 14px 20px; }
+    .f15-dep p { font: 400 13px/1.5 var(--sans); color: var(--ink-2); margin: 0 0 6px; }
+    .f15-dep p:last-child { margin-bottom: 0; }
+    .f15-dep p strong { color: var(--ink); font-weight: 600; }
+    .f15-road { border: 1.5px solid var(--accent); border-radius: 10px; overflow: hidden; }
+    .f15-road .hd { background: var(--accent-soft); padding: 11px 18px; }
+    .f15-road .hd .ph { font: 500 10px var(--mono); letter-spacing: .08em; text-transform: uppercase;
+                        color: var(--accent); display: block; margin-bottom: 3px; }
+    .f15-road .hd .th { font: 600 15.5px/1.35 var(--sans); color: var(--ink); }
+    .f15-road .rw { padding: 8px 18px; border-top: 1px solid var(--line);
+                    font: 400 13px/1.45 var(--sans); color: var(--ink-2); }
+    .f15-road .rw strong { color: var(--ink); font-weight: 600; }
+    .f15-tof { margin-top: 0; }
+    .f15-tof .r { padding: 5px 0; border-bottom: 1px solid var(--line);
+                  font: 400 12.5px/1.45 var(--sans); color: var(--ink-2); }
+    .f15-tof .r:last-child { border-bottom: none; }
+    .f15-tof .r strong { color: var(--ink); font-weight: 600; }
+  </style>
+  <div class="slide-body">
+
+    <div class="head-block" data-anim="1">
+      <div class="eyebrow">15 <span class="sep">·</span> Infraestructura, despliegue — roadmap y trade-offs</div>
+      <h2 class="head" style="max-width:58ch">LiveKit resuelve el tiempo real; nosotros, la garantía transaccional encima</h2>
+    </div>
+
+    <div class="grid2 fill" data-anim="2">
+      <div>
+        <p class="f15-sec">El stack, con nombres</p>
+        <div class="f15-stack">
+          <p><strong>LiveKit autoalojado</strong> resuelve la capa de tiempo real completa:
+          servidor de medios WebRTC, puente telefónico SIP, un proceso aislado por llamada y
+          los permisos firmados por identidad. Sin él, nada de esto existiría en el plazo de
+          una prueba.</p>
+          <p><strong>Encima construimos lo que LiveKit no da</strong> — y esa es la tesis del
+          documento: el control transaccional con consentimiento, el historial inmutable, la
+          máscara por valor, los cuatro niveles de evaluación y la consola de operación.</p>
+          <p>Proveedores por contrato: Soniox / Deepgram (voz a texto), ElevenLabs (texto a voz),
+          Claude / GPT (modelo). Runtime Python, base embebida — y su paso a Postgres tiene el
+          disparador escrito: el día que un segundo proceso escriba.</p>
+        </div>
+        <p class="f15-sec f15-gap">Despliegue y operación</p>
+        <div class="f15-dep">
+          <p><strong>Desplegar es un comando idempotente</strong>; la configuración de los
+          negocios es estado vivo y no viaja con el deploy. El rollback es redeclarar la
+          versión anterior.</p>
+          <p><strong>El gate de calidad es la evaluación</strong>: la batería conversacional en
+          integración continua, y la nocturna vigilando lo desplegado. Sin GPU en todo el
+          sistema.</p>
+          <p><strong>Concurrencia probada contra este nodo</strong> (llamadas reales simultáneas):
+          con 1 y con 4 a la vez — el tamaño del pool precalentado — completa el 100%, con la
+          respuesta en 3,8 s de mediana bajo carga (2,25 s en solitario); con 8, dos de ocho
+          esperan proceso. El techo está medido, no estimado.</p>
+          <p><strong>Escalar tiene disparadores, no adjetivos</strong>: concurrencia sobre el
+          techo medido → segundo nodo de workers (sin estado, el dispatch ya reparte) ·
+          segundo escritor → Postgres · otra región → servidor de medios federado.</p>
+        </div>
+      </div>
+
+      <div>
+        <p class="f15-sec">Roadmap por fases</p>
+        <div class="f15-road">
+          <div class="hd">
+            <span class="ph">Fase 1 — la tesis, industrializada</span>
+            <span class="th">«Los verticales son código; los negocios, configuración»</span>
+          </div>
+          <div class="rw">El segundo negocio de un rubro se da de alta <strong>sin copiar una
+          línea</strong>: el código de «clínicas» sirve a todas las clínicas; cada una trae su
+          voz, su número, sus credenciales y sus horarios.</div>
+          <div class="rw"><strong>2 · Tools remotos</strong> — el protocolo de la lámina 12: el
+          código del cliente corre en su infraestructura, la autoridad se queda aquí.</div>
+          <div class="rw"><strong>3 · Re-enganche automático</strong> — la llamada que se corta
+          retoma contexto al volver a llamar.</div>
+          <div class="rw"><strong>4 · Escala multi-nodo</strong> — según los disparadores de la
+          izquierda, no antes.</div>
+        </div>
+        <p class="f15-sec f15-gap">Trade-offs principales — decididos con medición</p>
+        <div class="f15-tof">
+          <div class="r"><strong>LiveKit autoalojado, evaluado frente a Vapi y Pipecat</strong> —
+          Vapi es un panel sobre el bucle de otro: el prompt, el estado y las credenciales viven
+          en su SaaS, y la tesis de este documento — control, consentimiento y auditoría en el
+          backend — sería inexpresable allí. Pipecat da el pipeline, no el SFU ni el SIP ni la
+          supervisión. LiveKit deja el bucle, los datos y la telefonía en casa; la dependencia
+          se asume con la migración como coste conocido.</div>
+          <div class="r"><strong>Motor conversacional propio</strong> — un motor SaaS dejaría la
+          autorización y la auditoría fuera del bucle; el control transaccional exige poseerlo.</div>
+          <div class="r"><strong>Sub-agentes especializados antes que un agente que lo hace
+          todo</strong> — medido aquí: una herramienta extra en una etapa cuesta ~17 puntos de
+          acierto (38/40 sin ella, 16/20 con ella, 154 corridas). Cada mostrador es un agente de
+          dos o tres verbos y el traspaso lleva el contexto: la precisión se compra quitando
+          opciones, no añadiendo prompt.</div>
+          <div class="r"><strong>Generación anticipada apagada</strong> — medida: con fin de
+          turno en ~0,4 s, especular no ocultaba latencia y solo gastaba modelo.</div>
+          <div class="r"><strong>Base embebida antes que Postgres — single-node deliberado</strong> —
+          el contrato de persistencia no depende del storage local (todo proceso escribe por el
+          plano de control, nunca contra el fichero). Un único escritor hoy; el segundo es el
+          disparador, y ese día migrar es un cambio de conexión, no de arquitectura.</div>
+        </div>
+      </div>
+    </div>
+
+    <p class="proof" data-anim="3">
+      Coste de infraestructura conocido y coste por llamada medido en céntimos — la decisión de
+      escalar siempre tendrá un número delante. Plataforma en vivo: https://lk.bernardocastro.dev
+    </p>
+
+  </div>
+
+  <footer class="slide-foot"><span class="brand">convo · plataforma conversacional transaccional</span><span class="num">15 / 15</span></footer>
+</section>
+
+  </div>
+</div>
+<div class="chrome">
+  <div class="progress"></div>
+  <nav class="dots" aria-label="slides"></nav>
+  <div class="hint">← → · espacio · inicio/fin · f pantalla completa</div>
+</div>
+<script>
+/* The deck runtime: which slide is showing, and nothing else.
+ *
+ * Lifted in spirit from ~/pinecall/presentations/decks/pinecall.html — the same
+ * chassis (absolute slides, .is-active / .is-past, the [data-anim] stagger,
+ * arrows/space/Home/End) with the framework taken out. There is no state store,
+ * no build step for the runtime and no narrator: the URL hash IS the state, so
+ * every slide is linkable and reload lands where you were.
+ */
+
+(function () {
+  var stage = document.getElementById("stage");
+  var slides = Array.prototype.slice.call(stage.querySelectorAll(".slide"));
+  var progress = document.querySelector(".progress");
+  var dots = document.querySelector(".dots");
+  var i = 0;
+
+  /** Fit the fixed 1600x900 stage inside whatever viewport we were given. */
+  function fit() {
+    var s = Math.min(window.innerWidth / 1600, window.innerHeight / 900);
+    document.documentElement.style.setProperty("--scale", String(s));
+  }
+
+  /** Show slide n (clamped), and write it into the hash so reload survives. */
+  function go(n, silent) {
+    var next = Math.max(0, Math.min(slides.length - 1, n));
+    i = next;
+    slides.forEach(function (el, k) {
+      el.classList.toggle("is-active", k === i);
+      el.classList.toggle("is-past", k < i);
+    });
+    if (progress) progress.style.width = (slides.length < 2 ? 100 : (i / (slides.length - 1)) * 100) + "%";
+    if (dots) {
+      Array.prototype.forEach.call(dots.children, function (b, k) {
+        b.setAttribute("aria-current", k === i ? "true" : "false");
+      });
+    }
+    if (!silent) history.replaceState(null, "", "#" + String(i + 1));
+    document.title = (slides[i].dataset.title || "convo") + " · " + (i + 1) + "/" + slides.length;
+  }
+
+  /** The slide asked for in the hash, 1-based, or the first one. */
+  function fromHash() {
+    var n = parseInt((location.hash || "").replace("#", ""), 10);
+    return isNaN(n) ? 0 : n - 1;
+  }
+
+  /** Every box on this slide that spilled out of the room it was given. */
+  function overflow(el) {
+    var worst = 0, culprit = "";
+    var boxes = el.querySelectorAll("*");
+    for (var j = 0; j < boxes.length; j++) {
+      var b = boxes[j];
+      if (getComputedStyle(b).overflow !== "visible") continue;
+      var spill = b.scrollHeight - b.clientHeight;
+      if (spill > worst) { worst = spill; culprit = String(b.className || b.tagName).trim(); }
+    }
+    return { spill: worst, culprit: culprit };
+  }
+
+  /* ?audit — measure every slide and report through document.title, the one
+   * value `chrome --headless --dump-dom` hands back without a devtools client.
+   *
+   * Two different overflows ruin a slide and neither warns you: the section
+   * growing past 900px becomes a silent SECOND page in the PDF, and a flex or
+   * grid track whose content does not fit stays 900px tall while OVERLAPPING
+   * what is under it — worse, because it still looks like a slide. Check both.
+   * See audit.mjs. */
+  if (/[?&]audit\b/.test(location.search)) {
+    // Measure the slide as it PRINTS, not as it enters: the [data-anim] stagger
+    // parks every element 10px lower, and measuring that reports a 10px
+    // overflow on a slide that fits perfectly.
+    var off = document.createElement("style");
+    off.textContent = ".slide [data-anim]{opacity:1!important;transform:none!important;transition:none!important}";
+    document.head.appendChild(off);
+
+    document.title = "AUDIT:" + JSON.stringify(slides.map(function (el, k) {
+      var page = Math.max(0, el.scrollHeight - 900);
+      var inner = overflow(el);
+      var spill = inner.spill > 1 ? inner.spill : 0;
+      return {
+        n: k + 1,
+        title: el.dataset.title || "",
+        height: el.scrollHeight,
+        over: Math.max(page, spill),
+        where: page >= spill ? (page ? "la lámina entera" : "") : inner.culprit
+      };
+    }));
+    return;
+  }
+
+  if (dots) {
+    slides.forEach(function (el, k) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.title = (k + 1) + ". " + (el.dataset.title || "");
+      b.addEventListener("click", function () { go(k); });
+      dots.appendChild(b);
+    });
+  }
+
+  window.addEventListener("keydown", function (e) {
+    var tag = e.target && e.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { go(i + 1); e.preventDefault(); }
+    else if (e.key === "ArrowLeft" || e.key === "PageUp") { go(i - 1); e.preventDefault(); }
+    else if (e.key === "Home") { go(0); e.preventDefault(); }
+    else if (e.key === "End") { go(slides.length - 1); e.preventDefault(); }
+    else if (e.key === "f" || e.key === "F") {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else document.documentElement.requestFullscreen && document.documentElement.requestFullscreen();
+    }
+  });
+
+  window.addEventListener("hashchange", function () { go(fromHash(), true); });
+  window.addEventListener("resize", fit);
+
+  fit();
+  go(fromHash(), true);
+})();
+
+</script>
+</body>
+</html>
