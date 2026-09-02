@@ -2,15 +2,15 @@
 
 import pytest
 
-from core.providers import stt, tts
-from core.session import (
+from convo.providers import stt, tts
+from convo.session.build import (
     build_session,
     channel_options,
     start_session,
     text_turn_handling,
     voice_turn_handling,
 )
-from core.testing import fake_context
+from convo.testing import fake_context
 from tests.conftest import needs_llm
 
 pytestmark = pytest.mark.unit
@@ -45,7 +45,7 @@ def test_a_voice_session_keeps_the_room_defaults() -> None:
 async def test_a_voice_session_with_keys_and_a_vad_builds_every_provider(monkeypatch) -> None:
     monkeypatch.setenv(stt.KEY_ENV, "sx-test")
     monkeypatch.setenv(tts.KEY_ENV, "el-test")
-    from core.providers import vad_for
+    from convo.providers import vad_for
 
     tc = fake_context("clinica-norte", "reagendamiento", channel="voice")
     session = build_session(tc, vad=vad_for())
@@ -69,7 +69,7 @@ async def test_a_voice_session_without_keys_is_text_only(monkeypatch) -> None:
 async def test_a_chat_session_opens_no_provider_even_with_both_keys(monkeypatch) -> None:
     monkeypatch.setenv(stt.KEY_ENV, "sx-test")
     monkeypatch.setenv(tts.KEY_ENV, "el-test")
-    from core.providers import vad_for
+    from convo.providers import vad_for
 
     tc = fake_context("clinica-norte", "reagendamiento", channel="chat")
     session = build_session(tc, vad=vad_for())

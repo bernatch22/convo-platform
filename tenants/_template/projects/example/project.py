@@ -1,30 +1,17 @@
 """Example: one use case of Example Co — find a booking and cancel it.
 
-A project is everything about ONE thing a caller can ring about: the tools it
-may use, the voice it speaks with, its knowledge block, the sentences it says
-when a tool fails, and the stage the call starts in. A tenant with two use cases
-has two of these folders and one `tenant.py`.
-
-The catalog is data the platform reads before every call, not documentation: a
-tool missing from here cannot run, however convincingly the model asks for it,
-and the `side_effect` declared on each spec is what decides whether the customer
-has to say yes first.
-
-TODO(copy): one `ToolSpec` per capability this use case may reach, the voice,
-and the failure sentences in your own register. Declare nothing you have no
-adapter for — a tool with no system behind it buys a spoken failure where a
-refusal would have been the honest answer.
+Decisions: docs/decisions/tenants._template.projects.example.project.md
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
-from core.context import Project, TenantContext
-from core.telephony.human import TRANSFER_TO_HUMAN
-from core.tools.catalog import ToolCatalog
-from core.tools.contract import SideEffect, ToolSpec
-from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
+from convo.domain.catalog import ToolCatalog
+from convo.domain.context import Project, TenantContext
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.telephony.human import TRANSFER_TO_HUMAN
 
-from . import knowledge
+from .messages import MESSAGES
 
 FIND_BOOKING = ToolSpec(
     name="find_booking",
@@ -53,14 +40,8 @@ RESTORE_BOOKING = ToolSpec(
     timeout_s=5.0,
 )
 
-# What the caller hears when a tool cannot produce a result. The platform's defaults are in
-# `core.tools.messages`; these override them in this business's own words and register.
-MESSAGES = {
-    UNKNOWN_TOOL: "Eso no puedo consultarlo yo. ¿Le ayudo con su reserva?",
-    NO_ADAPTER: "No puedo entrar ahora mismo en el sistema de reservas. ¿Le llamamos luego?",
-    TIMEOUT: "El sistema está tardando en contestar. ¿Lo intento otra vez?",
-    FAILURE: "No he podido consultar su reserva. ¿Quiere que lo intente de nuevo?",
-}
+
+HERE = Path(__file__).parent
 
 
 @dataclass
@@ -91,5 +72,7 @@ PROJECT = ExampleProject(
     # business with nobody on the other end of it.
     transfer_number="",
     messages=MESSAGES,
-    knowledge_seed=knowledge.BUSINESS,
+    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_tag="business_knowledge",
+    prompts=HERE / "prompts",
 )

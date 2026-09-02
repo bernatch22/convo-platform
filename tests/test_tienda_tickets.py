@@ -29,11 +29,11 @@ from deepeval.metrics.dag.schema import BinaryJudgementVerdict, TaskNodeOutput
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, ToolCall, Turn
 
-from core import business
-from core.adapters.base import LIST_RECORDS
-from core.state.store import MemoryStore
-from core.testing import fake_context
-from core.tools.contract import SideEffect
+from convo.adapters.base import LIST_RECORDS
+from convo.domain import business
+from convo.domain.tools import SideEffect
+from convo.state.store import MemoryStore
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 
@@ -41,7 +41,8 @@ TENANT, PROJECT = "tienda-sur", "pedidos"
 PACKAGE = f"tenants.{TENANT}.projects.{PROJECT}"
 project_module = importlib.import_module(f"{PACKAGE}.project")
 stages = importlib.import_module(f"{PACKAGE}.stages")
-tools_module = importlib.import_module(f"{PACKAGE}.tools")
+helpers_module = importlib.import_module(f"{PACKAGE}.helpers")
+messages_module = importlib.import_module(f"{PACKAGE}.messages")
 evals_dag = importlib.import_module(f"{PACKAGE}.evals.dag")
 tickets_module = importlib.import_module(f"tenants.{TENANT}.adapters.tickets")
 ticketbook = importlib.import_module(f"tenants.{TENANT}.adapters.ticketbook")
@@ -211,14 +212,14 @@ async def test_an_incident_carries_the_order_the_call_had_already_located(tc) ->
 
 
 def test_an_incident_nobody_can_find_is_said_so_plainly_and_offered_a_new_one() -> None:
-    assert "no consta" in tools_module.NO_TICKET.lower()
-    assert "abrirle una nueva" in tools_module.NO_TICKET
+    assert "no consta" in messages_module.NO_TICKET.lower()
+    assert "abrirle una nueva" in messages_module.NO_TICKET
 
 
 def test_the_line_read_back_names_the_number_the_state_and_what_was_written() -> None:
     ticket = {"ticket_id": IN_PROGRESS, **ticketbook.seeded()[IN_PROGRESS]}
 
-    said = tools_module.ticket_line(ticket)
+    said = helpers_module.ticket_line(ticket)
 
     assert IN_PROGRESS in said
     assert "en curso" in said
@@ -231,7 +232,7 @@ def test_the_line_read_back_names_the_number_the_state_and_what_was_written() ->
 
 async def test_the_shop_answers_two_tables_and_never_one_with_a_mixed_vocabulary() -> None:
     """Orders and incidents are different records: own shape, own columns, own state words."""
-    from core.registry import load_registry
+    from convo.session.registry import load_registry
 
     view = await business.records(load_registry()[TENANT], PROJECT, MemoryStore())
 

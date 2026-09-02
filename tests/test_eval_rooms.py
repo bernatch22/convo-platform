@@ -17,13 +17,13 @@ import pytest
 from fastapi.testclient import TestClient
 from livekit import api as lkapi
 
-from api import app
-from core import rooms
-from core.contracts import SessionMeta
-from core.router import session_meta
-from core.testing.audio import Timeline
-from core.testing.fake_job import fake_job_context
-from core.testing.ring2 import Transcript
+from convo.api.app import app
+from convo.domain.contracts import SessionMeta
+from convo.session import rooms
+from convo.session.router import session_meta
+from convo.testing.callers.audio import Timeline
+from convo.testing.fake_job import fake_job_context
+from convo.testing.reports.ring2 import Transcript
 
 pytestmark = pytest.mark.unit
 

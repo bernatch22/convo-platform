@@ -12,18 +12,18 @@ from typing import Any
 import pytest
 from livekit.agents.llm import ToolError
 
-from core import confirm
-from core.context import Project, Tenant, TenantContext
-from core.tools.catalog import (
+from convo.domain.catalog import (
     ToolCatalog,
     infrastructure_names,
     infrastructure_specs,
     platform_specs,
 )
-from core.tools.contract import SideEffect, ToolSpec
-from core.tools.executor import SUMMARY_CHARS, LocalExecutor
-from core.tools.guard import ToolRefused, mask
-from core.tools.messages import DEFAULTS, FAILURE, TIMEOUT, UNKNOWN_TOOL
+from convo.domain.context import Project, Tenant, TenantContext
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.tools import confirm
+from convo.tools.executor import SUMMARY_CHARS, LocalExecutor
+from convo.tools.guard import ToolRefused, mask
+from convo.tools.messages import DEFAULTS, FAILURE, TIMEOUT, UNKNOWN_TOOL
 
 pytestmark = pytest.mark.unit
 
@@ -226,8 +226,8 @@ def logged(tc) -> list[tuple[str, dict]]:
 
 
 async def test_a_call_leaves_call_and_result_events_with_pii_masked() -> None:
-    from core.state.attach import attach_log
-    from core.state.store import MemoryStore
+    from convo.state.attach import attach_log
+    from convo.state.store import MemoryStore
 
     tc = attach_log(context(FakeAdapter()), MemoryStore())
     args = {"phone": "600123456"}
@@ -243,8 +243,8 @@ async def test_a_call_leaves_call_and_result_events_with_pii_masked() -> None:
 
 
 async def test_a_refusal_and_a_failure_are_logged_without_payloads() -> None:
-    from core.state.attach import attach_log
-    from core.state.store import MemoryStore
+    from convo.state.attach import attach_log
+    from convo.state.store import MemoryStore
 
     tc = attach_log(context(FakeAdapter()), MemoryStore())
 
@@ -343,7 +343,7 @@ async def test_a_name_the_arguments_never_carried_is_masked_because_the_result_c
 
 def attached(tc):
     """The same context with an in-memory log, for the assertions that read one."""
-    from core.state.attach import attach_log
-    from core.state.store import MemoryStore
+    from convo.state.attach import attach_log
+    from convo.state.store import MemoryStore
 
     return attach_log(tc, MemoryStore())

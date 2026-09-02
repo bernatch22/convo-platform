@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from core.testing.register import slips
+from convo.testing.metrics.register import slips
 
 pytestmark = pytest.mark.unit
 

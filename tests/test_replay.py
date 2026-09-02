@@ -8,9 +8,9 @@ from, and what a judge is told about a result the log never stored.
 
 import pytest
 
-from core.state.events import Event
-from core.state.store import MemoryStore, SessionRow
-from core.testing.replay import (
+from convo.state.events import Event
+from convo.state.store import MemoryStore, SessionRow
+from convo.testing.replay import (
     NO_PAYLOAD,
     conversational_case_from,
     missing_tool_outputs,

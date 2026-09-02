@@ -12,7 +12,7 @@ import os
 import pytest
 from dotenv import load_dotenv
 
-from core.adapters.ledger import PATH_ENV as LEDGER_ENV
+from convo.adapters.ledger import PATH_ENV as LEDGER_ENV
 
 load_dotenv(".env")
 

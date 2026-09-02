@@ -21,15 +21,14 @@ Run with `deepeval test run tests/evals` (needs ANTHROPIC_API_KEY).
 """
 
 import datetime
-import importlib
 import json
 import pathlib
 
 import pytest
 from deepeval import assert_test
 
-from core.testing import deepeval as bridge
-from core.testing import fake_context, run_conversation
+from convo.testing import fake_context, run_conversation
+from convo.testing.metrics import deepeval as bridge
 
 pytestmark = pytest.mark.evals
 
@@ -37,7 +36,8 @@ TENANT, PROJECT = "clinica-norte", "reagendamiento"
 AGENDA_TOOL = "find_availability"
 GOLDENS = pathlib.Path("tenants") / TENANT / "projects" / PROJECT / "evals" / "goldens.json"
 
-dates = importlib.import_module(f"tenants.{TENANT}.projects.{PROJECT}.dates")
+from convo.lang import es as dates  # noqa: E402
+
 metrics = bridge.project_metrics(TENANT, PROJECT)
 
 

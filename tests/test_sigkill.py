@@ -8,16 +8,16 @@ import textwrap
 
 import pytest
 
-from core.state.store import SQLiteStore
+from convo.state.store import SQLiteStore
 
 pytestmark = pytest.mark.unit
 
 WRITER = textwrap.dedent(
     """
     import os, signal, sys
-    from core.state.attach import attach_log
-    from core.state.store import SQLiteStore
-    from core.testing import fake_context
+    from convo.state.attach import attach_log
+    from convo.state.store import SQLiteStore
+    from convo.testing import fake_context
     store = SQLiteStore(sys.argv[1])
     tc = fake_context("clinica-norte", "reagendamiento")
     tc.session_id = "killed"

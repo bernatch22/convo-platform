@@ -1,20 +1,15 @@
 """NewBooking: give a cita to a caller the appointment book had never heard of.
 
-The same shape as ChooseSlot and deliberately not the same stage. A caller with
-no cita has two things still missing — the specialty and the day — nothing to
-release before the new hour is taken, and nothing to fall back on when the
-booking system says no. The write is its own irreversible tool
-(`create_appointment`), so `guard.check` and the consent metric each watch one
-name, and the saga is two steps instead of three: take the hour, tell the
-patient. If either fails, the compensation cancels what was written and the
-caller is told plainly that nothing is on the book.
+Decisions: docs/decisions/tenants.clinica-norte.projects.reagendamiento.stages.new_booking.md
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, function_tool
-from core.context import TenantContext
-from core.tools.saga import Saga, SagaFailed
+from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
+from convo.lang import es
+from convo.prompting import prompt, stage_prompt
+from convo.tools.saga import Saga, SagaFailed
 
-from .. import dates, prompts, tools
+from .. import helpers, messages
 from .farewell import Farewell
 
 
@@ -22,7 +17,7 @@ class NewBooking(TenantAgent):
     """Asks what the cita is for, offers the hours the agenda really has, and writes one."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.new_booking_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "new_booking"))
         self.offered: dict[str, dict[str, str]] = {}
         self.specialty: str | None = None
         self.booked: dict[str, str] | None = None
@@ -32,7 +27,7 @@ class NewBooking(TenantAgent):
         if not self.booked:
             return "Todavía no se ha reservado ninguna hora."
         return (
-            f"Cita nueva confirmada: {dates.spanish_moment(self.booked['when'])} con "
+            f"Cita nueva confirmada: {es.spanish_moment(self.booked['when'])} con "
             f"{self.booked['doctor']}. El SMS de confirmación ya se ha enviado."
         )
 
@@ -67,16 +62,18 @@ class NewBooking(TenantAgent):
         """
         tc = ctx.userdata
         try:
-            day = tools.resolve_day(date, tc.today)
+            day = helpers.resolve_day(date, tc.today)
         except ValueError:
-            return tools.UNREADABLE_DATE
+            return messages.UNREADABLE_DATE
         self.specialty = specialty or self.specialty
         args = {"date": day.isoformat()}
         if self.specialty:
             args["specialty"] = self.specialty
         slots = await tc.tools.call("find_availability", args)
-        self.offered = {tools.hour_of(slot["when"]): slot for slot in slots[: tools.OFFER_LIMIT]}
-        return tools.offer(day, slots)
+        self.offered = {
+            helpers.hour_of(slot["when"]): slot for slot in slots[: helpers.OFFER_LIMIT]
+        }
+        return helpers.offer(day, slots)
 
     @function_tool
     async def request_appointment(self, ctx: RunContext[TenantContext], time: str) -> str | tuple:
@@ -97,54 +94,41 @@ class NewBooking(TenantAgent):
         confirmado. Cuenta eso y solo eso.
         """
         tc = ctx.userdata
-        slot = self.offered.get(tools.normalise_hour(time))
+        slot = self.offered.get(helpers.normalise_hour(time))
         if slot is None:
-            return tools.NO_SUCH_HOUR
+            return messages.NO_SUCH_HOUR
         args = _booking_args(tc, slot, self.specialty)
         # The sentence the caller says yes to is rendered by us, from the row the agenda
         # returned, so consent and booking cannot drift apart.
         said_yes = await ConfirmTask(
             tc,
-            question=tools.new_confirmation_question(slot),
+            question=helpers.new_confirmation_question(slot),
             tool="create_appointment",
             args=args,
-            instructions=prompts.confirm_new_booking_instructions(),
+            instructions=prompt(tc, "confirm/new_booking"),
         )
         if not said_yes:
-            return tools.NOT_CONFIRMED
+            return messages.NOT_CONFIRMED
         try:
             await _booking(tc, slot, args).run()
         except SagaFailed:
             # The token is spent by the executor only AFTER a successful call, so a
             # failure leaves the caller's yes intact: retrying the same hour inside the
             # token's ttl needs no second confirmation, and a different hour mints its own.
-            return tools.NEW_BOOKING_FAILED
+            return messages.NEW_BOOKING_FAILED
         self.booked = slot
         return self.hand_off(Farewell(tc))
 
 
 def _booking(tc: TenantContext, slot: dict[str, str], args: dict[str, str]) -> Saga:
-    """Take the hour, then write to the patient — both or neither.
-
-    Two steps where a rescheduling has three: there is no earlier hour to
-    release. The cancel that undoes `create_appointment` is declared on its spec
-    as the compensation, so a failed SMS still takes the cita off the book rather
-    than leaving one nobody was told about.
-
-    `undo_args` is not optional here, and this is the one place the difference
-    bites: the saga's default hands a compensation the STEP's own arguments, and
-    `create_appointment` is called with a slot id while `cancel_slot` needs the
-    appointment id the write produced. Rebooking gets away with the default
-    because the cancel it undoes was already keyed by appointment; a creation has
-    no such id until the row exists.
-    """
+    """Take the hour, then write to the patient — both or neither."""
     patient = tc.customer or {}
     return (
         Saga(tc)
         .step("create_appointment", args, undo_args=_the_appointment_it_created)
         .step(
             "send_sms",
-            {"phone": patient.get("phone", ""), "text": tools.sms_text(args["patient"], slot)},
+            {"phone": patient.get("phone", ""), "text": helpers.sms_text(args["patient"], slot)},
         )
     )
 

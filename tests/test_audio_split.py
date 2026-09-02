@@ -13,8 +13,8 @@ import wave
 import numpy as np
 import pytest
 
-from core.state.events import Event
-from core.testing.audio import (
+from convo.state.events import Event
+from convo.testing.callers.audio import (
     AGENT,
     CALLER,
     TAIL_MS,
@@ -24,7 +24,7 @@ from core.testing.audio import (
     recorded_path,
     split_channels,
 )
-from core.testing.replay import turns_from
+from convo.testing.replay import turns_from
 
 pytestmark = pytest.mark.unit
 

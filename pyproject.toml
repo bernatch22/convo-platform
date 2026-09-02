@@ -15,6 +15,9 @@ dependencies = [
     "uvicorn>=0.30",
 ]
 
+[project.scripts]
+convo = "convo.cli:main_argv"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8",
@@ -22,6 +25,13 @@ dev = [
     "ruff>=0.6",
     "deepeval>=3.0",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["convo"]
 
 [tool.uv]
 default-groups = []
@@ -38,6 +48,10 @@ extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# A fixture imported from tests/fixtures/ is "redefined" by the parameter that asks for it.
+"tests/*" = ["F811"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

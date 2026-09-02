@@ -10,13 +10,14 @@ from a session id and never from anything a caller sent.
 import pytest
 from fastapi.testclient import TestClient
 
-import worker
-from api import app, open_store
-from core import control_plane, recordings
-from core.context import Project
-from core.state.events import Event
-from core.state.store import MemoryStore, SessionRow
-from core.testing import fake_context
+from convo import worker
+from convo.api import client as control_plane
+from convo.api.app import app, open_store
+from convo.domain.context import Project
+from convo.session import recordings
+from convo.state.events import Event
+from convo.state.store import MemoryStore, SessionRow
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

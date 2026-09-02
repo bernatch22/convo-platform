@@ -1,0 +1,198 @@
+"""Handing the call to a person as a VERB of the agent: the number, the rule, the words.
+
+Decisions: docs/decisions/convo.telephony.human.md
+"""
+
+from convo.domain.context import Project
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.telephony.transfer import WARM, TransferRefused, phone_number
+
+# The project field the console may set, and the name the model calls.
+FIELD = "transfer_number"
+TOOL = "transfer_to_human"
+
+# 25 s of ringing (`transfer.RINGING_S`) plus the REFER round trip: a timeout
+# under the ring would abandon a colleague who was about to pick up.
+TIMEOUT_S = 30.0
+
+
+def summarise(payload: dict) -> str:
+    """The one line a transfer leaves in the log: the mode, how it ended, where it went."""
+    return f"{payload.get('mode')} → {payload.get('outcome')} ({payload.get('to')})"
+
+
+TRANSFER_TO_HUMAN = ToolSpec(
+    name=TOOL,
+    side_effect=SideEffect.WRITE,
+    timeout_s=TIMEOUT_S,
+    result_summary=summarise,
+)
+
+# --- what the console is told ------------------------------------------------
+
+NOT_DECLARED = (
+    f"this project does not declare {TOOL!r} in its tool catalog, so no number will make the "
+    "agent offer it. That is a deploy decision, not a console one: add the spec to the "
+    "project's catalog (core.telephony.human.TRANSFER_TO_HUMAN) and redeploy."
+)
+
+NO_NUMBER = (
+    f"{FIELD} is empty, so this project has no human to hand a call to and the model is never "
+    f"offered {TOOL!r} at all. A tool that cannot work is not offered: a transfer that fails "
+    "mid-call costs a caller their patience, one that was never possible costs them nothing. "
+    "Set an E.164 number below (+34910000000) and the NEXT session carries the verb."
+)
+
+OFFERED = (
+    "the agent may hand a call to this number on its own, after announcing it. A PSTN call "
+    "is moved with a REFER on its own leg; a browser voice call gets this number dialled "
+    "INTO its room instead — a warm bridge, which needs SIP_OUTBOUND_TRUNK_ID on the box and "
+    "is refused at the door without it; a chat gets an honest refusal, there being no audio "
+    "to join. Every attempt is one `supervisor.transfer` line in the caller's log with its "
+    "mode and its outcome."
+)
+
+
+def refusal(value: str) -> str | None:
+    """Why this number is refused, or None when a call could really be handed to it."""
+    if not value:
+        return None
+    try:
+        phone_number(value)
+    except TransferRefused as refused:
+        return (
+            f"{value!r} is not a number a call can be handed to: {refused}. The console stores "
+            "E.164 — a leading '+', a country code and digits, no spaces — because the transfer "
+            "is a SIP REFER carrying a tel: URI. Leave it empty to take the verb away instead."
+        )
+    return None
+
+
+def number_of(project: Project) -> str:
+    """Where this project's transfers go, stripped; "" when it names nobody."""
+    return (project.transfer_number or "").strip()
+
+
+def declared(project: Project) -> bool:
+    """Whether the project opted into the verb at all — the catalog is the opt-in."""
+    return project.tools.get(TOOL) is not None
+
+
+def offered(project: Project) -> bool:
+    """Whether this project's next session shows the model a transfer tool."""
+    return declared(project) and bool(number_of(project))
+
+
+def unavailable(project: Project) -> str | None:
+    """Why the model is not offered the verb, or None when it is."""
+    if not declared(project):
+        return NOT_DECLARED
+    if not number_of(project):
+        return NO_NUMBER
+    return None
+
+
+def view(project: Project) -> dict:
+    """The transfer half of the console's phone block: the number, and why it is or is not live."""
+    why = unavailable(project)
+    return {
+        "tool": TOOL,
+        "number": number_of(project),
+        "declared": declared(project),
+        "offered": offered(project),
+        "unavailable_reasons": {TOOL: why} if why else {},
+        "note": why or OFFERED,
+    }
+
+
+# --- what the model is told --------------------------------------------------
+
+# The prompt half of the verb, and it is deliberately SMALL. Anthropic's current
+# guidance is to remove over-prompting — "instructions like 'If in doubt, use
+# [tool]' will cause overtriggering", and aggressive "you MUST use this tool
+# when…" language should be dialled back to plain "use this tool when…" — and a
+# tool's own description is already loaded into the system prompt, so a
+# paragraph that repeats the docstring's trigger rules is pure noise on every
+# stage, including the stages that will never transfer anybody. So the trigger
+# ("úsala cuando…") and the outcome handling live in the DOCSTRING
+# (`core.agents.human.transfer_to_human`), where the model reads them at the
+# moment it is deciding, and what stays here is the one thing a tool
+# description cannot express: the announcement is a spoken TURN, and it has to
+# happen before the line moves. Positive, with its motivation attached, because
+# "tell Claude what to do instead of what not to do".
+#
+# The first version was nine sentences of prohibitions in the LAST slot of every
+# stage prompt. It was suspected of a flake and it was innocent — see `protocol`
+# for the 154 runs. This version is a third the size and follows the guidance;
+# it did not move the flake either, because the flake was never about the words.
+PROTOCOL = """\
+<derivacion>
+Cuando vayas a pasar la llamada a un compañero, anúncialo primero en una frase corta y con
+el mismo trato que lleves usando en la llamada —«le paso con un compañero, un momento»— y
+deja que esa frase sea tu turno entero. Quien llama necesita oír que va a esperar antes de
+que la línea se mueva: un traspaso hecho en silencio se oye como una llamada que se corta.
+</derivacion>
+"""
+
+# What the tool answers with. One sentence per thing that can happen, and each
+# one written as an instruction to the model rather than as a line to read out:
+# what the caller hears is the model's, in the project's own register.
+MOVED = (
+    "La llamada está pasando a un compañero: quien llamaba deja de estar contigo. No digas "
+    "nada más y no te despidas otra vez."
+)
+
+# The warm half of MOVED: on a browser call nobody leaves — the colleague ARRIVES.
+JOINED = (
+    "El compañero está entrando a la llamada y quien llama ya puede hablar con él. No digas "
+    "nada más y no te despidas: la conversación sigue entre ellos."
+)
+
+FAILED = (
+    "El traspaso no ha podido hacerse ({outcome}) y quien llama SIGUE contigo en la línea, "
+    "esperando. Díselo con naturalidad y sin tecnicismos —no has podido pasarle con un "
+    "compañero—, ofrécele el teléfono del centro que tienes en tu información por si prefiere "
+    "llamar, y sigue ayudándole tú con lo que necesitaba."
+)
+
+NO_PHONE_CALL = (
+    "Esta conversación no es una llamada de teléfono, así que no hay ninguna línea que pasar a "
+    "un compañero y no se ha hecho nada. Díselo tal cual, ofrécele el teléfono del centro que "
+    "tienes en tu información para que le atienda una persona, y sigue ayudándole tú mientras "
+    "tanto."
+)
+
+# A voice call the platform cannot bridge right now — refused at the door, nothing rang.
+NO_BRIDGE = (
+    "Ahora mismo no es posible pasar esta llamada a un compañero y no se ha hecho nada: quien "
+    "llama sigue contigo. Díselo con naturalidad, ofrécele el teléfono del centro que tienes en "
+    "tu información para que le atienda una persona, y sigue ayudándole tú mientras tanto."
+)
+
+# The situation-paragraph for a business with nobody on the other end. It names
+# the situation and never the tool: a rule about a verb the model does not have
+# is the surest way to have it reach for one.
+ALONE = """\
+<derivacion>
+En esta línea no hay nadie más a quien pasar la llamada: quien atiende eres tú y no tienes
+forma de transferir a nadie. Si te piden hablar con una persona, se lo dices con naturalidad
+y sin disculparte de más —quien está al teléfono eres tú y les atiendes igual—, les ofreces
+resolverlo tú o los otros canales del negocio que tengas en tu información, y sigues con lo
+que necesitaban. Lo que no haces nunca es prometer un traspaso: decir «ahora mismo te paso»
+y no pasar a nadie deja a quien llama esperando una voz que no va a llegar.
+</derivacion>
+"""
+
+
+def protocol(project: Project) -> str:
+    """The paragraph a stage's prompt closes with about handing the call to a person."""
+    if not declared(project):
+        return ""
+    return PROTOCOL if offered(project) else ALONE
+
+
+def said(payload: dict) -> str:
+    """What the model reads back after a transfer attempt — an outcome, never a stack trace."""
+    if payload.get("ok"):
+        return JOINED if payload.get("mode") == WARM else MOVED
+    return FAILED.format(outcome=payload.get("outcome", "sin respuesta"))

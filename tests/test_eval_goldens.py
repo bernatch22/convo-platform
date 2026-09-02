@@ -13,8 +13,8 @@ import pathlib
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app
-from core.evals import goldens
+from convo.api.app import app
+from convo.evals import goldens
 
 pytestmark = pytest.mark.unit
 

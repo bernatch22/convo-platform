@@ -26,9 +26,9 @@ this file is the telephone that plugs into it.
   ▼  the SIP participant joins with sip.trunkPhoneNumber, sip.callID, …
   livekit-server 1.9.1   creates the room, dispatches the fleet
   ▼  ws://lk.bernardocastro.dev:7880   (the worker dialled OUT to here)
-  laptop   python worker.py dev
+  laptop   python -m convo worker dev
        core/sip.py     reads the caller's sip.* attributes off the ROOM
-       core/router.py  store.route("cc", "+14176743169")  →  clinica-norte /
+       convo/session/router.py  store.route("cc", "+14176743169")  →  clinica-norte /
                        reagendamiento / voice     ← the ONLY tenant decision
 ```
 
@@ -45,7 +45,7 @@ uv run python scripts/twilio_trunk.py --number +14176743169 \
     --twilio-env ~/pinecall/sdk-server/.env.production      # create what is missing
 uv run python -m convo routes add cc +14176743169 clinica-norte reagendamiento voice
 uv run python -m convo routes list
-env -u TENANT -u PROJECT uv run python worker.py dev        # then call the number
+env -u TENANT -u PROJECT uv run python -m convo worker dev        # then call the number
 ```
 
 The script is idempotent: it reads first and creates only what is missing, so
@@ -180,7 +180,7 @@ ssh convo-box 'sudo docker ps; sudo docker logs --tail 50 convo-sip-1'
 # 3. the route row exists on the db the worker reads
 uv run python -m convo routes list
 # 4. the worker registered with the SFU
-env -u TENANT -u PROJECT uv run python worker.py dev   # "registered worker … agent_name=cc"
+env -u TENANT -u PROJECT uv run python -m convo worker dev   # "registered worker … agent_name=cc"
 # 5. the whole path, minus the audio — see below
 uv run python scripts/sip_probe.py
 uv run python -m convo sessions list
@@ -253,7 +253,7 @@ carrier.
 convo-evals.timer     OnCalendar=*-*-* 04:00:00 Europe/Madrid   (the box runs UTC;
                       the zone is spelled out so DST cannot move the run)
    └─ convo-evals.service   Type=oneshot, WorkingDirectory=/home/berna/convo-app
-        └─ uv run python -m core.testing.nightly
+        └─ uv run python -m convo evals nightly
              ├─ discovers every tenants/*/projects/*/evals/test_ring2.py
              ├─ counts its goldens = the number of LIVE CALLS = the bill
              ├─ takes whole suites while they fit the 8-call budget
@@ -268,7 +268,7 @@ Both units are installed by `deploy_api.sh`; the run needs `uv sync --extra dev`
 ```bash
 ssh convo-box 'systemctl list-timers convo-evals.timer --no-pager'      # armed?
 ssh convo-box 'sudo systemctl start convo-evals.service'               # one night, by hand
-ssh convo-box 'cd convo-app && ~/.local/bin/uv run python -m core.testing.nightly --dry-run'
+ssh convo-box 'cd convo-app && ~/.local/bin/uv run python -m convo evals nightly --dry-run'
 ssh convo-box 'column -t -s"\t" convo-app/tmp/evals/index.tsv'          # the whole history
 ssh convo-box 'journalctl -u convo-evals -n 40 --no-pager'              # last night, narrated
 ```
@@ -284,7 +284,7 @@ retargeted (`CONVO_API=…`) without editing the unit.
 - **`deepeval test run` exits 0 over a failed metric.** A ring-2 wire case is
   `flaky=True` by design, and DeepEval will not let a flaky metric fail a case.
   The runner therefore reads the scores, not the exit code — see
-  `core.testing.nightly.status_of`. Measured on this box on 2026-08-31: a tuteo
+  `convo.testing.reports.nightly.status_of`. Measured on this box on 2026-08-31: a tuteo
   greeting scored `Keeps the register` 0.00 and pytest passed the suite.
 - **Port 8091 is `livekit-sip`**, not a free port. Anything ad hoc goes higher.
 

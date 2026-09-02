@@ -10,7 +10,7 @@ User=berna
 WorkingDirectory=/home/berna/convo-app
 # start = production mode: one prewarmed process per CPU. dev mode keeps ZERO
 # idle processes and every call paid ~5s of cold process spawn (measured).
-ExecStart=/home/berna/.local/bin/uv run python worker.py start
+ExecStart=/home/berna/.local/bin/uv run python -m convo worker start
 EnvironmentFile=/home/berna/convo-app/.env
 Restart=always
 RestartSec=3

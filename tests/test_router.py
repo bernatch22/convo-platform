@@ -5,9 +5,9 @@ import textwrap
 
 import pytest
 
-from core import registry, router
-from core.state.store import MemoryStore, ProjectVersion, Route
-from core.testing.fake_job import fake_job_context
+from convo.session import registry, router
+from convo.state.store import MemoryStore, ProjectVersion, Route
+from convo.testing.fake_job import fake_job_context
 
 pytestmark = pytest.mark.unit
 

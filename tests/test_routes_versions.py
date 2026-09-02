@@ -2,7 +2,7 @@
 
 import pytest
 
-from core.state.store import MemoryStore, ProjectVersion, Route, SQLiteStore
+from convo.state.store import MemoryStore, ProjectVersion, Route, SQLiteStore
 
 pytestmark = pytest.mark.unit
 

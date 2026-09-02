@@ -20,7 +20,7 @@ What is left here is what code can decide on its own.
 
 import pytest
 
-from core.testing import fake_context, run_turns, text_of
+from convo.testing import fake_context, run_turns, text_of
 from tests.conftest import needs_llm
 
 pytestmark = [pytest.mark.unit, needs_llm]

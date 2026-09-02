@@ -4,8 +4,8 @@ import pytest
 from livekit.agents import AgentSession
 from livekit.agents.voice import Agent
 
-from core.agents import TenantAgent
-from core.testing import fake_context
+from convo.agents import TenantAgent
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

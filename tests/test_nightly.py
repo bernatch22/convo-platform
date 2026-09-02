@@ -10,10 +10,10 @@ import json
 
 import pytest
 
-from core.testing import nightly
-from core.testing import nightly_report as report
-from core.testing.nightly import Result, Suite
-from core.testing.nightly_html import page
+from convo.testing.reports import nightly
+from convo.testing.reports import nightly_report as report
+from convo.testing.reports.nightly import Result, Suite
+from convo.testing.reports.nightly_html import page
 
 pytestmark = pytest.mark.unit
 
