@@ -41,7 +41,7 @@ own.
 
 from deepeval.metrics import DeepAcyclicGraph
 
-from core.testing import dag, leakage, register
+from convo.testing.metrics import dag, leakage, register
 
 from . import grounding
 

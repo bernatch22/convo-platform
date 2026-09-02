@@ -27,9 +27,9 @@ anywhere in `core/`: it lives in these four files and in the project's own
 `messages`.
 """
 
-from core.context import TenantContext
-from core.security.protocol import SUPERVISOR_PROTOCOL
-from core.telephony import human
+from convo.domain.context import TenantContext
+from convo.prompting.protocols import SUPERVISOR_PROTOCOL
+from convo.telephony import human
 
 from .farewell import FAREWELL_EXAMPLES, FAREWELL_INSTRUCTIONS, FAREWELL_ROLE
 from .identify import IDENTIFY_EXAMPLES, IDENTIFY_INSTRUCTIONS, IDENTIFY_ROLE

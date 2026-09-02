@@ -8,8 +8,8 @@ change is every line of the runtime that carries them.
 
 from dataclasses import dataclass
 
-from core.adapters.base import Adapter
-from core.context import Tenant
+from convo.adapters.base import Adapter
+from convo.domain.context import Tenant
 
 from .projects.pedidos.project import PROJECT
 

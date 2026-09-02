@@ -12,7 +12,7 @@ writing a NODE here, the shape is probably reusable and belongs in
 
 from deepeval.metrics import DeepAcyclicGraph
 
-from core.testing import dag, leakage, register
+from convo.testing.metrics import dag, leakage, register
 
 from . import grounding
 

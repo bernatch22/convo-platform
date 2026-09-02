@@ -14,12 +14,11 @@ import importlib
 
 import pytest
 
-from core import confirm
-from core.state.log import record
-from core.testing.harness import fake_context
-from core.tools import guard
-from core.tools.contract import SideEffect, ToolSpec
-from core.tools.guard import ToolRefused, mask
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.state.log import record
+from convo.testing.harness import fake_context
+from convo.tools import confirm, guard
+from convo.tools.guard import ToolRefused, mask
 
 pytestmark = pytest.mark.unit
 

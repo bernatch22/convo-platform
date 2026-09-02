@@ -4,7 +4,7 @@ import importlib
 
 import pytest
 
-from core.testing import fake_context
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

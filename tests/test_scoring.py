@@ -11,12 +11,12 @@ import time
 
 import pytest
 
-from convo import sessions as cli
-from core.context import Project, Tenant
-from core.scoring import checks, report, runner, sweeper
-from core.scoring.rules import ScoringRules, rules_for
-from core.state.events import Event
-from core.state.store import MemoryStore, SessionRow
+from convo.cli import sessions as cli
+from convo.domain.context import Project, Tenant
+from convo.scoring import checks, report, runner, sweeper
+from convo.scoring.rules import ScoringRules, rules_for
+from convo.state.events import Event
+from convo.state.store import MemoryStore, SessionRow
 
 pytestmark = pytest.mark.unit
 
@@ -67,7 +67,7 @@ def stored(
 
 
 def turns_of(events: list[Event]) -> list:
-    from core.testing import replay
+    from convo.testing import replay
 
     return replay.turns_from(events)
 
@@ -272,7 +272,7 @@ def long_case(turns: int = 12):
 
 
 def test_a_call_under_three_turns_is_never_judged() -> None:
-    from core.scoring import judge as judge_module
+    from convo.scoring import judge as judge_module
 
     check, run = judge_module.judge(two_turn_case(), ScoringRules())
 
@@ -281,7 +281,7 @@ def test_a_call_under_three_turns_is_never_judged() -> None:
 
 
 def test_the_cap_is_proved_before_the_call_is_made_not_after(monkeypatch) -> None:
-    from core.scoring import judge as judge_module
+    from convo.scoring import judge as judge_module
 
     monkeypatch.setattr(judge_module, "CAP_EUR", 0.0000001)
     monkeypatch.setattr(judge_module, "MAX_TURNS", 100)
@@ -292,13 +292,13 @@ def test_the_cap_is_proved_before_the_call_is_made_not_after(monkeypatch) -> Non
 
 
 def test_a_longer_transcript_estimates_dearer_than_a_shorter_one() -> None:
-    from core.scoring import judge as judge_module
+    from convo.scoring import judge as judge_module
 
     assert judge_module.estimated_eur(long_case(20)) > judge_module.estimated_eur(long_case(4))
 
 
 def test_the_transcript_is_cut_to_the_last_turns_before_it_is_priced() -> None:
-    from core.scoring import judge as judge_module
+    from convo.scoring import judge as judge_module
 
     trimmed = judge_module._trim(long_case(200), long_case(200).turns)
 
@@ -361,7 +361,7 @@ def test_sessions_score_can_be_asked_for_by_hand_and_is_idempotent(capsys) -> No
 def test_the_session_list_carries_the_score_the_console_draws_a_chip_from() -> None:
     from fastapi.testclient import TestClient
 
-    from api import app, open_store
+    from convo.api.app import app, open_store
 
     store = stored(good_call())
     runner.score_session(SESSION, store, judge=False)
@@ -378,7 +378,7 @@ def test_the_session_list_carries_the_score_the_console_draws_a_chip_from() -> N
 def test_an_unscored_session_says_null_rather_than_zero() -> None:
     from fastapi.testclient import TestClient
 
-    from api import app, open_store
+    from convo.api.app import app, open_store
 
     app.dependency_overrides[open_store] = lambda: stored(good_call())
     try:
@@ -394,8 +394,8 @@ def test_the_score_endpoint_writes_once_and_answers_the_same_thing_twice(
 ) -> None:
     from fastapi.testclient import TestClient
 
-    from api import app
-    from core.state.store import SQLiteStore
+    from convo.api.app import app
+    from convo.state.store import SQLiteStore
 
     monkeypatch.setenv("CONVO_DB", str(tmp_path / "convo.db"))
     monkeypatch.setenv("SCORING_SWEEP", "0")  # the route under test, not the background one
@@ -419,7 +419,7 @@ def test_a_call_with_no_words_at_all_still_gets_its_free_checks_and_no_judge() -
     """A hang-up before the first word: DeepEval refuses an empty-turns case, so the
     judge must be skipped BEFORE the case is built — the live sweeper wedged on that
     TypeError, retrying one silent call forever (found on the box, 2026-08-31)."""
-    from core.scoring.runner import build_report
+    from convo.scoring.runner import build_report
 
     end = Event(2, "session.end", 900, {"outcome": "dropped"})
     events = [Event(1, "session.start", 0, {}), end]

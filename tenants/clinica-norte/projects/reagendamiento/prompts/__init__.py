@@ -25,9 +25,9 @@ the expensive one:
   timestamp in there and every stage pays full price on every turn.
 """
 
-from core.context import TenantContext
-from core.security.protocol import SUPERVISOR_PROTOCOL
-from core.telephony import human
+from convo.domain.context import TenantContext
+from convo.prompting.protocols import SUPERVISOR_PROTOCOL
+from convo.telephony import human
 
 from .cancel_or_confirm import (
     CANCEL_OR_CONFIRM_EXAMPLES,

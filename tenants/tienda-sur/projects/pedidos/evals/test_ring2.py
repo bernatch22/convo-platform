@@ -22,8 +22,8 @@ from pathlib import Path
 import pytest
 from deepeval import assert_test
 
-from core.testing import deepeval as bridge
-from core.testing import ring2_goldens
+from convo.testing.metrics import deepeval as bridge
+from convo.testing.reports import ring2_goldens
 
 pytestmark = pytest.mark.evals
 

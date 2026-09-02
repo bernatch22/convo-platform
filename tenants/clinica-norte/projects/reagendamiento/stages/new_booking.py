@@ -10,9 +10,9 @@ patient. If either fails, the compensation cancels what was written and the
 caller is told plainly that nothing is on the book.
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, function_tool
-from core.context import TenantContext
-from core.tools.saga import Saga, SagaFailed
+from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
+from convo.tools.saga import Saga, SagaFailed
 
 from .. import dates, prompts, tools
 from .farewell import Farewell

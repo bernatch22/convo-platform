@@ -29,11 +29,11 @@ from deepeval.metrics.dag.schema import BinaryJudgementVerdict, TaskNodeOutput
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, ToolCall, Turn
 
-from core import business
-from core.adapters.base import LIST_RECORDS
-from core.state.store import MemoryStore
-from core.testing import fake_context
-from core.tools.contract import SideEffect
+from convo.adapters.base import LIST_RECORDS
+from convo.domain import business
+from convo.domain.tools import SideEffect
+from convo.state.store import MemoryStore
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 
@@ -231,7 +231,7 @@ def test_the_line_read_back_names_the_number_the_state_and_what_was_written() ->
 
 async def test_the_shop_answers_two_tables_and_never_one_with_a_mixed_vocabulary() -> None:
     """Orders and incidents are different records: own shape, own columns, own state words."""
-    from core.registry import load_registry
+    from convo.session.registry import load_registry
 
     view = await business.records(load_registry()[TENANT], PROJECT, MemoryStore())
 

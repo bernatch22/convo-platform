@@ -31,11 +31,11 @@ import pytest
 from livekit.api import SipCallError
 from livekit.protocol.sip import SIPTransferStatus
 
-from core.security.control import NotASupervisor, SupervisorControl
-from core.security.supervisor import TRANSFER
-from core.telephony import handover, transfer
-from core.telephony.transfer import COLD, WARM, TransferRefused
-from core.testing import fake_context
+from convo.supervision.control import NotASupervisor, SupervisorControl
+from convo.supervision.supervisor import TRANSFER
+from convo.telephony import handover, transfer
+from convo.telephony.transfer import COLD, WARM, TransferRefused
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

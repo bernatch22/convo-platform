@@ -44,13 +44,13 @@ SFU through the same five methods or one of them is doing something else.
 import pytest
 from livekit.agents.llm import ToolError, tool_context
 
-from core import pipeline
-from core.agents.human import transfer_to_human
-from core.security.control import SupervisorControl
-from core.security.supervisor import TRANSFER
-from core.state.store import MemoryStore, PipelineOverride
-from core.telephony import human, transfer
-from core.testing import fake_context
+from convo.agents.human import transfer_to_human
+from convo.session import pipeline
+from convo.state.store import MemoryStore, PipelineOverride
+from convo.supervision.control import SupervisorControl
+from convo.supervision.supervisor import TRANSFER
+from convo.telephony import human, transfer
+from convo.testing import fake_context
 from tests.test_transfer import CALLER, ROOM, TRUNK, FakeAPI, FakeRoom, FakeSession, Person
 
 pytestmark = pytest.mark.unit
@@ -68,7 +68,7 @@ def tc():
 
 @pytest.fixture
 def livekit(monkeypatch) -> FakeAPI:
-    from core.telephony import handover
+    from convo.telephony import handover
 
     api_client = FakeAPI()
     monkeypatch.setattr(handover, "client", lambda: api_client)
@@ -175,7 +175,7 @@ def test_a_project_with_no_number_is_greyed_out_with_the_reason_in_the_servers_w
 
 
 async def test_clearing_the_number_from_the_console_takes_the_verb_off_the_next_session() -> None:
-    from core.state import overrides
+    from convo.state import overrides
 
     tc = fake_context(*CLINIC)
     store = MemoryStore()

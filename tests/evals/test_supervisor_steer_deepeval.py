@@ -25,10 +25,10 @@ pins Haiku's phrasing fails on the day it phrases it better.
 
 import pytest
 
-from core.security.control import NotASupervisor, SupervisorControl
-from core.security.supervisor import STEER
-from core.testing import fake_context
-from core.testing.harness import live_conversation, text_of
+from convo.supervision.control import NotASupervisor, SupervisorControl
+from convo.supervision.supervisor import STEER
+from convo.testing import fake_context
+from convo.testing.harness import live_conversation, text_of
 
 pytestmark = pytest.mark.evals
 

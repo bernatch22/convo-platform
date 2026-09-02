@@ -13,10 +13,11 @@ from pathlib import Path
 import pytest
 from deepeval.test_case import Turn
 
-from core.registry import load_registry
-from core.testing import deepeval as bridge
-from core.testing import personas, ring2_goldens
-from core.testing.ring2 import CALLER_VOICE, Transcript
+from convo.session.registry import load_registry
+from convo.testing.callers import personas
+from convo.testing.metrics import deepeval as bridge
+from convo.testing.reports import ring2_goldens
+from convo.testing.reports.ring2 import CALLER_VOICE, Transcript
 
 pytestmark = pytest.mark.unit
 

@@ -8,9 +8,9 @@ by nobody: the greeting is spoken verbatim by design, so equality is the test.
 
 import pytest
 
-from core.state.overrides import apply
-from core.state.store import MemoryStore, PipelineOverride
-from core.testing import fake_context
+from convo.state.overrides import apply
+from convo.state.store import MemoryStore, PipelineOverride
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.evals
 

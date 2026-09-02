@@ -53,8 +53,8 @@ import re
 import time
 from typing import Any
 
-from core.adapters.base import CHANGED, GONE, LIST_RECORDS, NEW, PLAIN, Adapter
-from core.adapters.ledger import Ledger
+from convo.adapters.base import CHANGED, GONE, LIST_RECORDS, NEW, PLAIN, Adapter
+from convo.adapters.ledger import Ledger
 
 from . import patients, slots
 from .slots import DOCTORS, normalise, specialty_key  # re-exported: the cuadro médico lives there

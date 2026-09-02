@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
-from core.adapters.base import Adapter
-from core.context import Tenant
+from convo.adapters.base import Adapter
+from convo.domain.context import Tenant
 
 from .projects.reagendamiento.project import PROJECT
 

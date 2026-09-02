@@ -23,14 +23,19 @@ import dataclasses
 import pytest
 from livekit.agents import AgentSession, stt
 
-from core.agents.base import TenantAgent
-from core.observability.observers import observe
-from core.session import text_turn_handling
-from core.state.attach import attach_log
-from core.state.store import MemoryStore
-from core.stt_gate import MAX_SPEECH_DB, MIN_SPEECH_DB, GateOptions, TranscriptGate, level_db
-from core.testing.harness import fake_context
-from core.testing.stt_script import (
+from convo.agents.stage import TenantAgent
+from convo.observability.observers import observe
+from convo.session.build import text_turn_handling
+from convo.session.stt_gate import (
+    MAX_SPEECH_DB,
+    MIN_SPEECH_DB,
+    GateOptions,
+    TranscriptGate,
+    level_db,
+)
+from convo.state.attach import attach_log
+from convo.state.store import MemoryStore
+from convo.testing.callers.stt_script import (
     ScriptedMicrophone,
     ScriptedSTT,
     Utterance,
@@ -38,6 +43,7 @@ from core.testing.stt_script import (
     speech,
     speech_event,
 )
+from convo.testing.harness import fake_context
 
 pytestmark = pytest.mark.unit
 

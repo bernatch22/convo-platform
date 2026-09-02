@@ -18,8 +18,8 @@ gets a refusal and no handoff — there is no record to change, no cita to cance
 and none to confirm.
 """
 
-from core.agents import RunContext, TenantAgent, function_tool
-from core.context import TenantContext
+from convo.agents import RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
 
 from .. import dates, prompts, tools
 

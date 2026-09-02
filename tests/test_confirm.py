@@ -2,8 +2,8 @@
 
 import pytest
 
-from core import confirm
-from core.tools.guard import ToolRefused
+from convo.tools import confirm
+from convo.tools.guard import ToolRefused
 from tests.test_tools import FakeAdapter, context
 
 pytestmark = pytest.mark.unit

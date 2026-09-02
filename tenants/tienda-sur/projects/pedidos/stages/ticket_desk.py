@@ -26,8 +26,8 @@ identical across the four stages, so the cached prefix is the same object and
 no existing golden moved.
 """
 
-from core.agents import RunContext, TenantAgent, function_tool
-from core.context import TenantContext
+from convo.agents import RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
 
 from .. import prompts, tools
 

@@ -31,8 +31,8 @@ shapes, and every layer above — tool, guard, prompt, console — works unchang
 import time
 from typing import Any
 
-from core.adapters.base import GONE, LIST_RECORDS, NEW, PLAIN, Adapter
-from core.adapters.ledger import Ledger
+from convo.adapters.base import GONE, LIST_RECORDS, NEW, PLAIN, Adapter
+from convo.adapters.ledger import Ledger
 
 from . import ticketbook
 from .ticketbook import IN_PROGRESS, OPEN, RESOLVED  # re-exported: the states

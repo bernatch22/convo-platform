@@ -32,7 +32,7 @@ from deepeval.metrics.dag.schema import BinaryJudgementVerdict, TaskNodeOutput
 from deepeval.models import DeepEvalBaseLLM
 from deepeval.test_case import ConversationalTestCase, ToolCall, Turn
 
-from core.testing.dag import NOTHING_WAS_SAID, consent_graph, names_of, ran_at, said_before
+from convo.testing.metrics.dag import NOTHING_WAS_SAID, consent_graph, names_of, ran_at, said_before
 
 pytestmark = pytest.mark.unit
 

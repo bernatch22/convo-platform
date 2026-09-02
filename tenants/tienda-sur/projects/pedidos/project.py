@@ -18,11 +18,11 @@ spoken failure instead of a refusal, and the refusal is the honest answer.
 
 from dataclasses import dataclass
 
-from core.context import Project, TenantContext
-from core.telephony.human import TRANSFER_TO_HUMAN
-from core.tools.catalog import ToolCatalog
-from core.tools.contract import SideEffect, ToolSpec
-from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
+from convo.domain.catalog import ToolCatalog
+from convo.domain.context import Project, TenantContext
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.telephony.human import TRANSFER_TO_HUMAN
+from convo.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
 from ...adapters.tickets import summarise_ticket
 from . import knowledge

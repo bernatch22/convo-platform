@@ -41,9 +41,9 @@ Three of these choices are worth the sentence:
 from deepeval.dataset import ConversationalGolden, Persona
 from deepeval.test_case import ConversationalTestCase
 
-from core.context import TenantContext
-from core.testing import fake_context
-from core.testing.simulator import SimulatedCaller, settled_when
+from convo.domain.context import TenantContext
+from convo.testing import fake_context
+from convo.testing.callers.simulator import SimulatedCaller, settled_when
 
 from ..stages import CancelOrConfirm, ChooseSlot, Identify, NewBooking, UpdateContact
 from ..stages.identify import CANCEL, CONTACT

@@ -19,7 +19,7 @@ rather than as passed. A project that wants no score at all sets
 business, and it belongs next to the voice and the greeting.
 """
 
-from core.scoring.rules import ScoringRules
+from convo.scoring.rules import ScoringRules
 
 from .dag import OTHER_BUSINESS_TERMS, TU_FORMS
 

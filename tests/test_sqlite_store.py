@@ -4,8 +4,8 @@ import sqlite3
 
 import pytest
 
-from core.state.events import Event
-from core.state.store import SessionRow, SQLiteStore
+from convo.state.events import Event
+from convo.state.store import SessionRow, SQLiteStore
 
 pytestmark = pytest.mark.unit
 

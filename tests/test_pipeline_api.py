@@ -10,13 +10,13 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app, open_store
-from core import router
-from core.agents import TenantAgent
-from core.providers import llm, stt, tts
-from core.state.events import Event
-from core.state.store import MemoryStore, PipelineOverride, SessionRow, SQLiteStore
-from core.testing.fake_job import fake_job_context
+from convo.agents import TenantAgent
+from convo.api.app import app, open_store
+from convo.providers import llm, stt, tts
+from convo.session import router
+from convo.state.events import Event
+from convo.state.store import MemoryStore, PipelineOverride, SessionRow, SQLiteStore
+from convo.testing.fake_job import fake_job_context
 
 pytestmark = pytest.mark.unit
 
@@ -391,7 +391,7 @@ async def test_an_override_stored_before_the_key_vanished_still_builds_a_session
 
 
 def test_every_model_the_platform_runs_has_a_price(client) -> None:
-    from core.observability.prices import PRICES
+    from convo.observability.prices import PRICES
 
     for model in llm.ALLOWED_MODELS:
         assert model in PRICES, "the allow-list IS the priced list; they cannot drift apart"

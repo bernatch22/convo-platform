@@ -2,8 +2,8 @@
 
 import pytest
 
-from core import sip
-from core.testing.fake_job import fake_job_context
+from convo.session import sip
+from convo.testing.fake_job import fake_job_context
 
 pytestmark = pytest.mark.unit
 

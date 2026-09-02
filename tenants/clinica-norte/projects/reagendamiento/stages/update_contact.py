@@ -22,8 +22,8 @@ saga, and that absence is the point — one step, nothing to compensate, and
 nothing anybody could compensate it with: the number it replaced is not kept.
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, ToolError, function_tool
-from core.context import TenantContext
+from convo.agents import ConfirmTask, RunContext, TenantAgent, ToolError, function_tool
+from convo.domain.context import TenantContext
 
 from .. import prompts, tools
 

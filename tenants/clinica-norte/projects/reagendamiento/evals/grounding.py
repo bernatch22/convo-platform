@@ -14,7 +14,7 @@ below is a unit test that costs nothing to run.
 
 import re
 
-from core.testing import grounding
+from convo.testing.metrics import grounding
 
 from .. import dates
 from ..knowledge import CLINIC

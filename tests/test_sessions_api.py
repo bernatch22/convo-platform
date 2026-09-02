@@ -5,10 +5,10 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app, open_store
-from core import control_plane
-from core.state.events import Event
-from core.state.store import MemoryStore, SessionRow
+from convo.api import client as control_plane
+from convo.api.app import app, open_store
+from convo.state.events import Event
+from convo.state.store import MemoryStore, SessionRow
 
 pytestmark = pytest.mark.unit
 

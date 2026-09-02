@@ -8,8 +8,8 @@ reachable. The fix is that the number is read per project from the same
 
 import pytest
 
-from core.state.store import MemoryStore, Route
-from core.telephony import lines
+from convo.state.store import MemoryStore, Route
+from convo.telephony import lines
 
 pytestmark = pytest.mark.unit
 
@@ -79,8 +79,8 @@ def test_a_number_registered_against_another_fleet_is_shown_as_unreachable(store
 
 
 def test_the_pipeline_snapshot_carries_the_project_s_own_phone_block(store) -> None:
-    from core.pipeline import snapshot
-    from core.registry import load_registry
+    from convo.session.pipeline import snapshot
+    from convo.session.registry import load_registry
 
     lines.seed(store)
     tenant = load_registry()[CLINICA]

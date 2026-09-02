@@ -12,8 +12,8 @@ declared on the spec (`restore_booking`) if a later step fails.
 `tenants/tienda-sur/projects/pedidos/stages/order_desk.py` is that shape.
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, function_tool
-from core.context import TenantContext
+from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
 
 from .. import prompts, tools
 

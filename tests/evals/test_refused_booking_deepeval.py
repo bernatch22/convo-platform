@@ -28,8 +28,8 @@ import pytest
 from deepeval import assert_test
 from deepeval.test_case import LLMTestCase
 
-from core.testing import deepeval as bridge
-from core.testing import run_conversation, text_of
+from convo.testing import run_conversation, text_of
+from convo.testing.metrics import deepeval as bridge
 from tests.test_stages import ANA, identified_context
 
 pytestmark = pytest.mark.evals

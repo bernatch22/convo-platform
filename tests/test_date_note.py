@@ -14,8 +14,8 @@ import pytest
 from livekit.agents import AgentSession
 from livekit.agents.llm._provider_format import anthropic as anthropic_format
 
-from core.dates_note import CLOCK_TOOL, date_note
-from core.testing import fake_context
+from convo.agents.clock import CLOCK_TOOL, date_note
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

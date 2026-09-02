@@ -10,9 +10,9 @@ was, because in this shop a cancellation the customer has no proof of is not a
 cancellation.
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, function_tool
-from core.context import TenantContext
-from core.tools.saga import Saga, SagaFailed
+from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
+from convo.tools.saga import Saga, SagaFailed
 
 from .. import prompts, tools
 from .farewell import Farewell

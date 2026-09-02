@@ -1,7 +1,7 @@
 """Farewell: confirm the cancellation out loud, promise the SMS, and close the call."""
 
-from core.agents import TenantAgent
-from core.context import TenantContext
+from convo.agents import TenantAgent
+from convo.domain.context import TenantContext
 
 from .. import prompts
 

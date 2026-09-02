@@ -1,7 +1,7 @@
 """Identify: open the call, find the customer's order, hand the call to OrderDesk."""
 
-from core.agents import RunContext, TenantAgent, function_tool
-from core.context import TenantContext
+from convo.agents import RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
 
 from .. import prompts, tools
 

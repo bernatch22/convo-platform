@@ -28,8 +28,8 @@ import pathlib
 import pytest
 from deepeval import assert_test
 
-from core.testing import deepeval as bridge
-from core.testing import fake_context, run_conversation
+from convo.testing import fake_context, run_conversation
+from convo.testing.metrics import deepeval as bridge
 
 pytestmark = pytest.mark.evals
 

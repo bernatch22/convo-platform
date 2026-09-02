@@ -28,17 +28,17 @@ from livekit.agents import StopResponse
 from livekit.agents.llm import ChatContext, FunctionCall, FunctionCallOutput
 from livekit.rtc import RpcError
 
-from core.agents import TenantAgent
-from core.history import orphans
-from core.security import monitor
-from core.security.control import (
+from convo.agents import TenantAgent
+from convo.session.history import orphans
+from convo.supervision import monitor
+from convo.supervision.control import (
     STEER_PREFACE,
     NotASupervisor,
     SupervisorControl,
     UnknownVerb,
 )
-from core.security.supervisor import RELEASE, STEER, TAKEOVER, TRANSFER
-from core.testing import fake_context
+from convo.supervision.supervisor import RELEASE, STEER, TAKEOVER, TRANSFER
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

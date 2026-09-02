@@ -16,9 +16,9 @@ The register — usted or tú, and which — lives in these files and in the
 project's `messages`, and in nothing under `core/`.
 """
 
-from core.context import TenantContext
-from core.security.protocol import SUPERVISOR_PROTOCOL
-from core.telephony import human
+from convo.domain.context import TenantContext
+from convo.prompting.protocols import SUPERVISOR_PROTOCOL
+from convo.telephony import human
 
 from .desk import CONFIRM_INSTRUCTIONS, DESK_EXAMPLES, DESK_INSTRUCTIONS, DESK_ROLE
 from .reception import RECEPTION_EXAMPLES, RECEPTION_INSTRUCTIONS, RECEPTION_ROLE

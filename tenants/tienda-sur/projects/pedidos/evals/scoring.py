@@ -9,7 +9,7 @@ The word lists come from `dag.py`, where the ring-1 metrics already keep them,
 so a term added for the suite is watched on real calls the same afternoon.
 """
 
-from core.scoring.rules import ScoringRules
+from convo.scoring.rules import ScoringRules
 
 from .dag import CLINIC_TERMS, USTED_FORMS
 

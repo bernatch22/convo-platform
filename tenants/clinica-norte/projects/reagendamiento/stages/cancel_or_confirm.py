@@ -28,8 +28,8 @@ cita is not refused by a paragraph, they are refused by a stage that has no way
 to ask.
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, ToolError, function_tool
-from core.context import TenantContext
+from convo.agents import ConfirmTask, RunContext, TenantAgent, ToolError, function_tool
+from convo.domain.context import TenantContext
 
 from .. import prompts, tools
 

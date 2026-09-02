@@ -12,8 +12,8 @@ below. The id is the folder name and the string a dispatch, a route or
 
 from dataclasses import dataclass
 
-from core.adapters.base import Adapter
-from core.context import Tenant
+from convo.adapters.base import Adapter
+from convo.domain.context import Tenant
 
 from .projects.example.project import PROJECT
 

@@ -16,7 +16,7 @@ and `evidence_of(turns)`.
 
 import re
 
-from core.testing import grounding
+from convo.testing.metrics import grounding
 
 from ..knowledge import BUSINESS
 

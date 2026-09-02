@@ -20,7 +20,7 @@ import json
 
 import pytest
 
-from core.testing import TODAY, fake_context, run_conversation
+from convo.testing import TODAY, fake_context, run_conversation
 from tests.conftest import needs_llm
 from tests.test_stages import identified_context
 

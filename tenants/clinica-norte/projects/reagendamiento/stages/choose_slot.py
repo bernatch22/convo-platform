@@ -8,9 +8,9 @@ make up a rebooking then run as one saga — release the old hour, take the new
 one, send the SMS — and any failure puts the old appointment back.
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, function_tool
-from core.context import TenantContext
-from core.tools.saga import Saga, SagaFailed
+from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
+from convo.tools.saga import Saga, SagaFailed
 
 from .. import dates, prompts, tools
 from .farewell import Farewell

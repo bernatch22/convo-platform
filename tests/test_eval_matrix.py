@@ -10,10 +10,11 @@ import dataclasses
 
 import pytest
 
-from core.providers import llm
-from core.registry import load_registry
-from core.testing import fake_context, matrix, model_under_test
-from core.testing.harness import MODEL_ENV
+from convo.providers import llm
+from convo.session.registry import load_registry
+from convo.testing import fake_context, model_under_test
+from convo.testing.harness import MODEL_ENV
+from convo.testing.reports import matrix
 
 pytestmark = pytest.mark.unit
 

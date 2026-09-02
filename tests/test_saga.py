@@ -4,12 +4,12 @@ from typing import Any
 
 import pytest
 
-from core import confirm
-from core.context import Project, Tenant, TenantContext
-from core.tools.catalog import ToolCatalog
-from core.tools.contract import SideEffect, ToolSpec
-from core.tools.executor import LocalExecutor
-from core.tools.saga import Saga, SagaFailed
+from convo.domain.catalog import ToolCatalog
+from convo.domain.context import Project, Tenant, TenantContext
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.tools import confirm
+from convo.tools.executor import LocalExecutor
+from convo.tools.saga import Saga, SagaFailed
 
 pytestmark = pytest.mark.unit
 

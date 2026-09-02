@@ -8,7 +8,7 @@ tool. This is the judged half — it belongs to the evals ring, never to unit
 
 import pytest
 
-from core.testing import fake_context, final_message, run_conversation
+from convo.testing import fake_context, final_message, run_conversation
 
 pytestmark = pytest.mark.evals
 

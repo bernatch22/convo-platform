@@ -17,7 +17,7 @@ provider refuses; the platform turns it into a sentence the caller hears.
 
 from typing import Any
 
-from core.adapters.base import Adapter
+from convo.adapters.base import Adapter
 
 SEND_SMS = "send_sms"
 MAX_CHARS = 480

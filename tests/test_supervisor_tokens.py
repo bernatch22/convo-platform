@@ -13,9 +13,9 @@ import jwt as pyjwt
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app
-from core.auth import SUPERVISOR_TTL, mint_supervisor
-from core.security.supervisor import KINDS, is_supervisor
+from convo.api.app import app
+from convo.api.auth import SUPERVISOR_TTL, mint_supervisor
+from convo.supervision.supervisor import KINDS, is_supervisor
 
 pytestmark = pytest.mark.unit
 

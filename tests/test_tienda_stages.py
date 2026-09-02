@@ -18,11 +18,11 @@ import importlib
 
 import pytest
 
-from core import confirm
-from core.testing import fake_context, run_conversation
-from core.tools.contract import SideEffect
-from core.tools.guard import ToolRefused
-from core.tools.saga import SagaFailed
+from convo.domain.tools import SideEffect
+from convo.testing import fake_context, run_conversation
+from convo.tools import confirm
+from convo.tools.guard import ToolRefused
+from convo.tools.saga import SagaFailed
 from tests.conftest import needs_llm
 
 pytestmark = pytest.mark.unit

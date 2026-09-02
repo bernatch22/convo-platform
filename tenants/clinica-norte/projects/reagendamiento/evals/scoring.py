@@ -16,7 +16,7 @@ that ends with the patient knowing exactly when they are expected is a good call
 even if it took six turns to get the name right.
 """
 
-from core.scoring.rules import ScoringRules
+from convo.scoring.rules import ScoringRules
 
 from .dag import SHOP_TERMS, TU_FORMS
 

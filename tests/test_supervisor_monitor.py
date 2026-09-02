@@ -18,9 +18,9 @@ from typing import Any
 
 import pytest
 
-from core.security.monitor import TOPIC, SupervisorWatch, watch_supervisors
-from core.state.log import EventLog
-from core.state.store import MemoryStore
+from convo.state.log import EventLog
+from convo.state.store import MemoryStore
+from convo.supervision.monitor import TOPIC, SupervisorWatch, watch_supervisors
 
 pytestmark = pytest.mark.unit
 

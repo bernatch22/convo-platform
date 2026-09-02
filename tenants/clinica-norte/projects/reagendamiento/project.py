@@ -44,11 +44,11 @@ nine o'clock and the agent said it".
 
 from dataclasses import dataclass
 
-from core.context import Project, TenantContext
-from core.telephony.human import TRANSFER_TO_HUMAN
-from core.tools.catalog import ToolCatalog, platform_specs
-from core.tools.contract import SideEffect, ToolSpec
-from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
+from convo.domain.catalog import ToolCatalog, platform_specs
+from convo.domain.context import Project, TenantContext
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.telephony.human import TRANSFER_TO_HUMAN
+from convo.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
 from ...adapters.agenda import (
     summarise_availability,

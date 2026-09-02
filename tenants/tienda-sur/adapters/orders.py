@@ -21,8 +21,8 @@ the executor turns into a sentence the caller hears — never a stack trace.
 import time
 from typing import Any
 
-from core.adapters.base import CHANGED, GONE, LIST_RECORDS, PLAIN, Adapter
-from core.adapters.ledger import Ledger
+from convo.adapters.base import CHANGED, GONE, LIST_RECORDS, PLAIN, Adapter
+from convo.adapters.ledger import Ledger
 
 from . import orderbook
 from .orderbook import CANCELLED, DELIVERED, PREPARING, SHIPPED  # re-exported: the statuses

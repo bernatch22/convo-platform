@@ -3,8 +3,8 @@
 import pytest
 from livekit.agents import AgentSession
 
-from core.agents import ConfirmTask
-from core.testing import fake_context
+from convo.agents import ConfirmTask
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

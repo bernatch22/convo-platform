@@ -2,8 +2,8 @@
 
 import pytest
 
-from core.state.log import EventLog
-from core.state.store import MemoryStore
+from convo.state.log import EventLog
+from convo.state.store import MemoryStore
 
 pytestmark = pytest.mark.unit
 

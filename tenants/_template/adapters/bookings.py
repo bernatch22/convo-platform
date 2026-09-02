@@ -14,7 +14,7 @@ never a stack trace, and never a silent success.
 
 from typing import Any
 
-from core.adapters.base import Adapter
+from convo.adapters.base import Adapter
 
 FIND_BOOKING = "find_booking"
 CANCEL_BOOKING = "cancel_booking"

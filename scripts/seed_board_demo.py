@@ -23,13 +23,13 @@ import uuid
 from datetime import date
 from typing import Any
 
-from core.confirm import mint
-from core.context import TenantContext
-from core.registry import load_registry
-from core.state.attach import attach_log, close_log
-from core.state.log import record
-from core.state.store import SQLiteStore, Store
-from core.tools.executor import attach_local_tools
+from convo.domain.context import TenantContext
+from convo.session.registry import load_registry
+from convo.state.attach import attach_log, close_log
+from convo.state.log import record
+from convo.state.store import SQLiteStore, Store
+from convo.tools.confirm import mint
+from convo.tools.executor import attach_local_tools
 
 TODAY = date(2026, 8, 31)
 PATIENTS = (("2026-09-03", "Bernardo Castro"), ("2026-09-04", "Lucía Ferrer"))
