@@ -24,10 +24,10 @@ import os
 
 import pytest
 
-from core.state.attach import attach_log
-from core.state.store import MemoryStore
-from core.testing.audio import voice_case_from
-from core.testing.harness import fake_context, live_conversation
+from convo.state.attach import attach_log
+from convo.state.store import MemoryStore
+from convo.testing.callers.audio import voice_case_from
+from convo.testing.harness import fake_context, live_conversation
 
 pytestmark = [pytest.mark.evals, pytest.mark.voice]
 

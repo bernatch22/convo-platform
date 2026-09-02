@@ -14,13 +14,13 @@ from importlib import import_module
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app, open_store
-from core import business
-from core.adapters.base import LIST_RECORDS, PLAIN, Adapter
-from core.adapters.ledger import Ledger
-from core.context import Project, Tenant
-from core.state.events import Event
-from core.state.store import MemoryStore, SessionRow
+from convo.adapters.base import LIST_RECORDS, PLAIN, Adapter
+from convo.adapters.ledger import Ledger
+from convo.api.app import app, open_store
+from convo.domain import business
+from convo.domain.context import Project, Tenant
+from convo.state.events import Event
+from convo.state.store import MemoryStore, SessionRow
 
 pytestmark = pytest.mark.unit
 

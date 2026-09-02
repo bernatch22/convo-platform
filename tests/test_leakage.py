@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from core.testing.leakage import mentions
+from convo.testing.metrics.leakage import mentions
 
 pytestmark = pytest.mark.unit
 

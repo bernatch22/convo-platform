@@ -23,13 +23,13 @@ from livekit.agents.voice.events import (
     UserInputTranscribedEvent,
 )
 
-from convo import sessions
-from core.observability import prices
-from core.observability.observers import observe, outcome_of, turn_metrics
-from core.state.attach import attach_log, close_log
-from core.state.store import MemoryStore
-from core.testing.harness import fake_context, run_conversation
-from core.tools.saga import Saga, SagaFailed
+from convo.cli import sessions
+from convo.observability import prices
+from convo.observability.observers import observe, outcome_of, turn_metrics
+from convo.state.attach import attach_log, close_log
+from convo.state.store import MemoryStore
+from convo.testing.harness import fake_context, run_conversation
+from convo.tools.saga import Saga, SagaFailed
 from tests.conftest import needs_llm
 
 pytestmark = pytest.mark.unit

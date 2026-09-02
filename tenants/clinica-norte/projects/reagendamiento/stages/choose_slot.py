@@ -1,18 +1,15 @@
 """ChooseSlot: read the agenda, offer real hours, and move the appointment once the caller says yes.
 
-The whole point of the stage is the last step. Booking is irreversible, so it
-does not happen because the model decided the conversation had gone well: it
-happens because `ConfirmTask` read the hour back to the caller, the caller said
-yes, and that yes minted a token for exactly this call. The three writes that
-make up a rebooking then run as one saga — release the old hour, take the new
-one, send the SMS — and any failure puts the old appointment back.
+Decisions: docs/decisions/tenants.clinica-norte.projects.reagendamiento.stages.choose_slot.md
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, function_tool
-from core.context import TenantContext
-from core.tools.saga import Saga, SagaFailed
+from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
+from convo.lang import es
+from convo.prompting import prompt, stage_prompt
+from convo.tools.saga import Saga, SagaFailed
 
-from .. import dates, prompts, tools
+from .. import helpers, messages
 from .farewell import Farewell
 
 
@@ -20,7 +17,7 @@ class ChooseSlot(TenantAgent):
     """Offers the hours the agenda really has, and books the one the caller confirms."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.choose_slot_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "choose_slot"))
         self.offered: dict[str, dict[str, str]] = {}
         self.booked: dict[str, str] | None = None
 
@@ -29,7 +26,7 @@ class ChooseSlot(TenantAgent):
         if not self.booked:
             return "Todavía no se ha reservado ninguna hora."
         return (
-            f"Cita nueva confirmada: {dates.spanish_moment(self.booked['when'])} con "
+            f"Cita nueva confirmada: {es.spanish_moment(self.booked['when'])} con "
             f"{self.booked['doctor']}. El SMS de confirmación ya se ha enviado."
         )
 
@@ -64,15 +61,17 @@ class ChooseSlot(TenantAgent):
         """
         tc = ctx.userdata
         try:
-            day = tools.resolve_day(date, tc.today)
+            day = helpers.resolve_day(date, tc.today)
         except ValueError:
-            return tools.UNREADABLE_DATE
+            return messages.UNREADABLE_DATE
         args = {"date": day.isoformat()}
         if specialty:
             args["specialty"] = specialty
         slots = await tc.tools.call("find_availability", args)
-        self.offered = {tools.hour_of(slot["when"]): slot for slot in slots[: tools.OFFER_LIMIT]}
-        return tools.offer(day, slots)
+        self.offered = {
+            helpers.hour_of(slot["when"]): slot for slot in slots[: helpers.OFFER_LIMIT]
+        }
+        return helpers.offer(day, slots)
 
     @function_tool
     async def book_appointment(self, ctx: RunContext[TenantContext], time: str) -> str | tuple:
@@ -93,28 +92,28 @@ class ChooseSlot(TenantAgent):
         confirmado. Cuenta eso y solo eso.
         """
         tc = ctx.userdata
-        slot = self.offered.get(tools.normalise_hour(time))
+        slot = self.offered.get(helpers.normalise_hour(time))
         if slot is None:
-            return tools.NO_SUCH_HOUR
+            return messages.NO_SUCH_HOUR
         args = _booking_args(tc, slot)
         # The sentence the caller says yes to is rendered by us, from the row the agenda
         # returned, so consent and booking cannot drift apart.
         said_yes = await ConfirmTask(
             tc,
-            question=tools.confirmation_question(slot),
+            question=helpers.confirmation_question(slot),
             tool="book_slot",
             args=args,
-            instructions=prompts.confirm_instructions(),
+            instructions=prompt(tc, "confirm/move"),
         )
         if not said_yes:
-            return tools.NOT_CONFIRMED
+            return messages.NOT_CONFIRMED
         try:
             await _rebooking(tc, slot, args).run()
         except SagaFailed:
             # The token is spent by the executor only AFTER a successful call, so a
             # failure leaves the caller's yes intact: retrying the same hour inside the
             # token's ttl needs no second confirmation, and a different hour mints its own.
-            return tools.BOOKING_FAILED
+            return messages.BOOKING_FAILED
         self.booked = slot
         return self.hand_off(Farewell(tc))
 
@@ -127,7 +126,7 @@ def _rebooking(tc: TenantContext, slot: dict[str, str], args: dict[str, str]) ->
         saga.step("cancel_slot", {"appointment_id": patient["appointment_id"]})
     return saga.step("book_slot", args).step(
         "send_sms",
-        {"phone": patient.get("phone", ""), "text": tools.sms_text(args["patient"], slot)},
+        {"phone": patient.get("phone", ""), "text": helpers.sms_text(args["patient"], slot)},
     )
 
 

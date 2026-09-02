@@ -31,3 +31,4 @@ sheets) live under `tmp/reports/` and are not versioned.
 | ms-18 reserva de cita — the missing verb, and the board that proves it | landed | [ms-18.md](ms-18.md) |
 | ms-19 console polish — the number where you look, the reservations you can read | landed | [ms-19.md](ms-19.md) |
 | ms-16 the deck — fifteen slides, six writers, one editor with the human live | landed | [ms-16.md](ms-16.md) |
+| ms-23 the refactor — one package with a Rails shape, prose out of the code, an open-source README | landed | [ms-23.md](ms-23.md) |

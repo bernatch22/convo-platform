@@ -18,6 +18,10 @@ la tenencia viven en el backend, nunca en el prompt.
 
 ---
 
+> **Layout note (ms-23, 2026-09-03).** Paths in this report predate the refactor that moved
+> `core/`, `api.py` and `worker.py` under the single package `convo/` and turned the prompt
+> modules into Markdown views. Read `core/x` as `convo/…/x`; the current map is in `README.md`.
+
 ## 0. Resumen ejecutivo
 
 Hay una plataforma corriendo. Un número de teléfono real (`+1 417 674 3169`)

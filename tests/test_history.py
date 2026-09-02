@@ -10,7 +10,7 @@ for a supervisor's whisper to swap the agent's context at any moment.
 import pytest
 from livekit.agents.llm import ChatContext, FunctionCall, FunctionCallOutput
 
-from core.history import orphans, sanitize_tool_pairing
+from convo.session.history import orphans, sanitize_tool_pairing
 
 pytestmark = pytest.mark.unit
 

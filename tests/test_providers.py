@@ -7,9 +7,9 @@ import os
 import pytest
 from livekit.plugins import deepgram
 
-from core.context import Project
-from core.providers import llm, stt, tts, turn
-from core.testing import fake_context
+from convo.domain.context import Project
+from convo.providers import llm, stt, tts, turn
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

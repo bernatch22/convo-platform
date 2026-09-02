@@ -1,31 +1,18 @@
 """Pedidos: where an order is, and stopping it while there is still time.
 
-The shop's half of ms-5. Same runtime as the clinic, same stages-and-saga
-shape, and every single thing that differs is data in this folder: the tools
-below, the knowledge block, the prompts, the voice, the failure sentences and
-the register — a shop says "tú".
-
-The catalog is the whole of what this project may call. It is data the platform
-reads before every call, not documentation: a tool missing from here cannot
-run, however convincingly the model asks for it, and the side effect declared
-on each spec is what decides whether a customer has to say yes first.
-
-`platform_specs()` is deliberately not merged in. The platform's inherited
-catalog still carries `find_availability` from ms-2, an agenda tool this shop
-has no system for; declaring a tool no adapter can serve buys a project a
-spoken failure instead of a refusal, and the refusal is the honest answer.
+Decisions: docs/decisions/tenants.tienda-sur.projects.pedidos.project.md
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
-from core.context import Project, TenantContext
-from core.telephony.human import TRANSFER_TO_HUMAN
-from core.tools.catalog import ToolCatalog
-from core.tools.contract import SideEffect, ToolSpec
-from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
+from convo.domain.catalog import ToolCatalog
+from convo.domain.context import Project, TenantContext
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.telephony.human import TRANSFER_TO_HUMAN
 
 from ...adapters.tickets import summarise_ticket
-from . import knowledge
+from .messages import MESSAGES
 
 FIND_ORDER = ToolSpec(
     name="find_order",
@@ -79,16 +66,8 @@ TICKET_STATUS = ToolSpec(
     timeout_s=5.0,
 )
 
-# When a tool call cannot produce a result the model still has to say something. The
-# platform's defaults already address the caller as "tú", but they talk about "sistemas";
-# a shop talks about its almacén, so the sentences are written here, next to the prompt
-# that established the voice.
-MESSAGES = {
-    UNKNOWN_TOOL: "Eso no lo puedo mirar yo desde aquí. ¿Te ayudo con tu pedido?",
-    NO_ADAPTER: "No puedo entrar ahora mismo en el sistema de pedidos. ¿Te llamamos luego?",
-    TIMEOUT: "El sistema de pedidos está tardando en contestar. ¿Lo intento otra vez?",
-    FAILURE: "No he podido consultar tu pedido. ¿Quieres que lo intente de nuevo?",
-}
+
+HERE = Path(__file__).parent
 
 
 @dataclass
@@ -129,5 +108,7 @@ PROJECT = PedidosProject(
         TRANSFER_TO_HUMAN,
     ),
     messages=MESSAGES,
-    knowledge_seed=knowledge.SHOP,
+    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_tag="shop_knowledge",
+    prompts=HERE / "prompts",
 )

@@ -25,10 +25,10 @@ printed with the calls it could not see, and never asserted.
 
 import pytest
 
-from core.state.store import SQLiteStore
-from core.state.store.protocol import SessionRow
-from core.testing import replay
-from core.testing.deepeval import project_metrics
+from convo.state.store import SQLiteStore
+from convo.state.store.protocol import SessionRow
+from convo.testing import replay
+from convo.testing.metrics.deepeval import project_metrics
 
 pytestmark = pytest.mark.evals
 

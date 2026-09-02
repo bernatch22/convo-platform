@@ -15,8 +15,8 @@ from typing import Any
 import pytest
 from deepeval.metrics import ToolCorrectnessMetric
 
-from core.testing import deepeval as bridge
-from core.testing.harness import Conversation, Exchange, PlatformCall, fake_context
+from convo.testing.harness import Conversation, Exchange, PlatformCall, fake_context
+from convo.testing.metrics import deepeval as bridge
 
 pytestmark = pytest.mark.unit
 

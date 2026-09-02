@@ -14,9 +14,9 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app
-from core import rooms
-from core.security import desk
+from convo.api.app import app
+from convo.session import rooms
+from convo.supervision import desk
 
 pytestmark = pytest.mark.unit
 

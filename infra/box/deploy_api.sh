@@ -45,4 +45,4 @@ scp -q "$HERE/convo-evals.service" "$HERE/convo-evals.timer" "$BOX:/tmp/"
 ssh "$BOX" 'sudo mv /tmp/convo-evals.service /tmp/convo-evals.timer /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable -q --now convo-evals.timer'
 ssh "$BOX" 'systemctl list-timers convo-evals.timer --no-pager | head -3'
 echo "   one night by hand:  ssh $BOX 'sudo systemctl start convo-evals.service'"
-echo "   what it would spend: ssh $BOX 'cd $APP && ~/.local/bin/uv run python -m core.testing.nightly --dry-run'"
+echo "   what it would spend: ssh $BOX 'cd $APP && ~/.local/bin/uv run python -m convo evals nightly --dry-run'"

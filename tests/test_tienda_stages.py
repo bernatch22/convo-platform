@@ -18,11 +18,11 @@ import importlib
 
 import pytest
 
-from core import confirm
-from core.testing import fake_context, run_conversation
-from core.tools.contract import SideEffect
-from core.tools.guard import ToolRefused
-from core.tools.saga import SagaFailed
+from convo.domain.tools import SideEffect
+from convo.testing import fake_context, run_conversation
+from convo.tools import confirm
+from convo.tools.guard import ToolRefused
+from convo.tools.saga import SagaFailed
 from tests.conftest import needs_llm
 
 pytestmark = pytest.mark.unit
@@ -32,7 +32,8 @@ PACKAGE = f"tenants.{TENANT}.projects.{PROJECT}"
 project_module = importlib.import_module(f"{PACKAGE}.project")
 stages = importlib.import_module(f"{PACKAGE}.stages")
 order_desk = importlib.import_module(f"{PACKAGE}.stages.order_desk")
-tools_module = importlib.import_module(f"{PACKAGE}.tools")
+helpers_module = importlib.import_module(f"{PACKAGE}.helpers")
+messages_module = importlib.import_module(f"{PACKAGE}.messages")
 orderbook = importlib.import_module(f"tenants.{TENANT}.adapters.orderbook")
 
 PREPARING = "TS-10432"  # Marta Alonso Gil, still in the warehouse: cancellable
@@ -208,7 +209,7 @@ def test_every_tool_the_project_can_call_declares_what_it_does_to_the_world() ->
 
 def test_the_confirmation_sentence_names_the_order_and_the_money(tc) -> None:
     """It is read out verbatim, so it has to be a sentence and not a summary of one."""
-    said = tools_module.confirmation_question(tc.customer)
+    said = helpers_module.confirmation_question(tc.customer)
 
     assert said == (
         "Te cancelo entonces el pedido TS-10432, el de 74,90 euros, y el importe te vuelve "
@@ -220,10 +221,10 @@ def test_a_shipped_order_is_refused_with_the_shop_s_own_return_policy() -> None:
     """The refusal and the way out are one sentence: «no se puede» alone is not an answer."""
     tc = identified_context(SHIPPED)
 
-    said = tools_module.cannot_cancel(tc.customer)
+    said = helpers_module.cannot_cancel(tc.customer)
 
     assert "ya no se puede cancelar" in said
-    assert tools_module.RETURN_POLICY in said
+    assert messages_module.RETURN_POLICY in said
     assert "30 días" in said
 
 

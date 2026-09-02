@@ -1,20 +1,14 @@
 """OrderDesk: say where the order is, and stop it while the warehouse still can.
 
-The whole point of the stage is the second half. Cancelling is irreversible, so
-it does not happen because the model decided the customer sounded sure: it
-happens because `ConfirmTask` read the order and the amount back, the customer
-said yes, and that yes minted a token for exactly this call. The two writes
-that make up a cancellation then run as one saga — stop the order, tell the
-customer — and if the SMS cannot go out the order is put back exactly as it
-was, because in this shop a cancellation the customer has no proof of is not a
-cancellation.
+Decisions: docs/decisions/tenants.tienda-sur.projects.pedidos.stages.order_desk.md
 """
 
-from core.agents import ConfirmTask, RunContext, TenantAgent, function_tool
-from core.context import TenantContext
-from core.tools.saga import Saga, SagaFailed
+from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
+from convo.prompting import prompt, stage_prompt
+from convo.tools.saga import Saga, SagaFailed
 
-from .. import prompts, tools
+from .. import helpers, messages
 from .farewell import Farewell
 
 SMS_STEP = "send_sms"
@@ -24,27 +18,12 @@ class OrderDesk(TenantAgent):
     """Reads the order's real state back, and cancels it once the customer confirms."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.order_desk_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "order_desk"))
         self.cancelled: dict[str, str] | None = None
         self.problem: str | None = None
 
     def summary(self) -> str:
-        """What the next stage needs: the cancellation if there is one, the order if there is not.
-
-        Two stages read this now and they need different halves of it. Farewell
-        arrives only after a cancellation and needs it in the words to read out.
-        TicketDesk arrives from a customer with a problem and needs the ORDER,
-        so that nobody is asked twice for a number they have already given.
-
-        The not-cancelled branch used to answer "todavía no se ha cancelado
-        nada", which was harmless while Farewell was the only reader and became
-        a defect the moment it was not: a summary reaches the model as a turn to
-        ANSWER (a system message added mid-conversation is rewritten as a user
-        one — see CLAUDE.md), so a customer who had just asked to file a written
-        complaint was greeted with «el pedido sigue en pie, no se ha cancelado
-        nada. ¿Qué prefieres hacer?» — every word true, about something nobody
-        had raised. Measured at 0.4 on the line metric before this was written.
-        """
+        """What the next stage needs: the cancellation if there is one, else the order."""
         if self.cancelled:
             return (
                 f"Pedido {self.cancelled['order_id']} cancelado. El importe de "
@@ -85,7 +64,7 @@ class OrderDesk(TenantAgent):
         """
         tc = ctx.userdata
         order = await self._reload(tc)
-        return tools.order_line(order) if order else tools.NOT_FOUND
+        return helpers.order_line(order) if order else messages.NOT_FOUND
 
     @function_tool
     async def request_cancellation(self, ctx: RunContext[TenantContext]) -> str | tuple:
@@ -103,25 +82,25 @@ class OrderDesk(TenantAgent):
         tc = ctx.userdata
         order = await self._reload(tc)
         if not order:
-            return tools.NOT_FOUND
-        if not tools.cancellable(order):
-            return tools.cannot_cancel(order)
+            return messages.NOT_FOUND
+        if not helpers.cancellable(order):
+            return helpers.cannot_cancel(order)
         args = {"order_id": order["order_id"]}
         # The sentence the customer says yes to is rendered by us, from the row the order
         # system returned, so consent and cancellation cannot drift apart.
         said_yes = await ConfirmTask(
             tc,
-            question=tools.confirmation_question(order),
+            question=helpers.confirmation_question(order),
             tool="cancel_order",
             args=args,
-            instructions=prompts.confirm_instructions(),
+            instructions=prompt(tc, "confirm/cancel_order"),
         )
         if not said_yes:
-            return tools.NOT_CONFIRMED
+            return messages.NOT_CONFIRMED
         try:
             await _cancellation(tc, order, args).run()
         except SagaFailed as failure:
-            return tools.NOTICE_FAILED if failure.step == SMS_STEP else tools.CANCEL_FAILED
+            return messages.NOTICE_FAILED if failure.step == SMS_STEP else messages.CANCEL_FAILED
         self.cancelled = order
         return self.hand_off(Farewell(tc))
 
@@ -166,15 +145,9 @@ class OrderDesk(TenantAgent):
 
 
 def _cancellation(tc: TenantContext, order: dict[str, str], args: dict[str, str]) -> Saga:
-    """Stop the order and write to the customer — both, or the order goes back as it was.
-
-    The compensation is not a technicality: this shop's own rule is that the SMS
-    is the customer's receipt, so a cancellation nobody could be told about is
-    undone rather than left standing silently. `restore_order` is declared as
-    the compensation of `cancel_order` in `project.py`; the saga finds it there.
-    """
+    """Stop the order and write to the customer — both, or the order goes back as it was."""
     return (
         Saga(tc)
         .step("cancel_order", args)
-        .step(SMS_STEP, {"phone": order["phone"], "text": tools.sms_text(order)})
+        .step(SMS_STEP, {"phone": order["phone"], "text": helpers.sms_text(order)})
     )

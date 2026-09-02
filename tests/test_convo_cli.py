@@ -2,9 +2,9 @@
 
 import pytest
 
-from convo import sessions
-from core.state.events import Event
-from core.state.store import MemoryStore, SessionRow
+from convo.cli import sessions
+from convo.state.events import Event
+from convo.state.store import MemoryStore, SessionRow
 
 pytestmark = pytest.mark.unit
 
@@ -69,7 +69,7 @@ def test_usage_on_anything_else(store: MemoryStore, capsys) -> None:
 
 
 def test_routes_add_and_list(capsys) -> None:
-    from convo import routes
+    from convo.cli import routes
 
     store = MemoryStore()
     assert routes.main(["add", "cc", "+34910000000", "clinica-norte", "reagendamiento"], store) == 0
@@ -79,7 +79,7 @@ def test_routes_add_and_list(capsys) -> None:
 
 
 def test_routes_seed_writes_the_deploys_lines_once(capsys) -> None:
-    from convo import routes
+    from convo.cli import routes
 
     store = MemoryStore()
     assert routes.main(["seed"], store) == 0
@@ -90,7 +90,7 @@ def test_routes_seed_writes_the_deploys_lines_once(capsys) -> None:
 
 
 def test_versions_pin_and_list(tmp_path, capsys) -> None:
-    from convo import versions
+    from convo.cli import versions
 
     store = MemoryStore()
     sheet = tmp_path / "ficha.txt"
@@ -105,16 +105,16 @@ async def test_tail_yields_events_appended_after_it_started(monkeypatch, capsys)
     """`tail` follows a growing session: events appended while it watches are printed."""
     import threading
 
-    from convo import sessions as cli
-    from core.state.store import MemoryStore
-    from core.testing import fake_context
+    from convo.cli import sessions as cli
+    from convo.state.store import MemoryStore
+    from convo.testing import fake_context
 
     store = MemoryStore()
     tc = fake_context("clinica-norte", "reagendamiento")
-    from core.state.attach import attach_log
+    from convo.state.attach import attach_log
 
     tc = attach_log(tc, store)
-    from core.state.log import record
+    from convo.state.log import record
 
     record(tc, "stage.enter", {"stage": "Identify"})
 

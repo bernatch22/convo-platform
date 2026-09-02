@@ -20,11 +20,11 @@ import pytest
 from livekit.agents import AgentSession
 from livekit.agents.llm._provider_format import anthropic as anthropic_format
 
-from core.registry import load_registry
-from core.security.control import SupervisorControl
-from core.security.protocol import STEER_PREFACE, SUPERVISOR_PROTOCOL
-from core.security.supervisor import STEER
-from core.testing import fake_context
+from convo.prompting.protocols import STEER_PREFACE, SUPERVISOR_PROTOCOL
+from convo.session.registry import load_registry
+from convo.supervision.control import SupervisorControl
+from convo.supervision.supervisor import STEER
+from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 

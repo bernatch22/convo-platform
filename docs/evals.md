@@ -9,9 +9,9 @@ document is built around:
 > **The judge does not need to be smarter. It needs to see more and decide less.**
 
 Everything below is verified against DeepEval 4.2 and the code in
-`core/testing/` and the two tenants' `evals/` folders. Run the suite with
+`convo/testing/` and the two tenants' `evals/` folders. Run the suite with
 `deepeval test run tests/evals -n 3`; read the HTML with
-`python -m core.testing.report clinica-norte reagendamiento` (writes
+`python -m convo evals report clinica-norte reagendamiento` (writes
 `tmp/reports/deepeval/`). Add `--model` twice to run the same goldens against
 both allowed models and get the comparison table — §10.
 
@@ -64,16 +64,16 @@ core's and a project supplies its nouns. `dag.py` is ~70 lines of constants and
 three one-line factories in both tenants, and the two read as translations of
 each other.
 
-The platform (`core/testing/`) owns the plumbing, never the criteria:
+The platform (`convo/testing/`) owns the plumbing, never the criteria:
 
 - `dag/` — `nodes.py` (`DeterministicNode`, the scores, the transcript params),
   `consent.py` (`consent_graph(irreversible_tool, asking_tool, yes_criteria)`)
   and `grounded.py` (`grounded_facts_graph(stated, backing, criteria)` and its
-  three computed nodes). All re-exported from `core.testing.dag`.
+  three computed nodes). All re-exported from `convo.testing.dag`.
 - `grounding/` — the language-agnostic half of §3.5, in two files: `extract.py`
   (`Extractor`, `Datum`, the clock/price/phone patterns, normalisation) and
   `evidence.py` (`Evidence`, `evidence_of`, `unsupported`). Re-exported from
-  `core.testing.grounding`. A project declares its own extractors (`Dra.` and
+  `convo.testing.grounding`. A project declares its own extractors (`Dra.` and
   streets for the clinic; `TS-10432`, a tracking code and a carrier for the
   shop).
 - `simulator.py` — `SimulatedCaller` and `settled_when`: one live session per
@@ -121,7 +121,7 @@ measured.
   a clock (`fecha_y_hora_actual`), and a golden that lists no tool is saying
   "do not touch the agenda", not "do not think". A `ToolSpec` marked
   `infrastructure=True` is dropped from the case this metric reads
-  (`core.testing.deepeval.business_calls`, `tk-18c659`); nothing else is
+  (`convo.testing.deepeval.business_calls`, `tk-18c659`); nothing else is
   filtered anywhere, and the whole-call case a grounding metric reads keeps
   every call and every output. §9 has the failure that paid for this.
 - **Settings:** `threshold=0.9`; neither `should_exact_match` nor
@@ -315,7 +315,7 @@ injected "500 euros" produces exactly one judge call and 0.0 with the reason
 
 ### 3.6 Replay (ring 3) — the same metrics on a call that really happened
 
-`core/testing/replay.py` rebuilds a `ConversationalTestCase` from the
+`convo/testing/replay.py` rebuilds a `ConversationalTestCase` from the
 append-only log of a stored session, and `python -m convo sessions eval <id>`
 runs the project's `never_book_before_yes` and `grounded_facts_dag` on it.
 Nothing about the metrics changes: ring 3 changes where the conversation comes
@@ -442,7 +442,7 @@ itself through — which is the thing §3.5 exists to prevent.
 - **Runs on:** a recorded session — `python -m convo sessions eval <id> --voice`
   and `tests/evals/test_voice_deepeval.py`. The case is `replay`'s
   `ConversationalTestCase` with `Turn.audio` filled in by
-  `core/testing/audio.py:voice_case_from`.
+  `convo/testing/audio.py:voice_case_from`.
 - **What each one actually reads.** `AudioIntegrityMetric` looks ONLY at
   assistant turns and only at their `Audio`: missing, undecodable, clipping,
   loops (repeated 0.25 s fingerprints), dropouts, an abrupt end.
@@ -458,14 +458,14 @@ itself through — which is the thing §3.5 exists to prevent.
   survives.
 
 **What the silent caller channel costs.** An offline recording
-(`python -m core.testing.record`) types the caller's lines, so channel L of the
+(`python -m convo evals record`) types the caller's lines, so channel L of the
 OGG is silence and the user turns carry no `Audio` at all. Neither metric
 suffers: integrity ignores user turns by construction, and responsiveness only
 asks whether the ASSISTANT's turn has sound. What is lost is elsewhere: **no
 `stt.final` events**, and no framework `e2e_latency` / `transcription_delay` /
 `end_of_turn_delay`, because all three are measured from an end of utterance a
 typed turn does not have. `llm_node_ttft` and `tts_node_ttfb` are there.
-`python worker.py console --record` is the run that has the other half.
+`python -m convo console --record` is the run that has the other half.
 
 **The score of AudioIntegrity is not a gate, and here is why.** Its dropout
 detector counts every silence of 20-200 ms that is surrounded by speech, with a
@@ -490,7 +490,7 @@ relative to its own websocket chunk and cannot address the file
 all of this on a synthetic stereo WAV, with no provider and no model.
 
 **The TTS golden is a duration, not a transcript.** `python -m
-core.testing.tts_golden` speaks one sentence with a DNI, an amount and a time
+convo.testing.tts_golden` speaks one sentence with a DNI, an amount and a time
 on both ElevenLabs models. The aligned transcript cannot judge it: in
 `livekit-plugins-elevenlabs` 1.7.1 it is ElevenLabs' `normalizedAlignment`, and
 for Spanish that returns the INPUT text with the digits unchanged. So the check
@@ -533,7 +533,7 @@ human's.
   script reproduces the bug — `stt.final` in the log. A green run therefore
   cannot be a test that proves nothing. Real speech in `es` and `en` passes in
   both directions.
-- **The fake half is reusable:** `core/testing/stt_script.py` — `ScriptedSTT`
+- **The fake half is reusable:** `convo/testing/stt_script.py` — `ScriptedSTT`
   (an STT that transcribes the script it was handed, not the audio), a
   `ScriptedMicrophone`, and `comfort_noise` / `speech` frame builders at a
   level. Nothing in it knows about tenants.
@@ -545,11 +545,11 @@ human's.
 
 ### 3.11 Ring 2 live — a synthetic caller who really speaks
 
-- **What it is:** `core/testing/ring2.py:converse(persona, tenant, project,
-  turns)` — the door and the result — over `core/testing/caller.py:Call`, the
+- **What it is:** `convo/testing/ring2.py:converse(persona, tenant, project,
+  turns)` — the door and the result — over `convo/testing/caller.py:Call`, the
   room mechanics. It asks `POST /evals/rooms` for a room, joins it as an
   ordinary participant with a published microphone
-  (`core/testing/speaker.py:VirtualMicrophone`), speaks each line with
+  (`convo/testing/speaker.py:VirtualMicrophone`), speaks each line with
   ElevenLabs, reads both sides off `lk.transcription` and hangs up, returning a
   `Transcript` of DeepEval `Turn`s with audio and latency on each.
 - **Why the room comes from `api.py`.** DeepEval's `LiveKitConnector` signs its
@@ -577,7 +577,7 @@ human's.
   greeting 6.5 s (cold job: process spawn, prewarm and Anthropic's first call),
   then 1.67 s / 1.32 s / 1.62 s.
 - **Every turn carries `Audio` with a `start_time`.** The agent's is cut from a
-  live `core.testing.audio.Timeline` — frames written at the wall clock they
+  live `convo.testing.audio.Timeline` — frames written at the wall clock they
   arrived on, so the silence between two answers is silence nobody sent rather
   than a splice. The caller's is the samples the microphone actually put on the
   wire, because no track carries our own voice back to us.
@@ -590,13 +590,13 @@ human's.
   registered under the same `FLEET` share every dispatch: run a harness against
   a private `FLEET` or the job lands in somebody else's process.
 - **How to see it:** three terminals —
-  `docker compose -f infra/compose/dev.yml up`, `uv run uvicorn api:app --port
-  8090`, `python worker.py dev` — then `converse(...)` from a fourth.
+  `docker compose -f infra/compose/dev.yml up`, `uv run python -m convo api --port
+  8090`, `python -m convo worker dev` — then `converse(...)` from a fourth.
 
 ### 3.12 Two personas, and the goldens that turn a call into a suite
 
-- **What it is:** `core/testing/personas.py` — two callers as data, not classes
-  — and `core/testing/ring2_goldens.py`, which reads a project's
+- **What it is:** `convo/testing/personas.py` — two callers as data, not classes
+  — and `convo/testing/ring2_goldens.py`, which reads a project's
   `evals/ring2_goldens.json`, makes the call through `converse`, and hands back
   the two cases it is scored on. Per project:
   `deepeval test run tenants/<t>/projects/<p>/evals/test_ring2.py`.
@@ -620,7 +620,7 @@ human's.
   everything that was SAID and nothing that was DONE — no track carries a tool
   call. So `register` and `leakage` are scored on the WIRE case (the
   transcript, `flaky=True`), and `consent` on the LOG case: the same call
-  rebuilt from its append-only log through `core.testing.replay`, ring 3's own
+  rebuilt from its append-only log through `convo.testing.replay`, ring 3's own
   reader, over `GET /sessions/<id>`. The session is identified DURING the call
   by `GET /live-calls` (`core.control_plane._match` now strips the `eval-`
   prefix), because the room is gone the moment we hang up. `grounded` is
@@ -657,8 +657,8 @@ human's.
   `import core` fails. `pythonpath = ["."]` in `pyproject.toml` is what makes a
   per-project suite runnable from a bare checkout.
 - **How to see it:** four terminals —
-  `docker compose -f infra/compose/dev.yml up`, `FLEET=cc uv run uvicorn api:app
-  --port 8090`, `FLEET=cc python worker.py dev`, then
+  `docker compose -f infra/compose/dev.yml up`, `FLEET=cc uv run python -m convo api
+  --port 8090`, `FLEET=cc python -m convo worker dev`, then
   `deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py -s`.
   Two workers on one `FLEET` share every dispatch, so a second harness needs a
   `FLEET` of its own and `CONVO_API` pointed at its own `api.py`.
@@ -686,8 +686,8 @@ human's.
   | Check | Decided by | Fails when |
   |---|---|---|
   | `consent` | a walk over `confirm.granted` and `tool.call` with `side_effect: irreversible` | something irreversible ran that no grant paid for |
-  | `register` | `core.testing.register.slips`, the ring-1 scanner | an agent turn used a form the business does not say |
-  | `no_leakage` | `core.testing.leakage.mentions`, the ring-1 scanner | an agent turn named a noun of the business next door |
+  | `register` | `convo.testing.register.slips`, the ring-1 scanner | an agent turn used a form the business does not say |
+  | `no_leakage` | `convo.testing.leakage.mentions`, the ring-1 scanner | an agent turn named a noun of the business next door |
   | `no_errors` | `error` events and the outcome | a provider failed, or the session ended in `error` |
 
   Two of the four are the ring-1 scanners **imported, not reimplemented**: a
@@ -733,8 +733,8 @@ human's.
   judge **0.0014 €** (0.14 cents), scored **5 s** after the call ended.
   A hang-up on the greeting: **0 €**, judge skipped, deterministic checks still
   written.
-- **How to see it:** `uv run uvicorn api:app --port 8090` in one terminal,
-  `python worker.py console` in another; hang up, wait ten seconds, then
+- **How to see it:** `uv run python -m convo api --port 8090` in one terminal,
+  `python -m convo console` in another; hang up, wait ten seconds, then
   `python -m convo sessions list` and `python -m convo sessions show <id>` —
   the last row of the log is the score. `python -m convo sessions score <id>`
   asks for one by hand (`--free` runs the deterministic half and spends
@@ -771,7 +771,7 @@ human's.
 
 ### 3.14 The nightly — ring 2 as a habit, and what "red means red" costs
 
-- **What it is:** `core/testing/nightly.py` (the run), `nightly_report.py`
+- **What it is:** `convo/testing/nightly.py` (the run), `nightly_report.py`
   (what it leaves behind), `nightly_html.py` (the page), and two systemd units
   on convo-box installed by `infra/box/deploy_api.sh`. Every night at 04:00
   Europe/Madrid `convo-evals.timer` fires a oneshot that calls the DEPLOYED
@@ -918,14 +918,14 @@ models, which is the only arrangement in which the matrix keeps comparing
 anything.
 
 One rule the file earned in ms-20: **two goldens may not share an input.**
-`test_case_for` names each case after the golden's line and `core/testing/matrix.py`
+`test_case_for` names each case after the golden's line and `convo/testing/matrix.py`
 joins two models' runs on that name, so a duplicate does not fail anything — it
 quietly makes one row of the comparison table meaningless. The cancel card
 nearly shipped a second «Ana García Ruiz», told apart from the contact one only
 by its `before`. `tests/test_eval_goldens.py` now refuses it.
 
 **Simulated calls** (`simulator.py`, 12 for the clinic and 3 for the shop; the
-machinery is `core.testing.simulator.SimulatedCaller`, so a project's file is
+machinery is `convo.testing.simulator.SimulatedCaller`, so a project's file is
 personas, goldens and the context a call starts from). DeepEval's
 `ConversationSimulator` with ten personas for the clinic, all Haiku, all in
 Spanish from Spain, each reaching a *live* stage (a session held open between
@@ -999,10 +999,10 @@ instrumented; `evaluationCost` in `tmp/evals/index.tsv` is the judge only.
 1. Decide what kind of question it is. A rule with no degrees (consent, no
    invention, register) is a **DAG**; a judgement of quality (tone, warmth,
    clarity) is a **GEval**; "did it call X" is **ToolCorrectness**.
-2. Check `core/testing/` first: consent, grounded facts and register are
+2. Check `convo/testing/` first: consent, grounded facts and register are
    already builders, and a new project usually writes constants, not nodes.
    If the shape really is new, write the nodes so that everything code can
-   decide is a `DeterministicNode` (`core/testing/dag/grounded.py` has the
+   decide is a `DeterministicNode` (`convo/testing/dag/grounded.py` has the
    three shapes:
    binary verdict, matched verdict, rendered evidence), and the judge gets
    **one binary question with the evidence attached**. Never give a judge node
@@ -1017,7 +1017,7 @@ instrumented; `evaluationCost` in `tmp/evals/index.tsv` is the judge only.
 4. Add the factory to `metrics.py` with a docstring that says why it is that
    kind of metric and what it must not judge. Threshold there, not in core.
 5. Wire it in `tests/evals/test_<project>_*.py` with `assert_test`, and — if
-   it should appear in the HTML — nothing else: `core.testing.report` imports
+   it should appear in the HTML — nothing else: `convo.testing.report` imports
    the same `metrics.py`.
 6. Run the suite once. If a judge misreads, fix the criterion text once, write
    the misreading down in the card's closing note, and move on. Do not loop.
@@ -1047,7 +1047,7 @@ judge anything without them. They travel into its environment and nowhere else;
 no handler echoes an environment and the only thing written to disk is the
 child's own output.
 
-**A run that happened somewhere else.** `python -m core.testing.report <tenant>
+**A run that happened somewhere else.** `python -m convo evals report <tenant>
 <project>` files itself with `POST /evals/runs` when it finishes, so a report
 written on a laptop shows up next to the runs the box launched. CI can do the
 same with one POST. A control plane that is not answering costs nothing: the
@@ -1133,7 +1133,7 @@ position so a run filed late by CI never diffs against a future.
   `core.tools.catalog.CLOCK` carries it, and `infrastructure_names()` derives
   the set from the flag rather than from a list of names written somewhere
   else, so a project that declares plumbing of its own is answered too.
-  `core.testing.deepeval.business_calls` applies it, and it applies to
+  `convo.testing.deepeval.business_calls` applies it, and it applies to
   `test_case_for` ALONE, which is the case ToolCorrectness reads. The
   conversational case and `turn_tool_calls` keep every call: grounding reads a
   tool's OUTPUT as evidence, and the clock reading is the evidence for what day
@@ -1260,7 +1260,7 @@ position so a run filed late by CI never diffs against a future.
   grounding, on stored sessions.
   §3.9 is measured on a recording whose caller channel is silent, so nothing
   yet exercises overlap, barge-in or the caller's own audio. That needs a human
-  with a microphone (`python worker.py console --record`) or ms-13's room.
+  with a microphone (`python -m convo console --record`) or ms-13's room.
 - ~~Ring 3 cannot ground facts against tool results.~~ **Closed in ms-7** by
   `ToolSpec.result_summary` (§3.6). What is left of it: a project opts in tool
   by tool, so a tenant that declares no renderer still scores 0.0 on any fact
@@ -1289,7 +1289,7 @@ override writes, and `core/providers/llm.py` dispatches on the name's family —
 `ALLOWED_MODELS` is the short list of models somebody priced and measured, and
 it is not a suggestion.
 
-Nothing in the suites knows about any of this. `core.testing.fake_context`
+Nothing in the suites knows about any of this. `convo.testing.fake_context`
 takes the model from its `llm_model=` argument or from `$CONVO_EVAL_MODEL`, and
 sets it on a **copy** of the project — the registry hands out one `Project` per
 process, and a suite must not leave the next test on a model it never asked for.
@@ -1298,7 +1298,7 @@ process, and a suite must not leave the next test on a model it never asked for.
 deepeval test run tests/evals -n 4                             # the platform's own model
 CONVO_EVAL_MODEL=gpt-5.4-mini deepeval test run tests/evals -n 4   # every golden, other model
 
-python -m core.testing.report clinica-norte reagendamiento \
+python -m convo evals report clinica-norte reagendamiento \
     --model claude-haiku-4-5 --model gpt-5.4-mini
 ```
 
@@ -1309,7 +1309,7 @@ would quietly measure Haiku and write `gpt-5.4-mini` at the top of the report.
 
 The report writes one HTML per model per case shape under
 `tmp/reports/deepeval/`, named `ring1@<model>_<tenant>-<project>-<shape>`, and
-ends on the metric × model table plus the divergences (`core/testing/matrix.py`).
+ends on the metric × model table plus the divergences (`convo/testing/matrix.py`).
 Two `evaluate()` calls per model, because DeepEval will not mix single-turn and
 conversational cases in one run — but both read the SAME conversations, so the
 second shape costs no agent turns.
@@ -1688,7 +1688,7 @@ carries (`TenantAgent.fecha_y_hora_actual`), a turn about "mañana" often asks
 what day it is before it asks the agenda anything, and the date assertion in
 `test_reception_tools_deepeval.py` was reading the clock's arguments — which
 hold no `date` at all — and failing a turn that had asked exactly the right
-question. Calls are looked up by NAME now (`core.testing.deepeval.call_named`);
+question. Calls are looked up by NAME now (`convo.testing.deepeval.call_named`);
 the ORDER of the calls, when it matters, is ToolCorrectness's job. Index is not
 identity, and any suite that reaches into `tools_called` should say which tool
 it means.

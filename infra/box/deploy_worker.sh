@@ -17,7 +17,7 @@ ssh "$BOX" "if [ -d $APP/.git ]; then git -C $APP fetch -q origin && git -C $APP
 # `--extra dev` even though the worker needs none of it: both services share ONE venv
 # and `uv sync` makes that venv match its arguments EXACTLY, so a bare sync here uninstalls
 # what deploy_api.sh installed. The control plane's scoring path imports deepeval
-# (core/scoring/runner.py → core.testing.replay), so a worker deploy that ran second left
+# (convo/scoring/runner.py → convo.testing.replay), so a worker deploy that ran second left
 # every finished call unscored with `ModuleNotFoundError: No module named 'deepeval'` in
 # the api's log and nothing at all in the console. Found 2026-09-01, after a call showed
 # no score. The two scripts must ask for the same environment or the second one wins.

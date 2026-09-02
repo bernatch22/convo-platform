@@ -1,481 +1,177 @@
-# convo-platform
+# convo
 
-[![ci](https://github.com/bernatch22/convo-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/bernatch22/convo-platform/actions/workflows/ci.yml)
+A multi-tenant conversational platform for contact centers: one deployment,
+many businesses, each answering its own phone number and web chat with its own
+voice, tools and rules. Built on self-hosted [LiveKit](https://livekit.io)
+(SFU, SIP and Agents), Anthropic Claude for the language model, Soniox for
+speech-to-text and ElevenLabs for text-to-speech.
 
-A multi-tenant conversational platform for contact centers — voice and chat —
-built on self-hosted [LiveKit](https://livekit.io) (SFU + SIP + Agents),
-Anthropic Claude Haiku, Soniox STT and ElevenLabs TTS. One deploy serves many
-businesses; the LLM is a swappable interface driver, the platform is a process
-runtime that talks.
+The thesis: the language model is a swappable interface driver. Control,
+state, tools, audit and tenancy live in the platform and never in a prompt.
+Anything irreversible needs a confirmation token minted from a real "yes";
+every call leaves an append-only event log, a recording and a score.
 
-Built in public as an architecture exercise: the design is in
-[`REPORT.md`](REPORT.md), the working rules in [`CLAUDE.md`](CLAUDE.md), and
-every step of the build lives on a public taskops board (milestones = chapters,
-cards = briefs). Each milestone lands with a learning report under
-`.taskops/reports/` — what was achieved, learned and decided.
+- **Design and evidence:** [`REPORT.md`](REPORT.md)
+- **Why the code is the way it is:** [`docs/decisions/`](docs/decisions/README.md)
+- **Adding a business:** [`tenants/_template/README.md`](tenants/_template/README.md)
+- **How the agent is measured:** [`docs/evals.md`](docs/evals.md)
 
-## Run
+## Quickstart
+
+Requirements: Python 3.12, [uv](https://docs.astral.sh/uv/), an
+`ANTHROPIC_API_KEY`. Voice on a laptop additionally needs `SONIOX_API_KEY` and
+`ELEVENLABS_API_KEY`; the phone path needs a LiveKit server and a SIP trunk
+(see [`infra/box/README.md`](infra/box/README.md)).
 
 ```bash
+git clone https://github.com/bernatch22/convo-platform.git && cd convo-platform
 uv sync --extra dev
-cp .env.example .env            # keys: Anthropic, Soniox (or Deepgram), ElevenLabs
-pytest -m unit                  # fast tests, no keys needed
-python worker.py --help         # the LiveKit Agents CLI (console/dev/start)
+cp .env.example .env            # then fill in the keys you have
+
+uv run convo console --text                          # type to the clinic's receptionist
+uv run convo console --tenant tienda-sur --project pedidos --text
+uv run convo console                                 # your microphone, the agent's voice
+uv run convo console --record                        # the same, keeping the OGG
 ```
 
-Talk to either demo business in the terminal — one worker, one codebase, two
-tenants; what differs is a folder under `tenants/`:
+The console talks to one project directly, with no server in between. The
+full stack is three processes:
 
 ```bash
-TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console --text
-TENANT=tienda-sur    PROJECT=pedidos        uv run python worker.py console --text
+docker compose -f infra/compose/dev.yml up -d        # livekit-server --dev + redis
+uv run convo api                                     # control plane + console UI on :8090
+uv run convo worker dev                              # the fleet: one process, every tenant
+open http://localhost:8090                           # the web console
 ```
 
-The clinic takes five errands. Say you want to change the cita you already have
-and reception finds it by name or phone; say you have none —
+Nothing in the worker's environment names a tenant. Who answers is decided
+per session by the dispatch metadata inside the token the control plane mints,
+by the phone number that was dialled, or by `TENANT`/`PROJECT` on a console.
 
-> «hola, quería pedir cita, no tengo ninguna» · «Pedro Ramos Gil, teléfono
-> 699000000» · «para traumatología, ¿qué tiene el jueves?» · «la primera» ·
-> «sí, resérvemela»
-
-— and the call goes down the other branch, asks what the cita is for, reads the
-agenda, reads the hour back to you and waits for a yes before writing anything.
-Either way `uv run python -m convo sessions show <id>` prints the log: the yes
-before the write, and one line for the cita the booking system created.
-
-The third errand is not an hour at all: the number the clinic rings you on. Say
-it is wrong and reception validates the one on file the way a bank does — by its
-last digits, never whole — takes the new one and reads it back digit by digit
-before writing anything:
-
-> «quiero cambiar mi teléfono, el que tenéis está mal» · «Ana García Ruiz» →
-> «El teléfono que me consta acaba en 456. ¿Es ese el que quiere cambiar?» ·
-> «sí, el nuevo es el 689 000 111» → «Su nuevo teléfono de contacto sería el
-> 689 000 111. ¿Se lo cambio?» · «sí, cámbiemelo»
-
-Ask it for the old number whole and it will not say it. The log of that call has
-a `confirm.granted` for `update_contact` before the write, and the line the write
-left behind names the record and three digits — «now reachable on a number ending
-111» — which is what an auditor needs and all a leak would get.
-
-The last two are what a caller does with the cita they already have and are not
-moving: drop it, or say they will be there. Both start the same way — reception
-looks the cita up in the booking system and reads it back, never off a note —
-and only the ending differs:
-
-> «buenos días, quería anular la cita que tengo» · «Ana García Ruiz» → «Me
-> consta su cita el jueves 3 a las diez de la mañana con la doctora Campos. ¿Es
-> esa la que quiere anular?» · «sí, esa» → «Jueves 3 de septiembre a las diez de
-> la mañana con Dra. Irene Campos, ¿se la anulo?» · «sí, anúlemela»
-
-The hour goes straight back on the agenda: from the moment that write lands,
-`find_availability` offers the ten o'clock you just gave up to whoever asks for
-that Thursday next, so cancelling does not lose the clinic the half hour — which
-is also why the verb declares no undo. (In the demo that is true for the rest of
-the session: the fake book lives in the process, and only the rows cross to the
-console. A real agenda is one system both processes reach, and has no such
-seam.) You can watch it happen without a phone:
-
-```bash
-uv run pytest -m unit -k "cancelled_hour_goes_back_on_offer or yes_drops_the_cita" -v
-```
-
-On the Board the cita is struck through (`tone: gone`); the confirming call
-
-> «hola, llamo para confirmar que voy a mi cita, soy Ana García Ruiz» · «sí, esa
-> misma, que voy a ir»
-
-leaves the same cita where it was and marks it `confirmed` instead. Cancelling
-is the fourth thing the platform will not do without a yes; confirming is not —
-nothing is taken from a patient who rang to say they are coming.
-
-The shop takes three. Ask where an order is («mi pedido es el TS-10432, ¿por
-dónde va?»), ask to cancel it and it reads the order and the amount back and
-waits for a yes — and if what you have is a problem it cannot fix, say so
-(«quiero poner una reclamación por escrito») and it opens an incident with your
-own words and reads you its number:
-
-> «quiero poner una reclamación por escrito» · «llevo tres correos sin
-> respuesta» → «Te la dejo apuntada con el número TS-T0003.»
-
-Hang up, run the console again and ask for that number («¿cómo va la incidencia
-TS-T0003?»): it is still there, because a helpdesk that forgot its tickets
-between calls would not be one — the rows live in `tmp/business.json`
-(`CONVO_LEDGER`), which is what a customer's real helpdesk would be. Both the orders and the incidents show up on the project's **Board**
-in the console, each as its own table with its own columns and its own words for
-a state.
-
-### Talking to it out loud
-
-Drop `--text` and the console runs in **audio mode**: it opens the laptop
-microphone and speaks back through the speakers. The project's STT provider
-transcribes (Soniox `stt-rt-v5` by default, Deepgram Flux when the console
-switches it — see `core/providers/stt.py`), ElevenLabs
-answers in the project's voice, and a local turn detector decides when you have
-finished — no LiveKit server, no GPU, nothing to deploy.
-
-```bash
-TENANT=clinica-norte PROJECT=reagendamiento uv run python worker.py console
-uv run python worker.py console --record          # also leaves the stereo OGG
-uv run python worker.py console --list-devices    # pick a microphone
-RECORD=1 uv run python worker.py dev              # same recording, against a server
-```
-
-While it runs: **Ctrl+T** switches between speaking and typing, **?** lists the
-shortcuts, **Ctrl+C** exits.
-`--record` writes `console-recordings/session-<stamp>/` — `audio.ogg` (you on
-one channel, the agent on the other) and the framework's `session_report.json`.
-
-Interrupting it works, and murmuring at it does not: an interruption needs two
-words (`InterruptionOptions.min_words`), and a turn that is nothing but Spanish
-backchannel — *vale*, *ajá*, *sí sí*, *mm*, *de acuerdo* — never becomes a
-reply. The list is project data (`Project.backchannels`); why there are two
-filters instead of one is written in [`core/barge_in.py`](core/barge_in.py).
-
-Then read the call back:
-
-```bash
-uv run python -m convo sessions list
-uv run python -m convo sessions show <id>
-```
-
-The log is append-only and written during the call, so it survives a kill:
+## The command line
 
 ```
-   5    3767  tts.word     Buenos@0.30 días,@0.11 le@0.21 atiende@0.06 recepción@0.61
-   8    5480  stt.final    {"text": "quiero cambiar mi cita", "language": "es"}
-   9    5678  turn.user    transcription_delay=0.12s end_of_turn_delay=0.30s {...}
-  14   11647  turn.agent   ttft=0.94s e2e=1.87s {"text": "Claro, ¿me dice su DNI?"}
-  24   25783  session.end  {"outcome": "completed", "cost": {...}, "audio": "console-recordings/…/audio.ogg"}
+convo console   talk to a project from this terminal (--text, --record, --tenant, --project)
+convo worker    dev | start: run the fleet against a LiveKit server
+convo api       run the control plane and the web console
+convo sessions  list | show <id> | eval <id> | tail <id>: read a session's event log
+convo routes    list | seed | add <fleet> <number> <tenant> <project> [voice|chat]
+convo versions  list | pin <tenant> <project> <version> [<file>]: the knowledge override
+convo evals     report | nightly | record | golden: the eval rings a person runs
 ```
 
-`stt.final` is the transcript (interim hypotheses are never logged),
-`tts.word` the agent's own words with the provider's alignment,
-`interruption.false` and `speech.overlap` the barge-in decisions, and the `t_ms`
-column is milliseconds since the call started.
+`uv run convo …` and `uv run python -m convo …` are the same thing.
 
-### Run against a local server
-
-The console has no server in it. This is the same worker talking to a real
-LiveKit SFU, dispatched by the token instead of by `TENANT` — three terminals
-and a script:
-
-```bash
-# 1 · the SFU and its redis (livekit-server 1.9.1, dev keypair, ports 7880-7882)
-docker compose -f infra/compose/dev.yml up
-
-# 2 · the control plane: it mints the JWT that carries the agent dispatch
-uv run uvicorn api:app --port 8090
-
-# 3 · the fleet: one worker process, no TENANT and no PROJECT in its environment
-env -u TENANT -u PROJECT uv run python worker.py dev
-```
-
-Then, in a fourth, the browser-less client — it asks `api.py` for a token,
-joins the room that token names, types on `lk.chat` and reads the agent on
-`lk.transcription`:
-
-```bash
-uv run python scripts/dev_call.py                             # both demo tenants
-uv run python scripts/dev_call.py tienda-sur/pedidos          # just one
-uv run python scripts/dev_call.py clinica-norte/reagendamiento "hola" "¿y el jueves?"
-```
+## How a call moves through the code
 
 ```
-── tienda-sur/pedidos · room tienda-sur-pedidos-3128dc53 ──
-agent  ▸ Tienda Sur, buenos días. ¿En qué te puedo ayudar?
-you    ▸ Buenas, llamo por el pedido TS-10432.
-agent  ▸ Perfecto, ahora mismo lo miro. Tengo localizado el pedido TS-10432 de Marta Alonso Gil.
+PSTN / browser
+      │
+      ▼
+convo/worker.py ─────────── entrypoint(ctx)
+      ▼
+convo/session/router.py ── resolve(ctx): whose job is this? → TenantContext
+      ▼
+convo/session/build.py ─── AgentSession(STT, LLM, TTS, VAD)   ← convo/providers/
+      ▼
+tenants/<t>/projects/<p>/project.py ── entry_agent(tc) → the first stage
+      ▼
+stages/identify.py ──────── a TenantAgent: its prompt is prompts/identify.md
+      │                      rendered by convo/prompting/layout.py
+      │   the caller speaks → stt_gate → the model calls a tool
+      ▼
+@function_tool ──────────── tc.tools.call("find_patient", …)
+      │                        ├─ convo/tools/guard.py    irreversible? token?
+      │                        ├─ adapters/patients.py    the customer's own system
+      │                        └─ convo/state/log.py      one append-only line per event
+      ▼
+return self.hand_off(ChooseSlot(tc)) ── the next stage; the log records the handoff
+      ▼
+ConfirmTask ─────────────── "…¿lo confirmo?" → a one-shot token → Saga: cancel, book, SMS
+      ▼
+on_session_end ──────────── the report; convo/scoring/ judges the call from the API
 ```
 
-Two businesses answered from one process and neither was named in its
-environment: who picks up is decided by `RoomAgentDispatch(agent_name=$FLEET,
-metadata={tenant, project, channel})`, minted at the door by `api.py` and read
-by `core/router.py`. A chat session joins with
-`RoomOptions(audio_input=False, audio_output=False)` — text both ways, no
-microphone permission asked for.
-
-The calls land in the same log the console writes, and score with the same
-metrics:
-
-```bash
-uv run python -m convo sessions eval <id>                     # the project's DAGs, ring 3
-uv run deepeval test run tests/evals/test_dispatch_ring.py    # the same, as a test
-```
-
-And every call scores itself without being asked. While `api.py` is up it
-sweeps for calls that have ended and writes a verdict into their own log as
-`session.score` — four checks decided by code (consent, register, cross-tenant
-leakage, provider errors) and at most one Haiku call, about 0.0014 € and only
-when the transcript is worth judging:
-
-```bash
-uv run python -m convo sessions show <id>    # the score is the last row
-uv run python -m convo sessions score <id>   # ask for one by hand (--free skips the judge)
-```
-
-A project opts out with `scoring=False` on its `Project`, and its sessions show
-a dash. The whole design is [`docs/evals.md`](docs/evals.md) §3.13.
-
-`tests/evals/test_dispatch_ring.py` skips itself when no routed session is in
-the store: `scripts/dev_call.py` is its fixture, and a suite that failed
-because nobody started a server would be reporting on the laptop.
-
-A third business is a copy of [`tenants/_template/`](tenants/_template/README.md),
-which walks a stranger through it in ten minutes;
-[`docs/tenants.md`](docs/tenants.md) is the table of what a tenant owns and what
-the platform owns.
-
-Evals (ring 1, needs `ANTHROPIC_API_KEY`; the judge is Claude Haiku, set
-`DEEPEVAL_JUDGE_MODEL` to change it):
-
-```bash
-uv run pytest -m unit                     # includes LLM-judged tests when the key is present
-uv run deepeval test run tests/evals -n 3 # both tenants' goldens + the cross-tenant leakage pair
-
-# the same goldens against the other allowed model — nothing in the suite is edited
-CONVO_EVAL_MODEL=gpt-5.4-mini uv run deepeval test run tests/evals -n 3
-
-# HTML per model plus the metric x model comparison table (needs OPENAI_API_KEY too)
-uv run python -m core.testing.report clinica-norte reagendamiento \
-    --model claude-haiku-4-5 --model gpt-5.4-mini
-```
-
-Ring 2 (live voice) calls the agent out loud with a synthetic caller, so it
-needs the dev stack up in three other terminals (compose, `api.py`,
-`worker.py dev`) plus `ELEVENLABS_API_KEY` and `SONIOX_API_KEY`:
-
-```bash
-uv run deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py -s
-uv run deepeval test run tenants/clinica-norte/projects/reagendamiento/evals/test_ring2.py -s
-```
-
-Two callers phone each project: `apurado`, who talks over the agent, and
-`spanglish`, who switches es↔en mid-sentence. `-s` prints the transcript, the
-latencies, how many answers were interrupted and which languages came back
-transcribed. `CONVO_API` points the caller at another control plane.
-
-The same suites run themselves on the box every night at 04:00 Europe/Madrid
-(`convo-evals.timer`), against the DEPLOYED fleet, capped at eight live
-conversations and killed at twenty minutes. Locally it is one command:
-
-```bash
-uv run python -m core.testing.nightly --dry-run   # what a night would spend
-uv run python -m core.testing.nightly             # run it; --only tenant/project narrows it
-```
-
-A night leaves `tmp/evals/<date>.log`, one page at `tmp/evals/<date>/index.html`
-with every red metric above the transcript that earned it, one line per suite in
-`tmp/evals/index.tsv`, and one row per suite on the console's evals screen. It
-goes red on a failed METRIC and not on pytest's exit code — a ring-2 wire case is
-`flaky=True`, so `deepeval test run` passes a suite whose register just broke.
-
-[`docs/evals.md`](docs/evals.md) explains every metric and how to add one;
-[`infra/box/README.md`](infra/box/README.md) covers the nightly on the box.
-
-A run also has a screen: the console's Evals page lists every run with its
-scores, diffs it against the previous run of the same suite, and can launch one
-on the box (one at a time, killed at fifteen minutes, log tail on screen).
-
-[`docs/evals.md`](docs/evals.md) explains every metric, how to add one, and how
-a project declares the suites the console can run (§8); §9 is the model matrix.
-
-## The web UI
-
-`ui/` is the operator console: the tenant/project switcher, Talk (the three
-channels — WebRTC voice, web chat, and the SIP trunk), Sessions, Board, Pipeline
-(the three providers, plus the phone line this project answers on, or the fact
-that it has none), Evals (every stored run with its per-metric diff, and the
-button that launches another on the box) and the Supervisor desk. Vite + React +
-TypeScript + react-router; no state library, no CSS framework.
-
-**The Board** (`/t/<tenant>/<project>/board`) reads like an agenda, and it is
-the one screen fed by two different places. It **leads with the reservations
-themselves** — patient, day, hour, professional, state — read off the
-customer's OWN system through the tenant's adapter (`GET /reservations` →
-`core.registry` → the adapter's `list_records` capability). That is where a
-name belongs: our append-only log masks PII on the way in, so it can prove a
-cita was booked and must not be the place the patient is stored. A project
-whose systems offer no such view says so plainly instead of drawing an empty
-agenda, and a project with a different shape answers with its own — Tienda Sur
-gets its orders, with an order's own columns, because nothing in `core` or in
-the console holds a list of shapes, columns or state words.
-
-Under the table, demoted to one strip, is the other reading: every
-*irreversible* thing the platform did, counted straight off the log, by verb
-and by day, each row linking to the call that did it. There is no rollup table:
-a transaction is one `tool.call` whose `side_effect` is `irreversible`, and the
-verb is the tool's own name, so a project that declares a new irreversible tool
-appears here the first time it runs with nothing changed in the console. The
-two halves are joined on the business's own identifier — the one thing that
-crosses the PII mask, because an id is not a person. The window is in the URL
-(`?days=30`).
-
-A laptop that has only ever been talked to has no transactions to show;
-`scripts/seed_board_demo.py` writes three real ones through the real executor,
-with no LLM and no keys:
-
-```bash
-export CONVO_DB=tmp/board-demo.db CONVO_LEDGER=tmp/board-demo.json
-uv run python scripts/seed_board_demo.py
-uv run uvicorn api:app --port 8090
-open http://localhost:8090/t/clinica-norte/reagendamiento/board
-```
-
-`CONVO_LEDGER` is the file the demo adapters record their rows in
-(`core/adapters/ledger.py`): a fake agenda lives in the job process and the
-console is a different one, so the fake needs the property a real booking
-system already has — the rows outlive the call. Point both at throwaway files.
-
-A number belongs to a project, never to the fleet: it is one row of the control
-plane's `routes` table (`python -m convo routes list | seed | add`), the same
-row `core/router.py` reads to decide who answers an inbound call. Today exactly
-one number is registered — **+1 417 674 3169**, clinica-norte/reagendamiento —
-and the console says so per project instead of printing it fleet-wide.
-
-**The Supervisor desk** (`/supervisor`) lists every call live on the fleet,
-phone calls included. Clicking one joins that room with a short-lived,
-subscribe-only ticket from `POST /supervise` and shows the transcript live,
-audio muted until you press *listen in*. The supervisor is `hidden` at the SFU,
-so the caller is never told anybody joined — and the badge on the screen is the
-server's own answer, read back off `list_participants`, not our claim. The
-arrival is written into the caller's own log as `supervisor.join`:
-
-```bash
-uv run python -m convo sessions show <id> | grep supervisor
-```
-
-From that desk a supervisor can also **whisper** to the agent, **take the
-line**, and **transfer the call to a phone** — cold (a SIP REFER: the caller
-leaves for that number and this job ends) or warm (the colleague is dialled
-into the room, briefed where the caller provably cannot hear it, then bridged).
-Every verb is one line in the caller's own log, and a transfer carries its mode
-and its outcome, so a transfer that did NOT happen is as readable as one that
-did. Warm needs an outbound trunk (`SIP_OUTBOUND_TRUNK_ID`) this box does not
-have yet and says so instead of failing mid-call; cold needs only
-`transfer_mode=enable-all` on the Twilio trunk — `infra/box/README.md` has the
-exact toggles, and `scripts/twilio_trunk.py` reports whether they are set.
-
-**The agent transfers too, and it does not need a supervisor to decide.**
-`transfer_to_human` is a tool of every stage of a project that names a
-`transfer_number` — E.164, set from the Pipeline screen's Control panel — and
-the prompt teaches it to announce the handover («le paso con un compañero, un
-momento») before the REFER goes out. A project with the field empty is never
-offered the tool at all: the model cannot reach for a verb it was never shown,
-and the Phone panel greys it out with the control plane's own sentence saying
-which half is missing. Only a phone call can be moved, so a browser call and a
-chat get an honest refusal and the business's own number instead of a promise
-nobody can keep. Every attempt — moved, refused by the carrier, or never
-attempted — is one more `supervisor.transfer` line in the caller's log.
-
-The same three verbs without a browser, for an escalation rule or a terminal:
-
-```bash
-curl -XPOST localhost:8090/supervise/verb -H 'content-type: application/json' \
-  -d '{"room":"call-…","identity":"sup:berna","verb":"transfer",
-       "mode":"cold","to":"+34600111222"}'
-```
-
-Two ways to run it. In development the vite server serves the app and proxies
-`/tenants`, `/token`, `/sessions`, `/outcomes`, `/reservations`, `/pipeline` and
-`/evals` to the control
-plane:
-
-```bash
-uv run uvicorn api:app --port 8090        # terminal 1: the control plane
-cd ui && npm install && npm run dev       # terminal 2: http://localhost:5173
-```
-
-In production there is one port: build once and `api.py` serves the bundle
-itself, with the API paths keeping priority and everything else falling back to
-the SPA.
-
-```bash
-cd ui && npm install && npm run build     # writes ui/dist (never committed)
-uv run uvicorn api:app --port 8090        # http://localhost:8090
-```
-
-### Hearing a call back
-
-Every voice call the fleet answers keeps its audio. Open a session in the
-console and there is a player above the latency strip; the Sessions list marks
-the rows that have one with a `♪` beside the channel. Stereo, on the log's own
-timeline: the caller on the left channel, the agent on the right, sample zero
-at the `audio.start` row.
-
-```bash
-# the same file, without a browser
-curl -sf localhost:8090/sessions/<session_id>/recording -o /tmp/call.ogg && afplay /tmp/call.ogg
-```
-
-The capture is the agent's own audio IO, tapped by the framework's
-`RecorderIO`, which costs one queue push per frame on the call path and encodes
-in a daemon thread — there is no egress container and nothing that needs a GPU.
-What changed for ms-17 is only the destination: outside the console the
-framework aimed it at a temp directory it then deleted, so every real call
-recorded perfectly and lost the file on the way out. Recordings now land under
-`CONVO_RECORDINGS` (`tmp/recordings` locally, `/var/lib/convo/recordings` on the
-box), keyed by session id, and never in git.
-
-They hold PII, so `GET /sessions/{id}/recording` is the only door — a validated
-session id, never a path from a log — and a box reachable from outside its own
-network should set `RECORDINGS_TOKEN`. A project can refuse to be recorded with
-`recording=False` in its own `project.py`, and its sessions then show no
-player at all; `RECORD=0` does the same for a whole deploy. Retention, the
-storage budget and the one thing these recordings do NOT contain (a supervisor
-who took the line) are in `infra/box/README.md`.
+A **stage** is one phase of a conversation: a LiveKit `Agent` with its own
+prompt and its own tools, and a stage moves the call on by returning the next
+one from a tool. Rails readers will recognise the shape: the router resolves,
+a stage is the controller, adapters are the models, and a prompt is the view,
+rendered in a layout with partials.
 
 ## Layout
 
 ```
-worker.py     data plane: one AgentServer, one fleet, every tenant
-api.py        control plane (ms-8+): tokens, dispatch, tools hub, call log
-core/         runtime: contracts, agents, tools, adapters, state, observability
-ui/           the operator console: React + vite, served by api.py once built
-tenants/      one folder per customer: adapters + projects (agents, prompts, evals)
-infra/        compose/ — the local dev stack (livekit-server + redis)
-scripts/      dev_call.py: a browser-less chat call against a running server
-tests/        unit tests and ring-1 evals
-docs/         how the platform is meant to be used: tenants, prompts, evals
-.taskops/reports/  per-milestone learning reports (Markdown)
-presentation/ self-narrating deck engine
+convo/            the engine, one installable package
+  cli/            one module per command group
+  domain/         Tenant, Project, TenantContext, ToolSpec, catalog: contracts, no framework
+  agents/         TenantAgent (a stage), ConfirmTask, the clock the model reads
+  prompting/      the layout every prompt renders in, Markdown views and partials, the protocols
+  tools/          guard, executor, saga, confirmation tokens, the default failure sentences
+  session/        router, registry, session build, pipeline, rooms, SIP, STT gate, recordings
+  providers/      llm, stt, tts, turn: the only modules that name a vendor
+  state/          the append-only log, the store (sqlite, memory), overrides, outcomes
+  telephony/      lines, cold and warm transfer, handover, audio isolation
+  supervision/    a second human on a live call: control, monitor, desk
+  scoring/        ring 4: every finished call scores itself, off the job process
+  observability/  latency, prices, timed words
+  lang/           es.py: Spanish calendar words, one copy
+  api/            the control plane: app.py and one router per resource
+  evals/          suites, goldens, runs and the runner the console launches
+  testing/        the harness and the metric shapes tenants' evals import
+tenants/          the businesses: _template/, clinica-norte/, tienda-sur/
+  <id>/tenant.py            id, name, region, build_adapters()
+  <id>/adapters/            one class per system the business runs
+  <id>/projects/<p>/        project.py · knowledge.md · messages.py · helpers.py
+                            stages/*.py · prompts/*.md (+ _partials, confirm/) · evals/
+tests/            unit tests (ring 1) and tests/evals (DeepEval); tests/fixtures/ shared fakes
+docs/             decisions/, evals.md, prompts.md, tenants.md, deck.pdf
+infra/            box/ (systemd, Caddy, deploy scripts), compose/, seed/, scripts/
+ui/               the React console
 ```
 
-License: Apache-2.0.
+Rules the tests enforce: no `.py` at the repo root; `convo/` never imports
+`tenants/`; a project imports `convo.agents`, never `livekit` directly; no
+file over 400 lines; every docstring is one line, the reasoning lives in
+`docs/decisions/`.
 
-## How this repository is orchestrated
-
-The build itself is public. A [taskops](https://pypi.org/project/taskops-cli/)
-board holds the plan; this repo carries the board's hooks (`.claude/`,
-`.mcp.json`) so any clone can join it.
-
-- **Milestones are chapters.** Each one is small enough for a human to review
-  in minutes and ends with a command to run plus `.taskops/reports/ms-N.md`, a
-  learning report: what was achieved, what was learned, what was decided.
-- **Cards are briefs.** A card carries a spec a stranger could pick up, the
-  files it may touch, acceptance criteria, and — when a decision was made — a
-  short essay in its thread explaining why.
-- **One orchestrator, many workers.** The orchestrator plans, assigns (each
-  card gets its own git worktree), reviews the diff in session and merges with
-  `--no-ff`. Workers are AI sub-agents, one per brief; the first infrastructure
-  cards were done by the orchestrator itself.
-- **Humans judge.** Every milestone report leaves an `nvim -p …` command to
-  read the code; evaluations (DeepEval) run on every milestone so prompts keep
-  a consistent line as the system grows.
-
-Reusable for other teams: the hooks are two lines of JSON, the conventions are
-this section, and the pattern (seams first, then parallel cards, HTML report
-per milestone) does not depend on any particular framework.
-
-## Production box (convo-box)
-
-The dedicated GCP box (`e2-standard-4`, `lk.bernardocastro.dev`) runs the SFU
-stack — livekit-server + livekit-sip + redis, host networking, real keypair
-generated on the box on first run:
+## Adding a business
 
 ```bash
-./infra/box/setup.sh     # idempotent: install docker, render configs, compose up
+cp -r tenants/_template tenants/<your-id>
+grep -rl 'example-co' tenants/<your-id> | xargs sed -i '' 's/example-co/<your-id>/g'
+uv run convo console --tenant <your-id> --project example --text
 ```
 
-It also mirrors `LIVEKIT_URL` and the keypair into your local `.env`, so
-`python worker.py dev` registers against the box instead of the laptop stack.
+Then follow [`tenants/_template/README.md`](tenants/_template/README.md): one
+adapter per system, a `ToolSpec` per capability with its side effect declared,
+one stage per phase of the call, one Markdown prompt per stage, a knowledge
+sheet over 4,096 tokens (the prompt-cache floor of Claude Haiku), and goldens.
+`tests/test_template.py` performs that copy and proves it routes, renders and
+scans its own register.
+
+## Testing
+
+```bash
+uv run ruff check . && uv run ruff format --check .
+uv run pytest -m unit                                # ring 1: fast, no keys, ~3 minutes
+uv run deepeval test run tests/evals -n 3            # ring 1 metrics: needs ANTHROPIC_API_KEY
+uv run convo evals report clinica-norte reagendamiento   # one project, HTML under tmp/reports
+uv run convo evals nightly --dry-run                 # ring 2: what a night against the box would spend
+```
+
+Four rings, each cheaper than the next: unit tests over the harness (no
+network), DeepEval metrics over goldens (one judge call at most per case),
+synthetic callers against a deployed fleet, and a post-call score written into
+every real session's log. [`docs/evals.md`](docs/evals.md) has the detail.
+
+## Deploying
+
+`infra/box/` holds everything a single VM needs: `setup.sh` stands the box up,
+`deploy_worker.sh` and `deploy_api.sh` ship the two processes under systemd
+behind Caddy, and `infra/scripts/twilio_trunk.py` wires a phone number to the
+fleet's dispatch rule. Phone routes a fresh database is seeded with live in
+`infra/seed/routes.json`. See [`infra/box/README.md`](infra/box/README.md).
+
+## Licence
+
+Apache 2.0.

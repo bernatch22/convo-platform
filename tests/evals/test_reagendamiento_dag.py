@@ -26,7 +26,7 @@ Run with `deepeval test run tests/evals` (needs ANTHROPIC_API_KEY).
 
 import pytest
 
-from core.testing import deepeval as bridge
+from convo.testing.metrics import deepeval as bridge
 
 pytestmark = pytest.mark.evals
 

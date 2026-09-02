@@ -26,11 +26,11 @@ import importlib
 
 import pytest
 
-from core.state.attach import attach_log
-from core.state.store import MemoryStore
-from core.testing import replay
-from core.testing.deepeval import node_chain, project_metrics
-from core.testing.harness import fake_context, live_conversation
+from convo.state.attach import attach_log
+from convo.state.store import MemoryStore
+from convo.testing import replay
+from convo.testing.harness import fake_context, live_conversation
+from convo.testing.metrics.deepeval import node_chain, project_metrics
 
 pytestmark = pytest.mark.evals
 

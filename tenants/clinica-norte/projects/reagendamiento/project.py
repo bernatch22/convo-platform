@@ -1,54 +1,15 @@
 """Reagendamiento: move the cita a patient already has, or give them a first one.
 
-ms-3 turns the conversation into a process — Identify, ChooseSlot, Farewell —
-and gives it the right to write: `book_slot` is irreversible and unreachable
-without a confirmation token, and the three writes that make up a rebooking run
-as a saga so a failure halfway leaves the patient's old appointment standing.
-
-ms-20 also closes the two verbs a reception has and this project did not: a cita
-could be moved and created, and only ever cancelled as the first half of a move.
-`cancel_appointment` is the standalone cancel — the fourth irreversible door,
-and the one that gives an hour back instead of taking one, which is why the
-freed slot reappears in `find_availability` and why the spec declares no
-compensation. `confirm_attendance` is its opposite in every way: the patient
-rang to say they ARE coming, nothing is taken from them, and it is a plain
-`write` with `rebook_slot` as its undo. Both live in one stage, because the
-conversation is one conversation — the cita you already have, and what you want
-done with it that is not moving it.
-
-ms-20 adds the third, and it is the first one that is not an appointment:
-`update_contact` changes the number the clinic rings the patient on. The verb is
-only reachable once the caller has been found on the book — an unidentified
-caller cannot change anybody's data — and it goes through the same door as the
-other two, which is the point: a new irreversible verb is a ToolSpec, a stage
-and a consent graph name, not a new mechanism.
-
-ms-18 adds the second errand and, with it, the second irreversible door.
-`Identify` now has two exits and `create_appointment` opens a cita for somebody
-the book had never held — through the same guard, the same `ConfirmTask` and a
-saga of its own. The project keeps its name: what a caller asks reception for is
-an appointment, and whether one already existed is the platform's problem.
-
-The catalog below is the whole of what this project may call. It is data the
-platform reads before every call, not documentation: a tool missing from here
-cannot run, however convincingly the model asks for it, and the side effect
-declared on each spec is what decides whether a caller has to say yes first.
-
-Every spec here also declares a `result_summary` (ms-7): the one line of a
-result the session log is allowed to keep, rendered by the adapter that
-produced it and masked by the platform before it is written. Reading a
-rescheduling call back months later — or scoring it with the grounding metric —
-is the difference between "the agent said nine o'clock" and "the agenda offered
-nine o'clock and the agent said it".
+Decisions: docs/decisions/tenants.clinica-norte.projects.reagendamiento.project.md
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
-from core.context import Project, TenantContext
-from core.telephony.human import TRANSFER_TO_HUMAN
-from core.tools.catalog import ToolCatalog, platform_specs
-from core.tools.contract import SideEffect, ToolSpec
-from core.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
+from convo.domain.catalog import ToolCatalog, platform_specs
+from convo.domain.context import Project, TenantContext
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.telephony.human import TRANSFER_TO_HUMAN
 
 from ...adapters.agenda import (
     summarise_availability,
@@ -57,7 +18,7 @@ from ...adapters.agenda import (
     summarise_patient,
 )
 from ...adapters.sms import summarise_message
-from . import knowledge
+from .messages import MESSAGES
 
 # The platform's own `find_availability` spec, re-declared with the one clause only a
 # clinic can write: what a free slot may say in the log. The renderer lives next to the
@@ -167,16 +128,8 @@ SEND_SMS = ToolSpec(
     result_summary=summarise_message,
 )
 
-# When a tool call cannot produce a result the model still has to say something,
-# and the platform's defaults address the caller as "tú". Clínica Norte speaks
-# to patients as "usted", so the register is set here, next to the prompt that
-# established it, rather than in core.
-MESSAGES = {
-    UNKNOWN_TOOL: "Eso no puedo consultarlo desde aquí. ¿Le ayudo con su cita?",
-    NO_ADAPTER: "No puedo entrar en la agenda ahora mismo. ¿Prefiere que le llamemos hoy?",
-    TIMEOUT: "La agenda está tardando en responder. ¿Lo intento otra vez?",
-    FAILURE: "No he podido consultar la agenda. ¿Quiere que lo intente de nuevo?",
-}
+
+HERE = Path(__file__).parent
 
 
 @dataclass
@@ -241,5 +194,7 @@ PROJECT = ReagendamientoProject(
         )
     ),
     messages=MESSAGES,
-    knowledge_seed=knowledge.CLINIC,
+    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_tag="clinic_knowledge",
+    prompts=HERE / "prompts",
 )

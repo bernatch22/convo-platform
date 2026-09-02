@@ -2,10 +2,10 @@
 
 import pytest
 
-from core.context import Project, Tenant, TenantContext
-from core.contracts import SessionMeta
-from core.state.events import Event
-from core.tools.contract import SideEffect, ToolSpec
+from convo.domain.context import Project, Tenant, TenantContext
+from convo.domain.contracts import SessionMeta
+from convo.domain.tools import SideEffect, ToolSpec
+from convo.state.events import Event
 
 pytestmark = pytest.mark.unit
 

@@ -16,14 +16,14 @@ from livekit.agents.llm import ChatContext, ChatMessage
 from livekit.agents.types import TimedString
 from livekit.agents.voice.events import AgentFalseInterruptionEvent, CloseEvent, CloseReason
 
-from convo import sessions
-from core.agents.base import TenantAgent
-from core.barge_in import SPANISH_BACKCHANNELS, is_backchannel
-from core.observability.observers import observe
-from core.observability.voice import MAX_WORDS_PER_EVENT, observe_voice, recording_path
-from core.state.attach import attach_log
-from core.state.store import MemoryStore
-from core.testing.harness import fake_context
+from convo.agents.stage import TenantAgent
+from convo.cli import sessions
+from convo.observability.observers import observe
+from convo.observability.voice import MAX_WORDS_PER_EVENT, observe_voice, recording_path
+from convo.session.barge_in import SPANISH_BACKCHANNELS, is_backchannel
+from convo.state.attach import attach_log
+from convo.state.store import MemoryStore
+from convo.testing.harness import fake_context
 
 pytestmark = pytest.mark.unit
 

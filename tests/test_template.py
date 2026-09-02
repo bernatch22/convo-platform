@@ -24,10 +24,10 @@ from dataclasses import dataclass
 
 import pytest
 
-from core import registry, router
-from core.state.store import MemoryStore
-from core.testing.fake_job import fake_job_context
-from core.testing.register import slips
+from convo.session import registry, router
+from convo.state.store import MemoryStore
+from convo.testing.fake_job import fake_job_context
+from convo.testing.metrics.register import slips
 
 pytestmark = pytest.mark.unit
 

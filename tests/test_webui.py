@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from core.webui import mount_ui
+from convo.api.webui import mount_ui
 
 pytestmark = pytest.mark.unit
 

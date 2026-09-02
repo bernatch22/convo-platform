@@ -6,10 +6,10 @@ import jwt as pyjwt
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app, open_store
-from core import rooms
-from core.state.events import Event
-from core.state.store import MemoryStore, SessionRow
+from convo.api.app import app, open_store
+from convo.session import rooms
+from convo.state.events import Event
+from convo.state.store import MemoryStore, SessionRow
 
 pytestmark = pytest.mark.unit
 

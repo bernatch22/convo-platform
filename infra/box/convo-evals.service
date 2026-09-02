@@ -22,7 +22,7 @@ Environment=CONVO_API=http://127.0.0.1:8090
 Environment=DEEPEVAL_TELEMETRY_OPT_OUT=YES
 # Optional and last, so an operator can retarget one night without editing the unit.
 EnvironmentFile=-/etc/default/convo-evals
-ExecStart=/home/berna/.local/bin/uv run python -m core.testing.nightly
+ExecStart=/home/berna/.local/bin/uv run python -m convo evals nightly
 # The runner kills its own children at 20 minutes and still writes its page and its
 # index line; this is the backstop for a run that never reached that code.
 TimeoutStartSec=1500

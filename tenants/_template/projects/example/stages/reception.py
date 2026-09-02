@@ -1,24 +1,20 @@
 """Reception: open the call, find the customer's booking, hand the call to Desk."""
 
-from core.agents import RunContext, TenantAgent, function_tool
-from core.context import TenantContext
+from convo.agents import RunContext, TenantAgent, function_tool
+from convo.domain.context import TenantContext
+from convo.prompting import stage_prompt
 
-from .. import prompts, tools
+from .. import messages
 
 
 class Reception(TenantAgent):
     """Greets, asks for the booking reference, and looks it up."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.reception_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "reception"))
 
     def summary(self) -> str:
-        """What Desk needs: WHICH booking this is, and deliberately not what state it is in.
-
-        Identity travels, state does not. A status read a minute ago is a
-        status that may have changed; the next stage asks the system instead of
-        inheriting a sentence. TODO(copy): keep this line to identity only.
-        """
+        """What Desk needs: WHICH booking this is, and deliberately not what state it is in."""
         booking = self.tc.customer
         if not booking:
             return "Todavía no se ha localizado ninguna reserva."
@@ -47,7 +43,7 @@ class Reception(TenantAgent):
         tc = ctx.userdata
         booking = await tc.tools.call("find_booking", {"reference": reference})
         if not booking:
-            return tools.NOT_FOUND
+            return messages.NOT_FOUND
         tc.customer = booking
         from .desk import Desk
 

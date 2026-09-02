@@ -1,24 +1,13 @@
 """What this project's agent can be wrong about, and what its calls may know.
 
-The machinery — extract, match, escalate the remainder — is
-`core.testing.grounding`, shared by every tenant. What lives here is the
-vocabulary: the kinds of claim a customer would ACT on and an agent could
-invent. Clock hours, prices and phone numbers come free from core.
-
-TODO(copy): one extractor per thing of yours that has a canonical form — an
-order number, a policy number, a carrier, a professional's name. A claim no
-extractor knows is never checked, so this list is the ceiling of the grounding
-metric.
-
-Two functions are the whole contract with the platform: `stated_data(turns)`
-and `evidence_of(turns)`.
+Decisions: docs/decisions/tenants._template.projects.example.evals.grounding.md
 """
 
 import re
 
-from core.testing import grounding
+from convo.testing.metrics import grounding
 
-from ..knowledge import BUSINESS
+from ..project import PROJECT
 
 REFERENCE = "reserva"
 PRICE = "precio"
@@ -45,4 +34,4 @@ def stated_data(turns: list) -> list[grounding.Datum]:
 
 def evidence_of(turns: list) -> grounding.Evidence:
     """The business's sheet, what the customer said, and every tool output of the call."""
-    return grounding.evidence_of(turns, BUSINESS)
+    return grounding.evidence_of(turns, PROJECT.knowledge_seed)

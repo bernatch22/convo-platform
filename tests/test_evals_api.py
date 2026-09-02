@@ -13,10 +13,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from api import app, evals_runner, open_store
-from core.evals import suites
-from core.evals.runner import EvalRunner
-from core.state.store import MemoryStore
+from convo.api.app import app, evals_runner, open_store
+from convo.evals import suites
+from convo.evals.runner import EvalRunner
+from convo.state.store import MemoryStore
 
 pytestmark = pytest.mark.unit
 

@@ -1,26 +1,14 @@
 """Three order calls nobody scripted: who calls, what should happen, where the call starts.
 
-The machinery is `core.testing.simulator`, shared with the clinic next door. What
-lives here is the shop's half of it, and only that: three personas, three
-goldens, the two tool names that settle a cancellation, and the seeded order each
-call starts from.
-
-Two of those choices are worth the sentence:
-
-- **The calls start at `OrderDesk`, already identified.** Every user turn is a
-  Haiku call for the persona and another for the agent, and identification is
-  already pinned by `tests/test_tienda_stages.py` with two deterministic turns.
-  `cancel_order` only exists in the stage these calls start in.
-- **`cancel_order` and `decline` end the call.** The first means the order was
-  stopped, the second that the customer said no to it. Neither needs a judge.
+Decisions: docs/decisions/tenants.tienda-sur.projects.pedidos.evals.simulator.md
 """
 
 from deepeval.dataset import ConversationalGolden, Persona
 from deepeval.test_case import ConversationalTestCase
 
-from core.context import TenantContext
-from core.testing import fake_context
-from core.testing.simulator import SimulatedCaller, settled_when
+from convo.domain.context import TenantContext
+from convo.testing import fake_context
+from convo.testing.callers.simulator import SimulatedCaller, settled_when
 
 from ..stages import Identify, OrderDesk
 
@@ -115,13 +103,7 @@ def simulate_calls() -> list[ConversationalTestCase]:
 
 
 def identified_context(order_id: str) -> TenantContext:
-    """A session that has already found one seeded order: exactly where OrderDesk begins.
-
-    `prev_agent` matters as much as `customer`. What OrderDesk knows about the
-    order arrives as the previous stage's `summary()` in its `on_enter`, and a
-    stage entered without one opens by asking for the order number again — the
-    right behaviour, and the wrong conversation to be simulating here.
-    """
+    """A session that has already found one seeded order: exactly where OrderDesk begins."""
     tc = fake_context(TENANT, PROJECT)
     tc.customer = {"order_id": order_id, **tc.adapters["orders"].book[order_id]}
     tc.prev_agent = Identify(tc)
