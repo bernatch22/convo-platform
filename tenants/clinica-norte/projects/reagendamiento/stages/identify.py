@@ -23,7 +23,7 @@ from convo.domain.context import TenantContext
 from convo.lang import es
 from convo.prompting import stage_prompt
 
-from .. import tools
+from .. import helpers
 
 # Which errand the caller turned out to want. It is not a routing flag — the handoff
 # already routed the call — but the one thing `summary()` cannot read off the patient:
@@ -305,6 +305,6 @@ class Identify(TenantAgent):
         """
         return (
             f"Paciente identificado: {patient['patient']}. El teléfono que consta en su ficha "
-            f"{tools.masked_phone(patient.get('phone'))} — esas cifras son lo único que sabes "
+            f"{helpers.masked_phone(patient.get('phone'))} — esas cifras son lo único que sabes "
             "de él y lo único que puedes decirle. Quiere cambiarlo por otro."
         )

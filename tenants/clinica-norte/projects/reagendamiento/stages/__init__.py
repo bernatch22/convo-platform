@@ -12,7 +12,7 @@ happened, recorded in the run, and not a flag somebody set.
 
 The two booking stages read the agenda the same way on purpose: the prompt
 paragraphs are shared (`prompts/reception.py`) and the hour helpers are shared
-(`tools.py`). What each owns alone is what its errand owns alone — a cita to
+(`helpers.py`). What each owns alone is what its errand owns alone — a cita to
 release, or a patient with nothing to fall back on.
 
 CancelOrConfirm shares three paragraphs and no tool with them. It reads no

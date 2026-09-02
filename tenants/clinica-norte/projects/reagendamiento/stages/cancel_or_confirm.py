@@ -32,7 +32,7 @@ from convo.agents import ConfirmTask, RunContext, TenantAgent, ToolError, functi
 from convo.domain.context import TenantContext
 from convo.prompting import prompt, stage_prompt
 
-from .. import tools
+from .. import helpers, messages
 
 CANCELLED = (
     "La cita ha quedado anulada y la hora ha vuelto a la agenda. Confírmaselo en una frase y "
@@ -79,8 +79,8 @@ class CancelOrConfirm(TenantAgent):
         """
         appointment = await _lookup(ctx.userdata)
         if not appointment:
-            return tools.NO_CITA_ON_THE_BOOK
-        return tools.appointment_line(appointment)
+            return messages.NO_CITA_ON_THE_BOOK
+        return helpers.appointment_line(appointment)
 
     @function_tool
     async def request_cancellation(self, ctx: RunContext[TenantContext]) -> str:
@@ -101,25 +101,25 @@ class CancelOrConfirm(TenantAgent):
         tc = ctx.userdata
         appointment = await _lookup(tc)
         if not appointment:
-            return tools.NO_CITA_ON_THE_BOOK
+            return messages.NO_CITA_ON_THE_BOOK
         args = {"appointment_id": appointment["appointment_id"]}
         # The sentence the caller says yes to is rendered by us, from the row the booking
         # system just returned, so consent and cancellation cannot drift apart.
         said_yes = await ConfirmTask(
             tc,
-            question=tools.cancellation_question(appointment),
+            question=helpers.cancellation_question(appointment),
             tool="cancel_appointment",
             args=args,
             instructions=prompt(tc, "confirm/cancellation"),
         )
         if not said_yes:
-            return tools.CANCEL_NOT_CONFIRMED
+            return messages.CANCEL_NOT_CONFIRMED
         try:
             await tc.tools.call("cancel_appointment", args)
         except ToolError:
             # The token is spent only after a successful call, so the caller's yes
             # survives: the same cita retried inside the ttl needs no second one.
-            return tools.CANCEL_FAILED
+            return messages.CANCEL_FAILED
         self.settled = "cancelled"
         tc.customer = {**(tc.customer or {}), "appointment_id": "", "status": "cancelled"}
         return CANCELLED
@@ -143,13 +143,13 @@ class CancelOrConfirm(TenantAgent):
         tc = ctx.userdata
         appointment = await _lookup(tc)
         if not appointment:
-            return tools.NO_CITA_ON_THE_BOOK
+            return messages.NO_CITA_ON_THE_BOOK
         try:
             await tc.tools.call(
                 "confirm_attendance", {"appointment_id": appointment["appointment_id"]}
             )
         except ToolError:
-            return tools.CONFIRM_FAILED
+            return messages.CONFIRM_FAILED
         self.settled = "confirmed"
         return CONFIRMED
 

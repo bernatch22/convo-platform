@@ -1,16 +1,4 @@
-"""What the stages hand the model, and what they hand the clinic's systems.
-
-The tools themselves are methods of the stage that owns them (`stages/`), so a
-reader opens one file and sees the model's whole surface for that step of the
-call. This module holds the pieces those tools share: turning the caller's
-words into a date and an hour, turning the agenda's rows into a line the model
-can read aloud, and writing the SMS a booking ends with. Both booking stages —
-the one that moves a cita and the one that creates it — read from here, which is
-the whole reason it is a module and not two sets of private helpers.
-
-Pure functions, no context and no I/O, which is why every rule below is a
-one-line unit test.
-"""
+"""Pure helpers the stages share: parse what the caller said, word what the systems answered."""
 
 import datetime
 import re
@@ -18,67 +6,11 @@ import re
 from convo.lang import es
 
 from ...adapters import patients
+from . import messages
 
 HHMM = re.compile(r"(\d{1,2})\s*[:.hy ]?\s*(\d{2})?")
 
-UNREADABLE_DATE = "No he entendido para qué día lo quiere. ¿Me dice el día de la semana o la fecha?"
 OFFER_LIMIT = 2
-MORE_LEFT = "(Ese día queda algún hueco más: ofrécelo solo si ninguno de estos dos le sirve.)"
-
-NO_SUCH_HOUR = (
-    "Esa hora no es una de las que le he ofrecido. Vuelve a mirar la agenda de ese día "
-    "y ofrécele las horas que te devuelva."
-)
-BOOKING_FAILED = (
-    "El sistema de citas ha rechazado esa hora y no se ha guardado nada: la cita que el "
-    "paciente ya tenía sigue en pie, tal cual estaba. Díselo con estas dos ideas —no ha "
-    "podido reservarse y su cita anterior no se ha tocado— y ofrécele otra hora."
-)
-NOT_CONFIRMED = (
-    "El paciente no ha confirmado, así que no se ha reservado nada. Pregúntale qué prefiere "
-    "hacer y ofrécele otra hora si la quiere."
-)
-NEW_BOOKING_FAILED = (
-    "El sistema de citas ha rechazado esa hora y no se ha guardado nada: el paciente sigue "
-    "sin ninguna cita apuntada. Díselo con estas dos ideas —no ha podido reservarse y no le "
-    "queda nada a su nombre— y ofrécele otra hora."
-)
-
-UNREADABLE_PHONE = (
-    "Ese número no son nueve cifras, así que no se ha cambiado nada. Pídele que te lo repita "
-    "cifra a cifra y vuelve a llamar a la herramienta con el número entero."
-)
-CONTACT_NOT_CONFIRMED = (
-    "El paciente no ha confirmado, así que su teléfono sigue siendo el que ya constaba. "
-    "Pregúntale qué prefiere hacer y no vuelvas a intentarlo sin que te lo pida."
-)
-CONTACT_UPDATE_FAILED = (
-    "La ficha del paciente no ha aceptado el cambio y su teléfono sigue siendo el que ya "
-    "constaba. Díselo tal cual —no se ha podido cambiar y el número de antes sigue en pie— y "
-    "ofrécele que lo intentemos de nuevo o que pase por recepción."
-)
-
-NO_CITA_ON_THE_BOOK = (
-    "No consta ninguna cita a su nombre, así que no hay nada que anular ni que confirmar. "
-    "Díselo tal cual y no toques nada. Si te dice que está seguro de que la tiene, pídele "
-    "que te repita el nombre por si se ha oído mal y vuelve a consultarla; si sigue sin "
-    "aparecer, ofrécele que se pase por recepción con su DNI."
-)
-CANCEL_NOT_CONFIRMED = (
-    "El paciente no ha confirmado, así que no se ha anulado nada y su cita sigue en pie, tal "
-    "cual estaba. Díselo así, sin insistir, y pregúntale si necesita algo más."
-)
-CANCEL_FAILED = (
-    "El sistema de citas ha rechazado la anulación y no se ha tocado nada: la cita del "
-    "paciente sigue en pie, el mismo día y a la misma hora. Díselo con esas dos ideas —no ha "
-    "podido anularse y su cita sigue como estaba— y ofrécele intentarlo otra vez o pasarse "
-    "por recepción."
-)
-CONFIRM_FAILED = (
-    "El sistema de citas no ha podido apuntar la confirmación. La cita del paciente sigue en "
-    "pie exactamente igual, así que díselo tal cual —no se ha podido dejar constancia, pero "
-    "su cita sigue— y que puede venir igualmente el día que tiene."
-)
 
 
 def resolve_day(text: str, today: datetime.date) -> datetime.date:
@@ -242,4 +174,4 @@ def _offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
         return f"Sin huecos libres el {es.spanish_day(day)}."
     lines = [f"- {es.spanish_moment(s['when'])}, {s['doctor']}" for s in slots[:OFFER_LIMIT]]
     text = f"Huecos libres el {es.spanish_day(day)}:\n" + "\n".join(lines)
-    return f"{text}\n{MORE_LEFT}" if len(slots) > OFFER_LIMIT else text
+    return f"{text}\n{messages.MORE_LEFT}" if len(slots) > OFFER_LIMIT else text

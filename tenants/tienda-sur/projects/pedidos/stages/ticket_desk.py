@@ -30,7 +30,7 @@ from convo.agents import RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
 from convo.prompting import stage_prompt
 
-from .. import tools
+from .. import helpers, messages
 
 
 class TicketDesk(TenantAgent):
@@ -87,9 +87,9 @@ class TicketDesk(TenantAgent):
         Devuelve el número de la incidencia —empieza por TS-T— y lo que se ha anotado en ella.
         """
         tc = ctx.userdata
-        subject = tools.ticket_subject(subject)
+        subject = helpers.ticket_subject(subject)
         if not subject:
-            return tools.NO_SUBJECT
+            return messages.NO_SUBJECT
         customer = tc.customer or {}
         ticket = await tc.tools.call(
             "open_ticket",
@@ -104,7 +104,7 @@ class TicketDesk(TenantAgent):
             },
         )
         self.opened = ticket
-        return tools.opened_line(ticket)
+        return helpers.opened_line(ticket)
 
     @function_tool
     async def ticket_status(
@@ -131,7 +131,7 @@ class TicketDesk(TenantAgent):
             "ticket_status",
             {"ticket_id": ticket_id, "phone": (tc.customer or {}).get("phone")},
         )
-        return tools.ticket_line(ticket) if ticket else tools.NO_TICKET
+        return helpers.ticket_line(ticket) if ticket else messages.NO_TICKET
 
     @function_tool
     async def back_to_orders(self, ctx: RunContext[TenantContext], pregunta: str) -> "TenantAgent":

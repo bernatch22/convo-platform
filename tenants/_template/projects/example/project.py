@@ -23,7 +23,6 @@ from convo.domain.catalog import ToolCatalog
 from convo.domain.context import Project, TenantContext
 from convo.domain.tools import SideEffect, ToolSpec
 from convo.telephony.human import TRANSFER_TO_HUMAN
-from convo.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
 FIND_BOOKING = ToolSpec(
     name="find_booking",
@@ -52,15 +51,8 @@ RESTORE_BOOKING = ToolSpec(
     timeout_s=5.0,
 )
 
-# What the caller hears when a tool cannot produce a result. The platform's defaults are in
-# `core.tools.messages`; these override them in this business's own words and register.
-MESSAGES = {
-    UNKNOWN_TOOL: "Eso no puedo consultarlo yo. ¿Le ayudo con su reserva?",
-    NO_ADAPTER: "No puedo entrar ahora mismo en el sistema de reservas. ¿Le llamamos luego?",
-    TIMEOUT: "El sistema está tardando en contestar. ¿Lo intento otra vez?",
-    FAILURE: "No he podido consultar su reserva. ¿Quiere que lo intente de nuevo?",
-}
 
+from .messages import MESSAGES
 
 HERE = Path(__file__).parent
 

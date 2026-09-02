@@ -4,7 +4,7 @@ from convo.agents import RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
 from convo.prompting import stage_prompt
 
-from .. import tools
+from .. import messages
 
 
 class Identify(TenantAgent):
@@ -72,7 +72,7 @@ class Identify(TenantAgent):
         tc = ctx.userdata
         order = await tc.tools.call("find_order", {"order_id": order_number, "phone": phone})
         if not order:
-            return tools.NOT_FOUND
+            return messages.NOT_FOUND
         tc.customer = order
         from .order_desk import OrderDesk
 

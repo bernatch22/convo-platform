@@ -30,7 +30,7 @@ MASKED_PHONE = "60*******"
 SLOT = {"id": "s-11", "when": "2026-09-03T11:00", "doctor": "Dra. Irene Campos"}
 BOOKABLE = "sl-20260903-0900-trau"  # a real slot id: `book_slot` reads the moment out of it
 
-project_tools = importlib.import_module("tenants.clinica-norte.projects.reagendamiento.tools")
+project_tools = importlib.import_module("tenants.clinica-norte.projects.reagendamiento.helpers")
 
 
 def clinic_context(identified: bool = True):

@@ -36,7 +36,8 @@ new_booking = importlib.import_module(f"{PROJECT}.stages.new_booking")
 update_contact = importlib.import_module(f"{PROJECT}.stages.update_contact")
 cancel_or_confirm = importlib.import_module(f"{PROJECT}.stages.cancel_or_confirm")
 identify = importlib.import_module(f"{PROJECT}.stages.identify")
-tools_module = importlib.import_module(f"{PROJECT}.tools")
+helpers_module = importlib.import_module(f"{PROJECT}.helpers")
+messages_module = importlib.import_module(f"{PROJECT}.messages")
 patients = importlib.import_module("tenants.clinica-norte.adapters.patients")
 
 ANA = "ap-20260903-1000-trau"  # the seeded appointment every test reschedules
@@ -335,7 +336,7 @@ async def test_a_failed_sms_takes_the_cita_it_had_just_created_back_off_the_book
 
 def test_the_new_booking_confirmation_asks_to_reserve_and_never_to_change(unknown) -> None:
     """Nothing is being moved, so «¿lo confirmo?» would name a change that does not exist."""
-    said = tools_module.new_confirmation_question(THURSDAY_11)
+    said = helpers_module.new_confirmation_question(THURSDAY_11)
 
     assert said == "jueves 3 de septiembre a las once de la mañana con Dra. Ruiz, ¿se la reservo?"
 
@@ -432,7 +433,7 @@ async def test_an_unidentified_session_cannot_reach_the_write_even_from_inside_t
 
     said = await stages.UpdateContact(tc).request_contact_change(run_context(tc), NEW_NUMBER)
 
-    assert said == tools_module.CONTACT_UPDATE_FAILED
+    assert said == messages_module.CONTACT_UPDATE_FAILED
     assert agenda.calls == []
     assert agenda.book[ANA]["phone"] == "600123456"
 
@@ -459,16 +460,16 @@ def test_the_same_identification_still_hands_a_rescheduling_the_whole_appointmen
 
 def test_the_confirmation_reads_the_new_number_out_in_groups_a_person_can_check() -> None:
     """Nine digits in a row are read as one cardinal, which nobody can compare to anything."""
-    said = tools_module.contact_confirmation_question(NEW_NUMBER)
+    said = helpers_module.contact_confirmation_question(NEW_NUMBER)
 
     assert said == "Su nuevo teléfono de contacto sería el 689 000 111. ¿Se lo cambio?"
 
 
 def test_a_number_the_caller_said_is_read_however_they_grouped_it() -> None:
-    assert tools_module.normalise_phone("689 00 01 11") == NEW_NUMBER
-    assert tools_module.normalise_phone("689-000-111") == NEW_NUMBER
-    assert tools_module.normalise_phone("689 000") == "", "eight digits is a misheard number"
-    assert tools_module.masked_phone("600123456") == "acaba en 456"
+    assert helpers_module.normalise_phone("689 00 01 11") == NEW_NUMBER
+    assert helpers_module.normalise_phone("689-000-111") == NEW_NUMBER
+    assert helpers_module.normalise_phone("689 000") == "", "eight digits is a misheard number"
+    assert helpers_module.masked_phone("600123456") == "acaba en 456"
 
 
 def test_the_log_line_of_a_change_names_the_record_and_only_the_tail_of_the_number() -> None:
@@ -496,16 +497,16 @@ def test_update_contact_is_irreversible_and_declares_no_undo() -> None:
 
 def test_the_hour_the_caller_says_is_matched_however_they_say_it() -> None:
     """Shared by both booking stages, which is why it lives in `tools` and not in either."""
-    assert tools_module.normalise_hour("11:00") == "11:00"
-    assert tools_module.normalise_hour("9") == "09:00"
-    assert tools_module.normalise_hour("las 16.30") == "16:30"
-    assert tools_module.normalise_hour("a media tarde") == ""
-    assert tools_module.hour_of("2026-09-03T11:00") == "11:00"
+    assert helpers_module.normalise_hour("11:00") == "11:00"
+    assert helpers_module.normalise_hour("9") == "09:00"
+    assert helpers_module.normalise_hour("las 16.30") == "16:30"
+    assert helpers_module.normalise_hour("a media tarde") == ""
+    assert helpers_module.hour_of("2026-09-03T11:00") == "11:00"
 
 
 def test_the_confirmation_sentence_says_the_hour_the_way_a_person_says_it() -> None:
     """It is read out verbatim, so «13:00» would be spoken «las trece cero cero»."""
-    said = tools_module.confirmation_question(REFUSED_13)
+    said = helpers_module.confirmation_question(REFUSED_13)
 
     assert said == "martes 8 de septiembre a la una de la tarde con Dra. Campos, ¿lo confirmo?"
 
@@ -951,7 +952,7 @@ async def test_the_lookup_can_only_ever_find_the_caller_on_the_line(settling, tc
 
     said = await settling.find_my_appointment(run_context(tc))
 
-    assert said == tools_module.NO_CITA_ON_THE_BOOK
+    assert said == messages_module.NO_CITA_ON_THE_BOOK
     assert tc.adapters["agenda"].calls == []
 
 
@@ -961,14 +962,14 @@ async def test_neither_verb_touches_the_book_when_nobody_was_identified(settling
     dropped = await settling.request_cancellation(run_context(tc))
     kept = await settling.confirm_attendance(run_context(tc))
 
-    assert dropped == kept == tools_module.NO_CITA_ON_THE_BOOK
+    assert dropped == kept == messages_module.NO_CITA_ON_THE_BOOK
     assert tc.adapters["agenda"].calls == []
     assert tc.adapters["agenda"].book[ANA].get("status") is None
 
 
 def test_the_cancellation_question_is_rendered_by_the_platform_and_names_the_cita() -> None:
     """What the caller agrees to and what the book loses have to be the same thing."""
-    said = tools_module.cancellation_question(
+    said = helpers_module.cancellation_question(
         {"when": "2026-09-03T10:00", "doctor": "Dra. Irene Campos"}
     )
 
@@ -980,7 +981,7 @@ def test_the_cancellation_question_is_rendered_by_the_platform_and_names_the_cit
 
 def test_the_cita_is_read_back_with_the_clock_s_hour_and_spoken_with_the_person_s() -> None:
     """`_offer`'s rule, applied to the cita: the shared paragraph turns 10:00 into words."""
-    line = tools_module.appointment_line(
+    line = helpers_module.appointment_line(
         {
             "when": "2026-09-03T10:00",
             "doctor": "Dra. Irene Campos",

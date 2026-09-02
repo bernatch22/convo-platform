@@ -26,7 +26,7 @@ from convo.agents import ConfirmTask, RunContext, TenantAgent, ToolError, functi
 from convo.domain.context import TenantContext
 from convo.prompting import prompt, stage_prompt
 
-from .. import tools
+from .. import helpers, messages
 
 CHANGED = (
     "El teléfono del paciente ha quedado cambiado en su ficha. Confírmaselo en una frase —a "
@@ -48,7 +48,7 @@ class UpdateContact(TenantAgent):
             return "El teléfono de contacto del paciente no se ha cambiado."
         return (
             "El teléfono de contacto del paciente ha quedado actualizado: "
-            f"{tools.masked_phone(self.changed_to)}."
+            f"{helpers.masked_phone(self.changed_to)}."
         )
 
     @function_tool
@@ -70,29 +70,29 @@ class UpdateContact(TenantAgent):
         solo eso.
         """
         tc = ctx.userdata
-        digits = tools.normalise_phone(phone)
+        digits = helpers.normalise_phone(phone)
         if not digits:
-            return tools.UNREADABLE_PHONE
+            return messages.UNREADABLE_PHONE
         args = _contact_args(tc, digits)
         if not args["appointment_id"]:
-            return tools.CONTACT_UPDATE_FAILED
+            return messages.CONTACT_UPDATE_FAILED
         # The sentence the caller says yes to is rendered by us, from the digits the write
         # is about to receive, so consent and record cannot drift apart.
         said_yes = await ConfirmTask(
             tc,
-            question=tools.contact_confirmation_question(digits),
+            question=helpers.contact_confirmation_question(digits),
             tool="update_contact",
             args=args,
             instructions=prompt(tc, "confirm/contact"),
         )
         if not said_yes:
-            return tools.CONTACT_NOT_CONFIRMED
+            return messages.CONTACT_NOT_CONFIRMED
         try:
             await tc.tools.call("update_contact", args)
         except ToolError:
             # The token is spent only after a successful call, so the caller's yes
             # survives: the same number retried inside the ttl needs no second one.
-            return tools.CONTACT_UPDATE_FAILED
+            return messages.CONTACT_UPDATE_FAILED
         self.changed_to = digits
         tc.customer = {**(tc.customer or {}), "phone": digits}
         return CHANGED

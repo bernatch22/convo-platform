@@ -4,7 +4,7 @@ from convo.agents import RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
 from convo.prompting import stage_prompt
 
-from .. import tools
+from .. import messages
 
 
 class Reception(TenantAgent):
@@ -48,7 +48,7 @@ class Reception(TenantAgent):
         tc = ctx.userdata
         booking = await tc.tools.call("find_booking", {"reference": reference})
         if not booking:
-            return tools.NOT_FOUND
+            return messages.NOT_FOUND
         tc.customer = booking
         from .desk import Desk
 
