@@ -39,6 +39,10 @@ extend-exclude = ["*.md"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# A fixture imported from tests/fixtures/ is "redefined" by the parameter that asks for it.
+"tests/*" = ["F811"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

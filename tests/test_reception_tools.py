@@ -22,7 +22,7 @@ import pytest
 
 from convo.testing import TODAY, fake_context, run_conversation
 from tests.conftest import needs_llm
-from tests.test_stages import identified_context
+from tests.fixtures.clinic import identified_context
 
 pytestmark = pytest.mark.unit
 
