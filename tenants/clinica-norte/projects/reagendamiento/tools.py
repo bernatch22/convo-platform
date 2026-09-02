@@ -15,8 +15,9 @@ one-line unit test.
 import datetime
 import re
 
+from convo.lang import es
+
 from ...adapters import patients
-from . import dates
 
 HHMM = re.compile(r"(\d{1,2})\s*[:.hy ]?\s*(\d{2})?")
 
@@ -82,7 +83,7 @@ CONFIRM_FAILED = (
 
 def resolve_day(text: str, today: datetime.date) -> datetime.date:
     """The day the caller means, or ValueError; the stage turns that into a spoken sentence."""
-    return dates.resolve(text, today)
+    return es.resolve(text, today)
 
 
 def hour_of(when: str) -> str:
@@ -106,7 +107,7 @@ def offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
 def sms_text(patient: str, slot: dict[str, str]) -> str:
     """The message the clinic sends when a change is done; short enough for one SMS."""
     return (
-        f"Clínica Norte: {patient}, su cita queda el {dates.spanish_moment(slot['when'])} "
+        f"Clínica Norte: {patient}, su cita queda el {es.spanish_moment(slot['when'])} "
         f"con {slot['doctor']}. Para cambiarla llame al 910 000 000."
     )
 
@@ -180,7 +181,7 @@ def appointment_line(appointment: dict[str, str]) -> str:
     did it too would be deciding the wording twice.
     """
     return (
-        f"Cita del paciente: {dates.spanish_moment(appointment['when'])} con "
+        f"Cita del paciente: {es.spanish_moment(appointment['when'])} con "
         f"{appointment['doctor']}"
         + (f" ({appointment['specialty']})" if appointment.get("specialty") else "")
         + ". Léesela —día, hora y profesional— y pregúntale si es esa."
@@ -196,7 +197,7 @@ def cancellation_question(appointment: dict[str, str]) -> str:
     heard read back, and there is no softer verb for it — the hour is on offer to
     somebody else a second later.
     """
-    return f"{dates.spoken_moment(appointment['when'])} con {appointment['doctor']}, ¿se la anulo?"
+    return f"{es.spoken_moment(appointment['when'])} con {appointment['doctor']}, ¿se la anulo?"
 
 
 def confirmation_question(slot: dict[str, str]) -> str:
@@ -207,7 +208,7 @@ def confirmation_question(slot: dict[str, str]) -> str:
     are built here from the row the agenda returned, so what the caller agrees
     to and what the platform books are the same thing by construction.
     """
-    return f"{dates.spoken_moment(slot['when'])} con {slot['doctor']}, ¿lo confirmo?"
+    return f"{es.spoken_moment(slot['when'])} con {slot['doctor']}, ¿lo confirmo?"
 
 
 def new_confirmation_question(slot: dict[str, str]) -> str:
@@ -218,7 +219,7 @@ def new_confirmation_question(slot: dict[str, str]) -> str:
     exist. «¿se la reservo?» names what the platform is about to do, and the day,
     the hour and the professional come off the agenda's own row.
     """
-    return f"{dates.spoken_moment(slot['when'])} con {slot['doctor']}, ¿se la reservo?"
+    return f"{es.spoken_moment(slot['when'])} con {slot['doctor']}, ¿se la reservo?"
 
 
 def _offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
@@ -238,7 +239,7 @@ def _offer(day: datetime.date, slots: list[dict[str, str]]) -> str:
     just offered, which is also what the patient says out loud.
     """
     if not slots:
-        return f"Sin huecos libres el {dates.spanish_day(day)}."
-    lines = [f"- {dates.spanish_moment(s['when'])}, {s['doctor']}" for s in slots[:OFFER_LIMIT]]
-    text = f"Huecos libres el {dates.spanish_day(day)}:\n" + "\n".join(lines)
+        return f"Sin huecos libres el {es.spanish_day(day)}."
+    lines = [f"- {es.spanish_moment(s['when'])}, {s['doctor']}" for s in slots[:OFFER_LIMIT]]
+    text = f"Huecos libres el {es.spanish_day(day)}:\n" + "\n".join(lines)
     return f"{text}\n{MORE_LEFT}" if len(slots) > OFFER_LIMIT else text

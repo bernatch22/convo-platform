@@ -12,9 +12,10 @@ caller is told plainly that nothing is on the book.
 
 from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
+from convo.lang import es
 from convo.tools.saga import Saga, SagaFailed
 
-from .. import dates, prompts, tools
+from .. import prompts, tools
 from .farewell import Farewell
 
 
@@ -32,7 +33,7 @@ class NewBooking(TenantAgent):
         if not self.booked:
             return "Todavía no se ha reservado ninguna hora."
         return (
-            f"Cita nueva confirmada: {dates.spanish_moment(self.booked['when'])} con "
+            f"Cita nueva confirmada: {es.spanish_moment(self.booked['when'])} con "
             f"{self.booked['doctor']}. El SMS de confirmación ya se ha enviado."
         )
 

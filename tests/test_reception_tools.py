@@ -27,7 +27,8 @@ from tests.test_stages import identified_context
 pytestmark = pytest.mark.unit
 
 PROJECT = "tenants.clinica-norte.projects.reagendamiento"
-dates = importlib.import_module(f"{PROJECT}.dates")
+from convo.lang import es as dates  # noqa: E402
+
 tools_module = importlib.import_module(f"{PROJECT}.tools")
 agenda_module = importlib.import_module("tenants.clinica-norte.adapters.agenda")
 stages = importlib.import_module(f"{PROJECT}.stages")

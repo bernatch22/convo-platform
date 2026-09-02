@@ -21,7 +21,6 @@ Run with `deepeval test run tests/evals` (needs ANTHROPIC_API_KEY).
 """
 
 import datetime
-import importlib
 import json
 import pathlib
 
@@ -37,7 +36,8 @@ TENANT, PROJECT = "clinica-norte", "reagendamiento"
 AGENDA_TOOL = "find_availability"
 GOLDENS = pathlib.Path("tenants") / TENANT / "projects" / PROJECT / "evals" / "goldens.json"
 
-dates = importlib.import_module(f"tenants.{TENANT}.projects.{PROJECT}.dates")
+from convo.lang import es as dates  # noqa: E402
+
 metrics = bridge.project_metrics(TENANT, PROJECT)
 
 

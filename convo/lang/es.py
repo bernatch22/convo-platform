@@ -1,14 +1,7 @@
-"""Spanish day expressions to a real date, read against the day the call happens.
+"""Spanish calendar words: what a caller says, what the agent says, and the date between them.
 
-Today's date never reaches the model. Haiku 4.5 caches a prompt prefix only
-while it stays byte-identical, so a date written into the system prompt would
-throw the cached prefix away every midnight — and the prefix is the expensive
-part. The model therefore passes the caller's own words ("el jueves", "mañana",
-"la semana que viene") and this module turns them into a calendar date against
-`TenantContext.today`.
-
-Pure functions that take the day as an argument: no clock, no context, no I/O,
-which is why every rule below is a one-line unit test.
+Pure functions that take the day as an argument, so every rule is a one-line
+unit test. Today's date never reaches the model (docs/decisions/001).
 """
 
 import datetime
@@ -70,12 +63,7 @@ NUMBERS = (
 
 
 def resolve(text: str, today: datetime.date) -> datetime.date:
-    """The date a caller means by `text`, read against `today`; ValueError if unreadable.
-
-    Understands an ISO date (`2026-09-03`), `hoy`, `mañana`, `pasado mañana`, a
-    weekday on its own (`el jueves`), `la semana que viene`, and the two
-    combined (`el jueves de la semana que viene`).
-    """
+    """The date a caller means by `text` ("el jueves", "mañana", "la semana que viene")."""
     raw = (text or "").strip()
     if not raw:
         raise ValueError("empty date expression")
@@ -98,31 +86,31 @@ def resolve(text: str, today: datetime.date) -> datetime.date:
 
 
 def spanish_day(value: datetime.date) -> str:
-    """`jueves 3 de septiembre` — how the receptionist names a day out loud."""
+    """`jueves 3 de septiembre`: how a receptionist names a day out loud."""
     return f"{DAY_NAMES[value.weekday()]} {value.day} de {MONTH_NAMES[value.month - 1]}"
 
 
+def spanish_date(iso: str) -> str:
+    """The same from a stored `2026-09-02`; empty when there is none."""
+    if not iso:
+        return ""
+    return spanish_day(datetime.date.fromisoformat(iso))
+
+
 def spanish_moment(when: str) -> str:
-    """`jueves 3 de septiembre a las 10:30` from the ISO timestamp the agenda returned."""
+    """`jueves 3 de septiembre a las 10:30` from an ISO timestamp, the clock form."""
     moment = datetime.datetime.fromisoformat(when)
     return f"{spanish_day(moment.date())} a las {moment:%H:%M}"
 
 
 def spoken_moment(when: str) -> str:
-    """`martes 8 de septiembre a la una de la tarde` — the hour as a person says it, not a clock.
-
-    Used for the one sentence the platform makes the agent read verbatim, the
-    confirmation. Everywhere else the model is handed `spanish_moment`, whose
-    `13:00` is what `book_appointment` takes as an argument: the precise form is
-    for the machine, this one is for the ear. A TTS reading "las 13:00" says
-    "las trece cero cero", which nobody has ever said on a phone.
-    """
+    """`martes 8 de septiembre a la una de la tarde`: the hour as a person says it, for the ear."""
     moment = datetime.datetime.fromisoformat(when)
     return f"{spanish_day(moment.date())} a {spanish_hour(moment.hour, moment.minute)}"
 
 
 def spanish_hour(hour: int, minute: int = 0) -> str:
-    """`la una de la tarde`, `las nueve y media de la mañana` — a 24h time said out loud."""
+    """`la una de la tarde`, `las nueve y media de la mañana`: a 24h time said out loud."""
     twelve = hour % 12 or 12
     said = "la una" if twelve == 1 else f"las {NUMBERS[twelve]}"
     if minute:
@@ -155,12 +143,7 @@ def _weekday(words: str) -> int | None:
 
 
 def _upcoming(today: datetime.date, weekday: int) -> datetime.date:
-    """The next `weekday` strictly after today: `el jueves` said on a Thursday is the next one.
-
-    A caller asking about today would say `hoy`; asking for a weekday means a
-    day still to come, and offering an hour that has already passed is worse
-    than offering one seven days out.
-    """
+    """The next `weekday` strictly after today: `el jueves` said on a Thursday is the next one."""
     ahead = (weekday - today.weekday()) % 7
     return today + datetime.timedelta(days=ahead or 7)
 

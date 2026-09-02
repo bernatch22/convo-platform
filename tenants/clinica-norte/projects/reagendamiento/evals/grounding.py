@@ -14,9 +14,9 @@ below is a unit test that costs nothing to run.
 
 import re
 
+from convo.lang import es
 from convo.testing.metrics import grounding
 
-from .. import dates
 from ..knowledge import CLINIC
 
 HOUR = "hora"
@@ -35,7 +35,7 @@ STREET = re.compile(
     re.IGNORECASE,
 )
 # Only a spoken hour that names its part of the day: that is the shape the platform
-# itself produces (`dates.spoken_moment` always appends one), and without the suffix
+# itself produces (`es.spoken_moment` always appends one), and without the suffix
 # "las dos" in "le ofrezco las dos horas" reads as two o'clock.
 SPOKEN_HOUR = re.compile(
     r"\b(?:la|las)\s+(una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce)"
@@ -47,16 +47,16 @@ SPOKEN_HOUR = re.compile(
 QUARTER, HALF = 15, 30
 MINUTES = {"media": HALF, "cuarto": QUARTER}
 PARTS = {
-    "madrugada": range(0, dates.MORNING),
-    "mañana": range(dates.MORNING, dates.AFTERNOON),
-    "tarde": range(dates.AFTERNOON, dates.NIGHT),
-    "noche": range(dates.NIGHT, 24),
+    "madrugada": range(0, es.MORNING),
+    "mañana": range(es.MORNING, es.AFTERNOON),
+    "tarde": range(es.AFTERNOON, es.NIGHT),
+    "noche": range(es.NIGHT, 24),
 }
 
 
 def spoken_hours(match: re.Match) -> tuple[str, ...]:
     """`las once de la mañana` becomes ('11:00',): the part of the day settles the ambiguity."""
-    twelve = dates.NUMBERS.index(match.group(1).lower())
+    twelve = es.NUMBERS.index(match.group(1).lower())
     minute = MINUTES.get((match.group(2) or "").lower(), 0)
     if match.group(2) and match.group(2).isdigit():
         minute = int(match.group(2))

@@ -40,25 +40,11 @@ from datetime import date, datetime, time
 from livekit.agents.llm import ChatItem, FunctionCall, FunctionCallOutput
 
 from convo.domain.catalog import CLOCK
+from convo.lang.es import DAY_NAMES as WEEKDAYS
+from convo.lang.es import MONTH_NAMES as MONTHS
 
 CLOCK_TOOL = CLOCK.name  # TenantAgent's clock; the reading below quotes it
 CLOCK_CALL_ID = "lk_session_date"  # no dots: Anthropic's tool_use.id is ^[a-zA-Z0-9_-]+$
-
-WEEKDAYS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
-MONTHS = (
-    "enero",
-    "febrero",
-    "marzo",
-    "abril",
-    "mayo",
-    "junio",
-    "julio",
-    "agosto",
-    "septiembre",
-    "octubre",
-    "noviembre",
-    "diciembre",
-)
 
 
 def date_note(today: date, now: time | None = None) -> str:

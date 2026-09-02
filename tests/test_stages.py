@@ -29,7 +29,6 @@ from tests.conftest import needs_llm
 pytestmark = pytest.mark.unit
 
 PROJECT = "tenants.clinica-norte.projects.reagendamiento"
-dates = importlib.import_module(f"{PROJECT}.dates")
 project_module = importlib.import_module(f"{PROJECT}.project")
 stages = importlib.import_module(f"{PROJECT}.stages")
 choose_slot = importlib.import_module(f"{PROJECT}.stages.choose_slot")

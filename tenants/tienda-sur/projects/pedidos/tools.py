@@ -12,8 +12,9 @@ Pure functions, no context and no I/O, which is why every rule below is a
 one-line unit test.
 """
 
+from convo.lang import es
+
 from ...adapters import ticketbook
-from . import dates
 
 RETURN_POLICY = (
     "cuando le llegue tiene 30 días para devolverlo gratis: pide la devolución en «Mis "
@@ -82,7 +83,7 @@ def ticket_line(ticket: dict[str, str]) -> str:
         [
             f"Incidencia {ticket['ticket_id']}, a nombre de {ticket['name'] or 'quien llamó'}.",
             f"Estado: {ticket['status']} ({ticketbook.STATUS_NOTES.get(ticket['status'], '')}).",
-            f"Abierta el {dates.spanish_date(ticket.get('opened', '')) or 'sin fecha'}, "
+            f"Abierta el {es.spanish_date(ticket.get('opened', '')) or 'sin fecha'}, "
             f"la lleva {ticket.get('team') or 'atención al cliente'}.",
             f"Asunto tal y como se anotó: {ticket['subject']}.",
             _about_order(ticket),
@@ -166,7 +167,7 @@ def cannot_cancel(order: dict[str, str]) -> str:
 
 def _delivery(order: dict[str, str]) -> str:
     """The delivery line: who carries it and for when it is expected."""
-    day = dates.spanish_date(order.get("eta", ""))
+    day = es.spanish_date(order.get("eta", ""))
     when = f"entrega prevista el {day}" if day else "sin fecha de entrega todavía"
     return f"Envío: {order['shipping']} con {order['carrier']}; {when}."
 

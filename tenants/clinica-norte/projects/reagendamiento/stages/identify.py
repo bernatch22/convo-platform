@@ -20,8 +20,9 @@ and none to confirm.
 
 from convo.agents import RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
+from convo.lang import es
 
-from .. import dates, prompts, tools
+from .. import prompts, tools
 
 # Which errand the caller turned out to want. It is not a routing flag — the handoff
 # already routed the call — but the one thing `summary()` cannot read off the patient:
@@ -86,7 +87,7 @@ class Identify(TenantAgent):
             )
         return (
             f"Paciente identificado: {patient['patient']}, teléfono {patient['phone']}. "
-            f"Su cita actual es el {dates.spanish_moment(patient['when'])} con "
+            f"Su cita actual es el {es.spanish_moment(patient['when'])} con "
             f"{patient['doctor']} ({patient['specialty']}). Es la cita que quiere cambiar."
         )
 
