@@ -481,7 +481,7 @@ wheels = [
 [[package]]
 name = "convo-platform"
 version = "0.0.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
     { name = "fastapi" },
