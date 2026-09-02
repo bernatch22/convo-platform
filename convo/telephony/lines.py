@@ -3,25 +3,29 @@
 Decisions: docs/decisions/convo.telephony.lines.md
 """
 
+import json
 from typing import Any
 
+from convo import settings
 from convo.api.auth import fleet
 from convo.state.store import Route, Store
-
-# The livekit-sip dispatch rule as it stands today, written down: one Twilio
-# number on the `cc` fleet, answering as Clínica Norte's reagendamiento. Adding
-# a line here does NOT create it — it only stops a fresh store from disagreeing
-# with the box. tienda-sur is deliberately absent: it has no number.
-SEEDED_LINES = (Route("cc", "+14176743169", "clinica-norte", "reagendamiento", "voice"),)
 
 # User-facing, and Spanish because the operator of this console is: a project
 # nobody can call is the one fact the pipeline screen must not soften.
 NO_LINE = "sin número asignado — las llamadas entrantes no llegan a este proyecto"
 
 
+def seeded_lines() -> list[Route]:
+    """The lines this deployment is known to answer, read from `infra/seed/routes.json`."""
+    path = settings.seed_routes_file()
+    if not path.exists():
+        return []
+    return [Route(**row) for row in json.loads(path.read_text())]
+
+
 def seed(store: Store) -> list[Route]:
     """Put this deployment's known lines into a store that does not have them yet."""
-    written = [line for line in SEEDED_LINES if store.route(line.fleet, line.key) is None]
+    written = [line for line in seeded_lines() if store.route(line.fleet, line.key) is None]
     for line in written:
         store.add_route(line)
     return written
@@ -55,6 +59,6 @@ def _note(lines: list[dict[str, Any]], serving: str) -> str:
         )
     return (
         f"the SIP dispatch rule hands an inbound call to the {serving!r} fleet and "
-        "core/router.py reads this row to decide whose project answers it. Changing it is a "
+        "the router reads this row to decide whose project answers it. Changing it is a "
         "change to the dispatch rule on the box, not a setting on this screen."
     )

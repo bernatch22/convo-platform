@@ -10,7 +10,7 @@ Wants=network-online.target
 [Service]
 User=berna
 WorkingDirectory=/home/berna/convo-app
-ExecStart=/home/berna/.local/bin/uv run uvicorn api:app --host 127.0.0.1 --port 8090
+ExecStart=/home/berna/.local/bin/uv run python -m convo api --host 127.0.0.1 --port 8090
 EnvironmentFile=/home/berna/convo-app/.env
 Restart=always
 RestartSec=3

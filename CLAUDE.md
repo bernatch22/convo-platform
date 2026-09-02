@@ -1,4 +1,4 @@
-# convo-platform — working agreement for agents
+# convo — working agreement for agents
 
 Multi-tenant conversational platform for contact centers: one deploy, many
 businesses. Built on self-hosted LiveKit (SFU + SIP + Agents), Anthropic Claude
@@ -9,143 +9,117 @@ comments, commit messages and this file in English.
 runtime that talks. Control, state, tools, audit and tenancy live in the
 backend, never in the prompt.
 
-Full design and evidence: `REPORT.md`. Each taskops card carries its own spec
-and, when a decision was made, a short essay in its thread.
+Design and evidence: `REPORT.md`. Why each module is the way it is:
+`docs/decisions/<module>.md`. Each taskops card carries its own spec.
 
-## Invariants (verified against livekit-agents 1.7.1 — do not "fix" them)
+## Layout (Rails-shaped, standard Python)
 
-- Repo root has exactly two loose `.py` files: `worker.py` (data plane) and
-  `api.py` (control plane). Nothing else at root.
-- One `AgentServer`, one `@server.rtc_session(agent_name=os.getenv("FLEET","cc"))`.
+```
+convo/        the engine, ONE package: cli/ domain/ agents/ prompting/ tools/ session/ providers/
+              state/ telephony/ supervision/ scoring/ observability/ lang/ api/ evals/ testing/
+tenants/      the apps: <id>/tenant.py, adapters/, projects/<p>/{project.py, knowledge.md,
+              messages.py, helpers.py, stages/*.py, prompts/*.md, evals/}
+tests/        unit + tests/evals (DeepEval); tests/fixtures/ shared fakes
+docs/         decisions/ evals.md prompts.md tenants.md deck.pdf
+infra/        box/ compose/ seed/ scripts/
+ui/           React console
+```
+
+Mapping, so the vocabulary stays fixed: router → `convo/session/router.py`;
+controller → a stage (`stages/x.py`, a `TenantAgent`); model → an adapter;
+view → `prompts/x.md`, rendered in the layout `convo/prompting/layout.py` with
+partials `prompts/_reception/*.md`; `lib/` → `convo/lang/`; `bin/` → `convo/cli/`.
+
+## Invariants the tests enforce
+
+- No `.py` at the repo root. `convo/` is the only package; entry points are
+  `python -m convo <group>` (`convo/cli/`) and `uvicorn convo.api.app:app`.
+- `convo/` never imports `tenants/` (`tests/test_core_isolation.py`).
+  `convo/session/registry.py` imports each tenant in try/except: a broken
+  tenant is unroutable, it does not take the fleet down.
+- Projects import `convo.agents` (`TenantAgent`, `ConfirmTask`, …), never
+  `livekit.agents` directly. `convo/domain`, `convo/lang`, `convo/state` import
+  no framework.
+- No file over 400 lines. Docstrings are ONE line: what it does, for whom. The
+  argument, the measurement and the history go to `docs/decisions/<module>.md`
+  and the module docstring cites it. Two exceptions keep their full text: tool
+  docstrings (the schema the model reads) and route docstrings (the JSON the
+  client reads).
+- A stage prompt is `prompts/<stage>.md`, rendered by `convo.prompting.stage_prompt`
+  as `<knowledge_tag>` + view + transfer protocol + `SUPERVISOR_PROTOCOL`, in that
+  order. Shared paragraphs are partials included by name; `tests/test_prompts.py`
+  pins the composition. `Project.prompts` and `Project.knowledge_tag` say where.
+- Spanish calendar words live once, in `convo/lang/es.py`. A tenant imports
+  `convo.lang`, never another tenant.
+- What a tool says to the model when it cannot do what was asked lives in the
+  project's `messages.py`; pure formatting and parsing in `helpers.py`.
+
+## Invariants of the runtime (verified against livekit-agents 1.7.1; do not "fix" them)
+
+- One `AgentServer`, one `@server.rtc_session(agent_name=settings.fleet())`.
   `agent_name` is never empty (empty = implicit dispatch to any anonymous worker).
-- Entry point ends with `cli.run_app(server)` (`server.run()` is async).
-- Each job is a separate process (spawn/forkserver). No DB/Redis pools in the
-  job process; all business IO goes over HTTP to `api.py` (`core/control_plane.py`).
-  `setup_fnc` (prewarm) only loads VAD/turn-detector; it has a 10 s budget.
-- `core/` never imports `tenants/` (`tests/test_core_isolation.py` enforces it).
-  `core/registry.py` imports each tenant in try/except: a broken tenant is
-  unroutable, it does not take the fleet down.
-- Projects import `core.agents` (`TenantAgent`, `ConfirmTask`, …), never
-  `livekit.agents.voice` directly. The framework is replaceable from one package.
-- Tenant identity comes from `ctx.job.metadata` / `ctx.job.attributes` (dispatch
-  rule, JWT `RoomAgentDispatch`), resolved by `core/router.resolve(ctx)` into a
-  single `TenantContext` (`core/context.py`) — the only definition of that object.
-  The channel (voice|chat) belongs to the **session**, not the project.
+- Each job is a separate process. No DB/Redis pools in the job process; all
+  business IO goes over HTTP to the API (`convo/api/client.py`). `setup_fnc`
+  (prewarm) only loads VAD/turn-detector; it has a 10 s budget.
+- Tenant identity comes from `ctx.job.metadata` / `ctx.job.attributes` /
+  the dialled number / `TENANT` env, resolved by `convo/session/router.py` into
+  a single `TenantContext` (`convo/domain/context.py`). The channel (voice|chat)
+  belongs to the **session**, not the project.
 - Every tool has a `ToolSpec` (`side_effect: read|write|irreversible`,
-  `idempotency_key`, `pii_scope`, `timeout_s`, `compensation`,
-  `result_summary`). `guard.check`
-  refuses `irreversible` without a `confirmation_token` minted by `ConfirmTask`.
-  Tools raise `ToolError(msg)` for user-facing failures (the LLM sees it); any
-  other exception is hidden by the framework.
+  `idempotency_key`, `pii_scope`, `timeout_s`, `compensation`, `result_summary`).
+  `guard.check` refuses `irreversible` without a `confirmation_token` minted by
+  `ConfirmTask`. Tools raise `ToolError(msg)` for user-facing failures.
 - Context summary across handoffs happens in `TenantAgent.on_enter` (handoff
-  does not copy history), reading `tc.prev_agent.chat_ctx`.
+  does not copy history).
 - Event log is append-only with a per-session `seq`; the stage is appended
-  **during** the call (SIGKILL-safe), not only in `on_session_end`.
-  `on_session_end` persists `ctx.make_session_report()`.
-- Every voice call keeps its audio, and the tap is the framework's own
-  `RecorderIO` (one `queue.put_nowait` per frame on the call path, Opus encoded
-  in a daemon thread) — never egress, never a GPU. `core/recordings.py` is the
-  ONLY module that composes a recording path: outside the console a
-  `JobContext` aims the recorder at a temp dir it deletes on cleanup, so
-  `recordings.aim` redirects it to `CONVO_RECORDINGS/<session_id>/audio.ogg`
-  during the call (SIGKILL-safe, like the event log). Recordings hold PII: out
-  of git, never a static mount, served only by `GET /sessions/{id}/recording`
-  from a validated session id. `Project.recording=False` opts a project out,
-  `RECORD=0` a deploy. A supervisor takeover is NOT in the file — `RoomIO`
-  links one participant.
-- Sessions are **re-engaged**, not resumed: a dropped call is a new room and job;
-  we snapshot `ChatContext.to_dict()` + stage keyed by `sip.phoneNumber` and
-  rehydrate on the next inbound within N minutes.
+  **during** the call (SIGKILL-safe). `on_session_end` persists the report.
+- Every voice call keeps its audio through the framework's `RecorderIO`;
+  `convo/session/recordings.py` is the ONLY module that composes a recording
+  path. Recordings hold PII: out of git, served only by
+  `GET /sessions/{id}/recording`. `Project.recording=False` opts out, `RECORD=0`
+  a deploy.
 - Prompt caching: `anthropic.LLM(model="claude-haiku-4-5", caching="ephemeral")`.
-  **Haiku 4.5 only caches prefixes >= 4096 tokens** (silent no-op below; Sonnet 5
-  caches at 1024). Every project prefix (system + tools + a stable policy/FAQ
-  block) must exceed 4096 tokens; assert `prompt_cached_tokens > 0` on turn 2 in
-  tests. Never put timestamps or per-request ids in the system prompt; never
-  reorder tools. `preemptive_generation` is DISABLED (human's decision 2026-08-31: with semantic
-  end-of-turn at ~0.33s, speculation never hid Haiku's ttft and only spent calls) —
-  generation starts on confirmed end of turn. Sonnet 5 is the
-  measured alternative in evals, not a default.
-- Call `sanitize_tool_pairing(chat_ctx)` before every generation (orphan
-  `tool_use` bricks the conversation with Anthropic 400s).
-- **A `system` message added to a live chat context is not a system message.**
-  `convert_mid_conversation_instructions` keeps only the FIRST system item as
-  one and rewrites every later one as a **user** message wrapped in
-  `<instructions>` — the agent's prompt is that first item, so anything added
-  afterwards arrives as the caller speaking. Haiku answers it (`tk-097125`: the
-  session date opened 5 of 6 calls). Context the model must READ but nobody
-  said goes in as a paired tool call + result (`core.dates_note.clock_reading`);
-  a `tool_use.id` must match `^[a-zA-Z0-9_-]+$` or the request 400s, and the
-  tool must be DECLARED on the agent or `update_chat_ctx` drops the pair.
-- **Context to be READ is a tool result; context to be OBEYED is an
-  instruction.** A supervisor's whisper stays in the mid-conversation
-  instruction channel (`role="system"` → a user `<instructions>` turn on the
-  wire): as a tool result the same note is filed and not acted on (1/3 vs 3/3,
-  `tk-bc0122`). And a whisper only outranks the stage script because every
-  project's prefix ends with `core.security.protocol.SUPERVISOR_PROTOCOL` —
-  without it, 0/3. `inject` bends the next answer; a note the supervisor wants
-  SAID needs `inject_and_speak`.
+  **Haiku 4.5 only caches prefixes >= 4096 tokens.** Every project's knowledge
+  block must clear that floor; never put timestamps or per-request ids in the
+  prefix; never reorder tools. `preemptive_generation` is DISABLED (human's
+  decision 2026-08-31).
+- The date reaches the model as a paired tool call + result
+  (`convo.agents.clock.clock_reading`), never as a system message: livekit-agents
+  rewrites every system item after the first into a USER turn, and Haiku
+  answers it. A supervisor's whisper stays in that instruction channel on
+  purpose (context to be OBEYED); context to be READ is a tool result.
+- Call `sanitize_tool_pairing(chat_ctx)` before every generation.
 - STT: Soniox `stt-rt-v5`, `language_hints=["es","en"]`, endpointing
-  `level=2 / sensitivity=0.3 / max_endpoint_delay_ms≈1000`, `context=` (Soniox
-  silently ignores `keyterms`). Keep `sample_rate=16000` even on PSTN.
-  The provider is a slot (`Project.stt_provider`, overridable from the console):
-  the alternative is Deepgram Flux `flux-general-multi` via the plugin's `STTv2`
-  (`/v2/listen`) — never `flux-general-en`, which 400s on a `language_hint`.
-- Every transcript passes `core.stt_gate` in `TenantAgent.stt_node`: a streaming
-  STT hallucinates over comfort noise (real call AJ_rt86KogpPxDa: a final
-  "Thank you." into an empty line), so a final with no voiced audio behind it in
-  the last 2.5 s is refused and logged as `stt.phantom`. Never a phrase
-  blocklist — the invention changes every time. Thresholds are project data
-  (`Project.stt_gate`). Overriding `stt_node` forfeits the framework's
-  STT-pipeline reuse across a handoff; that price is paid knowingly.
-- TTS: ElevenLabs `eleven_v3_conversational` (primary) / `eleven_flash_v2_5`
-  (latency profile), `sync_alignment=True`. Never `eleven_turbo_v2_5`
-  (deprecated) and never `eleven_v3` (non-realtime). On interruption the
-  plugin closes the context; do not flush.
-- VAD `inference.VAD(model="silero")`, turn detector `inference.TurnDetector()`
-  (v1-mini, local, CPU). VAD `min_silence_duration >= 0.25` or the session
-  raises. No GPU anywhere.
+  `level=2 / sensitivity=0.3 / max_endpoint_delay_ms≈1000`, `sample_rate=16000`
+  even on PSTN. Alternative slot: Deepgram Flux `flux-general-multi`.
+  Every transcript passes `convo.session.stt_gate` in `TenantAgent.stt_node`.
+- TTS: ElevenLabs `eleven_v3_conversational` / `eleven_flash_v2_5`,
+  `sync_alignment=True`. Never `eleven_turbo_v2_5`, never `eleven_v3`.
+- VAD `inference.VAD(model="silero")`, turn detector `inference.TurnDetector()`.
+  VAD `min_silence_duration >= 0.25`. No GPU anywhere.
 - Chat mode: `RoomOptions(audio_input=False, audio_output=False)`; agent text
-  arrives on `lk.transcription` as deltas, user text goes on `lk.chat`. Client
-  distinguishes speaker by `participantInfo.identity`, not by track id.
-- DeepEval: never leave `@observe(metrics=[...])` in production code; mark
-  voice test cases `flaky=True`; hard policies use `ConversationalDAGMetric`,
-  not `GEval`; eval rooms are created by `api.py` with dispatch metadata (the
-  `LiveKitConnector` cannot pass metadata).
-- Ring 4 (`core/scoring/`) scores every finished call from `api.py`, never from
-  the job process: four checks decided by code, then AT MOST one Haiku call,
-  whose worst case is priced against `SCORING_CAP_EUR` BEFORE it is made and
-  skipped under three turns. The verdict is `session.score`, one more
-  append-only log line at `max(seq)+1`. `Project.scoring=False` opts a project
-  out; `SCORING_SWEEP=0` opts a deploy out.
+  on `lk.transcription`, user text on `lk.chat`.
+- DeepEval: never leave `@observe(metrics=[...])` in production code; hard
+  policies use `ConversationalDAGMetric`, not `GEval`; eval rooms are created by
+  the API with dispatch metadata.
+- Ring 4 (`convo/scoring/`) scores every finished call from the API, never
+  from the job process: checks decided by code, then AT MOST one Haiku call
+  priced against `SCORING_CAP_EUR` first. `Project.scoring=False` opts out.
 - Secrets only from env. Never commit `.env*` except `.env.example`.
-
-## Layout
-
-```
-worker.py  api.py  pyproject.toml  Dockerfile  CLAUDE.md  REPORT.md
-core/        runtime: context, contracts, registry, routes, router, session, providers, auth, control_plane,
-             agents/ tools/ adapters/ state/ observability/ security/ testing/
-tenants/     _template/, clinica-norte/, tienda-sur/ — tenant.py, adapters/, projects/<p>/{project,agents,tools,prompts}.py, evals/
-tenant-sdk/  TS client for remote tools (outbound WS)
-client/      web client (livekit-client): voice + chat
-ui/          React app (switcher, conversation, call log, sessions, evals, supervisor)
-infra/       compose/ (livekit, sip, redis, minio, caddy), migrations/
-presentation/ self-narrating deck (stage engine) + static/PDF export
-tests/       unit + evals (ring 1); tenants/*/projects/*/evals/ hold per-project goldens
-tmp/         ignored: research docs, recordings
-```
 
 ## Commands
 
 ```
-uv sync                                  # deps
-python worker.py console                 # talk to the agent in the terminal (key toggles text/mic), --record saves OGG
-python worker.py console --tenant tienda-sur
-python worker.py dev                     # against a LiveKit server (LIVEKIT_URL/API_KEY/API_SECRET)
-python -m convo sessions list|show <id>  # read a session's event log (not `platform`: it shadows the stdlib module)
-pytest -m unit                           # ring 1 (fast)
-deepeval test run tests/evals -n 4       # ring 1 metrics; tenants/*/evals for per-project goldens
-docker compose -f infra/compose/dev.yml up   # livekit-server --dev + redis (ms-8+)
+uv sync --extra dev
+uv run convo console --text                 # talk to the default project from the keyboard
+uv run convo console --tenant tienda-sur --project pedidos
+uv run convo api                            # control plane + UI on :8090
+uv run convo worker dev                     # the fleet against LIVEKIT_URL
+uv run convo sessions list|show <id>
+uv run pytest -m unit                       # ring 1
+uv run deepeval test run tests/evals -n 3   # ring 1 metrics
+uv run convo evals report <tenant> <project>
+docker compose -f infra/compose/dev.yml up  # livekit-server --dev + redis
 ```
 
 ## Working on the board (taskops)
@@ -153,56 +127,32 @@ docker compose -f infra/compose/dev.yml up   # livekit-server --dev + redis (ms-
 - This session's MCP server may be pinned to another repo: pass
   `repo_path=/Users/berna/prueba-abai` on every taskops call.
 - Orchestrator plans (`taskops_plan`), assigns (`taskops_assign`), spawns one
-  Opus sub-agent per brief, reviews in-session (`taskops_review`) and merges
+  sub-agent per brief, reviews in-session (`taskops_review`) and merges
   (`taskops_merge`). Never raw git merges in the shared checkout; never
   `git switch`. Workers pass `actor=agent:<dev>/<name>` on every call.
-- Cards are small (one afternoon) and every milestone ends with a command the
-  human runs to see the result. Seams first (serialized), then parallel cards.
+- Cards are small and every milestone ends with a command the human runs.
 - Commits: `Bernardo Castro <me@bernardocastro.dev>`, no `Co-Authored-By`, no
   generated-with trailers. Versions and tags are the human's call.
 
-## Every milestone ships four things (non-negotiable)
+## Every milestone ships four things
 
-1. **A command the human runs** to see it working (`console`, a CLI, a URL).
-2. **`.taskops/reports/ms-N.md`** — a learning report, not a usage sheet: what we
-   set out to do, what we achieved, what we learned the hard way (with the real
-   cause), the decisions and why, where the project stands, what comes next.
-   Written so a person or an agent picking the project up cold understands how
-   we got here. Index in `.taskops/reports/README.md`. How-to lives in README,
-   design in REPORT.md, generated artifacts (DeepEval HTML, recordings) in `tmp/`.
-   After the commit that carries a report, register it on the board with
-   `taskops_filed path=.taskops/reports/ms-N.md title=… sha=<commit> milestone=ms-…`
-   — a report that is not filed does not exist for the board.
-3. **DeepEval, incrementally** — even one metric. Prompts must keep a consistent
-   line milestone to milestone: per-project `goldens.json` grows with every card,
-   `deepeval test run` is part of the milestone's definition of done, and the
-   HTML report links the DeepEval HTML output.
-4. **An nvim command** in the closing note of every card to read the code:
-   `nvim -p core/x.py core/y.py tenants/…` — the human is a code judge too.
+1. A command the human runs to see it working.
+2. `.taskops/reports/ms-N.md`, a learning report, indexed in
+   `.taskops/reports/README.md` and filed on the board with `taskops_filed`.
+3. DeepEval, incrementally: per-project `goldens.json` grows with every card.
+4. An `nvim -p …` command in the closing note of every card.
 
-Core before UI: the core must be tested (unit + evals + real calls through
-Twilio) before any UI work starts. CLI before UI.
+## Code style
 
-## Code style — Rails-clear
-
-- Public methods first and visible; private helpers below, prefixed `_`.
-- One blank line between methods, two between classes; nothing glued together.
-- Every public method has a one-line docstring saying what it does for whom.
-  Tool docstrings are the schema the LLM sees — write them for the model.
-- One domain per module, one responsibility per class; files stay small
-  (soft limit ~300 lines, never near 1000). Split before it grows.
-- Explicit over clever: no metaprogramming, no hidden globals, no magic
-  imports. A reader should follow a request end-to-end by opening files in order.
-- Python 3.12, `ruff` (line 100), full type hints; dataclasses for internal
-  data, pydantic for anything crossing a process boundary.
+- One responsibility per module, one line per docstring, files under 400 lines.
+- Public methods first; private helpers below, prefixed `_`.
+- Explicit over clever: no metaprogramming, no hidden globals, no magic imports.
+- Python 3.12, `ruff` (line 100), full type hints; dataclasses inside, pydantic
+  at process boundaries.
 - Tests: `pytestmark = pytest.mark.unit` or `.evals` per module; one behaviour
-  per test; names read as sentences.
-- Open-source mindset in every card: each card's spec says what a stranger
-  could reuse from it and what would need a contribution upstream.
+  per test; names read as sentences; shared fakes in `tests/fixtures/`.
 
 ## Voice
 
 Default TTS voice: ElevenLabs `Carolina - Spanish woman - es_ES`
-(`UOIqAnmS11Reiei1Ytkc`), peninsular, conversational. Alternatives in the
-account: `Carolina Ruiz` (`h2cd3gvcqTp3m65Dysk7`), `Sara Martin - 3`
-(`gD1IexrzCvsXPHUuT0s3`). Voice is per-project data, never hardcoded in core.
+(`UOIqAnmS11Reiei1Ytkc`). Voice is per-project data, never hardcoded in convo.

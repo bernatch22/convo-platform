@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 from livekit.agents import AgentServer, JobContext, JobProcess, cli
 from livekit.agents.cli import AgentsConsole
 
+from convo import settings
 from convo.domain.context import TenantContext
 from convo.providers import vad_for
 from convo.session import recordings
@@ -35,7 +36,7 @@ def prewarm(proc: JobProcess) -> None:
 server.setup_fnc = prewarm
 
 
-@server.rtc_session(agent_name=os.getenv("FLEET", "cc"))
+@server.rtc_session(agent_name=settings.fleet())
 async def entrypoint(ctx: JobContext) -> None:
     """Resolve the tenant for this job and run its conversation."""
     tc = await resolve(ctx)

@@ -8,6 +8,7 @@ import subprocess
 from datetime import date
 from typing import Any
 
+from convo import settings
 from convo.domain.context import TenantContext
 from convo.domain.contracts import SessionMeta
 from convo.session.registry import load_registry
@@ -21,8 +22,6 @@ TENANT_ATTR = "convo.tenant"
 PROJECT_ATTR = "convo.project"
 CHANNEL_ATTR = "convo.channel"
 TENANT_ENV = "TENANT"
-DEFAULT_TENANT = "clinica-norte"
-DEFAULT_PROJECT = "reagendamiento"
 
 
 class UnroutableTenant(LookupError):
@@ -65,19 +64,19 @@ def session_meta(ctx: Any, store: Store, sip: dict[str, str] | None = None) -> S
     if TENANT_ATTR in attributes:
         return SessionMeta(
             tenant=attributes[TENANT_ATTR],
-            project=attributes.get(PROJECT_ATTR, DEFAULT_PROJECT),
+            project=attributes.get(PROJECT_ATTR, settings.default_project()),
             channel=attributes.get(CHANNEL_ATTR, "chat"),
         )
     number = dialled_number(sip or {})
     if number:
-        route = store.route(os.getenv("FLEET", "cc"), number)
+        route = store.route(settings.fleet(), number)
         if route is None:
             raise UnroutableTenant(f"no route for {number!r} on this fleet")
         return SessionMeta(tenant=route.tenant, project=route.project, channel=route.channel)
     # a console with a microphone IS a voice session: the env fallback is voice
     return SessionMeta(
-        tenant=os.getenv(TENANT_ENV, DEFAULT_TENANT),
-        project=os.getenv("PROJECT", DEFAULT_PROJECT),
+        tenant=os.getenv(TENANT_ENV, settings.default_tenant()),
+        project=os.getenv("PROJECT", settings.default_project()),
         channel="voice",
     )
 

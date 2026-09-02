@@ -1,24 +1,9 @@
 """dev_call.py — a browser-less chat call against the local LiveKit server.
 
-The stack runs in three terminals (compose up · `uvicorn api:app` ·
-`python worker.py dev`); this script is the fourth, standing in for the web
-client nobody has written yet. It asks the control plane for a token, joins the
-room that token names, types on `lk.chat`, reads the agent's deltas on
-`lk.transcription` and hangs up.
-
-    uv run python scripts/dev_call.py                          # both demo tenants
-    uv run python scripts/dev_call.py clinica-norte/reagendamiento
-    uv run python scripts/dev_call.py tienda-sur/pedidos "hola" "¿cuándo llega?"
-
-Nothing below knows a tenant. Who answers is decided by the dispatch metadata
-inside the token — `RoomAgentDispatch(agent_name=FLEET, metadata=SessionMeta)`
-— which is exactly what this run exists to prove: one worker process, two
-businesses, no `TENANT` in its environment.
-
-Open source note: this is a generic LiveKit text-mode client in 150 lines. Point
-`--api` at any control plane that mints `{url, room, token}` and it works.
+Decisions: docs/decisions/infra.scripts.dev_call.md
 """
 
+import argparse
 import asyncio
 import json
 import sys
@@ -47,7 +32,12 @@ DEMO_CALLS: dict[str, list[str]] = {
 
 def main(argv: list[str]) -> int:
     """Run the demo calls, or the one `<tenant>/<project> [turn ...]` named on the command line."""
-    api, rest = _api_flag(argv)
+    parser = argparse.ArgumentParser(prog="dev_call.py", description=__doc__.split("\n")[0])
+    parser.add_argument("--api", default=DEFAULT_API, help="the control plane that mints tokens")
+    parser.add_argument("call", nargs="?", help="<tenant>/<project>; omitted, both demo tenants")
+    parser.add_argument("turns", nargs="*", help="what to say, one argument per turn")
+    args = parser.parse_args(argv)
+    api, rest = args.api, ([args.call, *args.turns] if args.call else [])
     calls = {rest[0]: list(rest[1:]) or DEMO_CALLS.get(rest[0], [])} if rest else DEMO_CALLS
     for reference, turns in calls.items():
         if not turns:
@@ -102,12 +92,7 @@ class ChatCall:
         await self.room.local_participant.send_text(text, topic=CHAT_TOPIC)
 
     async def reply(self) -> str:
-        """The agent's whole answer: the first segment, plus any that follow it right away.
-
-        A turn that calls a tool speaks twice — "un momento, le consulto" and
-        then the answer — so waiting for one segment and moving on would type
-        the next line over the agent's mouth.
-        """
+        """The agent's whole answer: the first segment, plus any that follow it right away."""
         segments = [await asyncio.wait_for(self.inbox.get(), REPLY_TIMEOUT_S)]
         while True:
             try:
@@ -129,13 +114,6 @@ class ChatCall:
 
     async def _drain(self, reader: rtc.TextStreamReader) -> None:
         await self.inbox.put((await reader.read_all()).strip())
-
-
-def _api_flag(argv: list[str]) -> tuple[str, list[str]]:
-    """Pull `--api <url>` out of the arguments; everything else is the call to make."""
-    if argv[:1] == ["--api"]:
-        return argv[1], argv[2:]
-    return DEFAULT_API, argv
 
 
 if __name__ == "__main__":
