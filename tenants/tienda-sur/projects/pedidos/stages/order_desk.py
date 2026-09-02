@@ -15,7 +15,7 @@ from convo.domain.context import TenantContext
 from convo.prompting import prompt, stage_prompt
 from convo.tools.saga import Saga, SagaFailed
 
-from .. import tools
+from .. import helpers, messages
 from .farewell import Farewell
 
 SMS_STEP = "send_sms"
@@ -86,7 +86,7 @@ class OrderDesk(TenantAgent):
         """
         tc = ctx.userdata
         order = await self._reload(tc)
-        return tools.order_line(order) if order else tools.NOT_FOUND
+        return helpers.order_line(order) if order else messages.NOT_FOUND
 
     @function_tool
     async def request_cancellation(self, ctx: RunContext[TenantContext]) -> str | tuple:
@@ -104,25 +104,25 @@ class OrderDesk(TenantAgent):
         tc = ctx.userdata
         order = await self._reload(tc)
         if not order:
-            return tools.NOT_FOUND
-        if not tools.cancellable(order):
-            return tools.cannot_cancel(order)
+            return messages.NOT_FOUND
+        if not helpers.cancellable(order):
+            return helpers.cannot_cancel(order)
         args = {"order_id": order["order_id"]}
         # The sentence the customer says yes to is rendered by us, from the row the order
         # system returned, so consent and cancellation cannot drift apart.
         said_yes = await ConfirmTask(
             tc,
-            question=tools.confirmation_question(order),
+            question=helpers.confirmation_question(order),
             tool="cancel_order",
             args=args,
             instructions=prompt(tc, "confirm/cancel_order"),
         )
         if not said_yes:
-            return tools.NOT_CONFIRMED
+            return messages.NOT_CONFIRMED
         try:
             await _cancellation(tc, order, args).run()
         except SagaFailed as failure:
-            return tools.NOTICE_FAILED if failure.step == SMS_STEP else tools.CANCEL_FAILED
+            return messages.NOTICE_FAILED if failure.step == SMS_STEP else messages.CANCEL_FAILED
         self.cancelled = order
         return self.hand_off(Farewell(tc))
 
@@ -177,5 +177,5 @@ def _cancellation(tc: TenantContext, order: dict[str, str], args: dict[str, str]
     return (
         Saga(tc)
         .step("cancel_order", args)
-        .step(SMS_STEP, {"phone": order["phone"], "text": tools.sms_text(order)})
+        .step(SMS_STEP, {"phone": order["phone"], "text": helpers.sms_text(order)})
     )

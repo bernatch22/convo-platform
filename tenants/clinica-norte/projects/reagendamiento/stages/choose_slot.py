@@ -14,7 +14,7 @@ from convo.lang import es
 from convo.prompting import prompt, stage_prompt
 from convo.tools.saga import Saga, SagaFailed
 
-from .. import tools
+from .. import helpers, messages
 from .farewell import Farewell
 
 
@@ -66,15 +66,17 @@ class ChooseSlot(TenantAgent):
         """
         tc = ctx.userdata
         try:
-            day = tools.resolve_day(date, tc.today)
+            day = helpers.resolve_day(date, tc.today)
         except ValueError:
-            return tools.UNREADABLE_DATE
+            return messages.UNREADABLE_DATE
         args = {"date": day.isoformat()}
         if specialty:
             args["specialty"] = specialty
         slots = await tc.tools.call("find_availability", args)
-        self.offered = {tools.hour_of(slot["when"]): slot for slot in slots[: tools.OFFER_LIMIT]}
-        return tools.offer(day, slots)
+        self.offered = {
+            helpers.hour_of(slot["when"]): slot for slot in slots[: helpers.OFFER_LIMIT]
+        }
+        return helpers.offer(day, slots)
 
     @function_tool
     async def book_appointment(self, ctx: RunContext[TenantContext], time: str) -> str | tuple:
@@ -95,28 +97,28 @@ class ChooseSlot(TenantAgent):
         confirmado. Cuenta eso y solo eso.
         """
         tc = ctx.userdata
-        slot = self.offered.get(tools.normalise_hour(time))
+        slot = self.offered.get(helpers.normalise_hour(time))
         if slot is None:
-            return tools.NO_SUCH_HOUR
+            return messages.NO_SUCH_HOUR
         args = _booking_args(tc, slot)
         # The sentence the caller says yes to is rendered by us, from the row the agenda
         # returned, so consent and booking cannot drift apart.
         said_yes = await ConfirmTask(
             tc,
-            question=tools.confirmation_question(slot),
+            question=helpers.confirmation_question(slot),
             tool="book_slot",
             args=args,
             instructions=prompt(tc, "confirm/move"),
         )
         if not said_yes:
-            return tools.NOT_CONFIRMED
+            return messages.NOT_CONFIRMED
         try:
             await _rebooking(tc, slot, args).run()
         except SagaFailed:
             # The token is spent by the executor only AFTER a successful call, so a
             # failure leaves the caller's yes intact: retrying the same hour inside the
             # token's ttl needs no second confirmation, and a different hour mints its own.
-            return tools.BOOKING_FAILED
+            return messages.BOOKING_FAILED
         self.booked = slot
         return self.hand_off(Farewell(tc))
 
@@ -129,7 +131,7 @@ def _rebooking(tc: TenantContext, slot: dict[str, str], args: dict[str, str]) ->
         saga.step("cancel_slot", {"appointment_id": patient["appointment_id"]})
     return saga.step("book_slot", args).step(
         "send_sms",
-        {"phone": patient.get("phone", ""), "text": tools.sms_text(args["patient"], slot)},
+        {"phone": patient.get("phone", ""), "text": helpers.sms_text(args["patient"], slot)},
     )
 
 

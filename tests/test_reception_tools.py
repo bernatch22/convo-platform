@@ -29,7 +29,8 @@ pytestmark = pytest.mark.unit
 PROJECT = "tenants.clinica-norte.projects.reagendamiento"
 from convo.lang import es as dates  # noqa: E402
 
-tools_module = importlib.import_module(f"{PROJECT}.tools")
+helpers_module = importlib.import_module(f"{PROJECT}.helpers")
+messages_module = importlib.import_module(f"{PROJECT}.messages")
 agenda_module = importlib.import_module("tenants.clinica-norte.adapters.agenda")
 stages = importlib.import_module(f"{PROJECT}.stages")
 FakeAgenda = agenda_module.FakeAgenda
@@ -137,15 +138,15 @@ def test_the_model_is_handed_two_hours_even_when_the_agenda_returns_three() -> N
         {"id": "c", "when": "2026-09-03T17:00", "doctor": "Dr. Hugo Ferrer"},
     ]
 
-    offer = tools_module._offer(THURSDAY, slots)
+    offer = helpers_module._offer(THURSDAY, slots)
 
     assert offer.count("\n- ") == 2
     assert "Hugo Ferrer" not in offer
-    assert tools_module.MORE_LEFT in offer
+    assert messages_module.MORE_LEFT in offer
 
 
 def test_a_day_with_nothing_free_says_so_instead_of_offering_nothing() -> None:
-    assert tools_module._offer(THURSDAY, []) == "Sin huecos libres el jueves 3 de septiembre."
+    assert helpers_module._offer(THURSDAY, []) == "Sin huecos libres el jueves 3 de septiembre."
 
 
 async def test_the_tool_reaches_the_adapter_through_the_platform_executor(tc) -> None:

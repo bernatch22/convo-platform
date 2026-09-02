@@ -23,9 +23,9 @@ from convo.domain.catalog import ToolCatalog
 from convo.domain.context import Project, TenantContext
 from convo.domain.tools import SideEffect, ToolSpec
 from convo.telephony.human import TRANSFER_TO_HUMAN
-from convo.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
 from ...adapters.tickets import summarise_ticket
+from .messages import MESSAGES
 
 FIND_ORDER = ToolSpec(
     name="find_order",
@@ -78,17 +78,6 @@ TICKET_STATUS = ToolSpec(
     pii_scope=frozenset({"phone"}),
     timeout_s=5.0,
 )
-
-# When a tool call cannot produce a result the model still has to say something. The
-# platform's defaults already address the caller as "tú", but they talk about "sistemas";
-# a shop talks about its almacén, so the sentences are written here, next to the prompt
-# that established the voice.
-MESSAGES = {
-    UNKNOWN_TOOL: "Eso no lo puedo mirar yo desde aquí. ¿Te ayudo con tu pedido?",
-    NO_ADAPTER: "No puedo entrar ahora mismo en el sistema de pedidos. ¿Te llamamos luego?",
-    TIMEOUT: "El sistema de pedidos está tardando en contestar. ¿Lo intento otra vez?",
-    FAILURE: "No he podido consultar tu pedido. ¿Quieres que lo intente de nuevo?",
-}
 
 
 HERE = Path(__file__).parent

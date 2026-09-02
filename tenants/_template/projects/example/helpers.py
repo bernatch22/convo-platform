@@ -1,27 +1,6 @@
-"""What the stages share: how a booking is read aloud, and what is said when a tool cannot.
-
-The tools themselves are methods of the stage that owns them (`stages/`), so a
-reader opens one file and sees the model's whole surface for that step of the
-call. This module holds the pieces those tools share.
-
-Pure functions, no context and no I/O, which is why every rule below is a
-one-line unit test.
-
-TODO(copy): the sentences are the business's, not the platform's — rewrite them
-in your register and your language.
-"""
+"""Pure helpers the stages share: parse what the caller said, word what the systems answered."""
 
 ACTIVE = "activa"
-
-NOT_FOUND = (
-    "No aparece ninguna reserva con esos datos. Pídale que le repita la referencia, por si "
-    "se ha oído mal. Si sigue sin aparecer, dígale que la busque en el correo de "
-    "confirmación o que escriba a hola@example.test."
-)
-NOT_CONFIRMED = (
-    "El cliente no ha confirmado, así que no se ha cancelado nada y la reserva sigue tal "
-    "cual. Pregúntele qué prefiere hacer."
-)
 
 
 def booking_line(booking: dict[str, str]) -> str:

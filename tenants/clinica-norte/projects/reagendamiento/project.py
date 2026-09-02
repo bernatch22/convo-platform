@@ -49,7 +49,6 @@ from convo.domain.catalog import ToolCatalog, platform_specs
 from convo.domain.context import Project, TenantContext
 from convo.domain.tools import SideEffect, ToolSpec
 from convo.telephony.human import TRANSFER_TO_HUMAN
-from convo.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
 from ...adapters.agenda import (
     summarise_availability,
@@ -58,6 +57,7 @@ from ...adapters.agenda import (
     summarise_patient,
 )
 from ...adapters.sms import summarise_message
+from .messages import MESSAGES
 
 # The platform's own `find_availability` spec, re-declared with the one clause only a
 # clinic can write: what a free slot may say in the log. The renderer lives next to the
@@ -166,17 +166,6 @@ SEND_SMS = ToolSpec(
     timeout_s=5.0,
     result_summary=summarise_message,
 )
-
-# When a tool call cannot produce a result the model still has to say something,
-# and the platform's defaults address the caller as "tú". Clínica Norte speaks
-# to patients as "usted", so the register is set here, next to the prompt that
-# established it, rather than in core.
-MESSAGES = {
-    UNKNOWN_TOOL: "Eso no puedo consultarlo desde aquí. ¿Le ayudo con su cita?",
-    NO_ADAPTER: "No puedo entrar en la agenda ahora mismo. ¿Prefiere que le llamemos hoy?",
-    TIMEOUT: "La agenda está tardando en responder. ¿Lo intento otra vez?",
-    FAILURE: "No he podido consultar la agenda. ¿Quiere que lo intente de nuevo?",
-}
 
 
 HERE = Path(__file__).parent

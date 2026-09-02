@@ -6,7 +6,7 @@ happen because the model decided the customer sounded sure: it happens because
 a token for exactly this call. The guard refuses `cancel_booking` without it.
 
 TODO(copy): when your irreversible act is more than one write — stop the order
-AND text the customer — wrap the steps in `core.tools.saga.Saga` instead of
+AND text the customer — wrap the steps in `core.helpers.saga.Saga` instead of
 calling the tool directly, and the platform will run the `compensation`
 declared on the spec (`restore_booking`) if a later step fails.
 `tenants/tienda-sur/projects/pedidos/stages/order_desk.py` is that shape.
@@ -16,7 +16,7 @@ from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
 from convo.prompting import prompt, stage_prompt
 
-from .. import tools
+from .. import helpers, messages
 
 
 class Desk(TenantAgent):
@@ -46,7 +46,7 @@ class Desk(TenantAgent):
         """
         tc = ctx.userdata
         booking = await self._reload(tc)
-        return tools.booking_line(booking) if booking else tools.NOT_FOUND
+        return helpers.booking_line(booking) if booking else messages.NOT_FOUND
 
     @function_tool
     async def request_cancellation(self, ctx: RunContext[TenantContext]) -> str:
@@ -62,25 +62,25 @@ class Desk(TenantAgent):
         tc = ctx.userdata
         booking = await self._reload(tc)
         if not booking:
-            return tools.NOT_FOUND
-        if not tools.cancellable(booking):
-            return tools.cannot_cancel(booking)
+            return messages.NOT_FOUND
+        if not helpers.cancellable(booking):
+            return helpers.cannot_cancel(booking)
         args = {"reference": booking["reference"]}
         said_yes = await ConfirmTask(
             tc,
-            question=tools.confirmation_question(booking),
+            question=helpers.confirmation_question(booking),
             tool="cancel_booking",
             args=args,
             instructions=prompt(tc, "confirm/cancel"),
         )
         if not said_yes:
-            return tools.NOT_CONFIRMED
+            return messages.NOT_CONFIRMED
         # The write itself. ConfirmTask only minted the token; the guard checks it here.
         # A refusal by the customer's system raises ToolError, which the framework speaks
         # in this project's own words (`MESSAGES[FAILURE]` in `project.py`).
         cancelled = await tc.tools.call("cancel_booking", args)
         self.cancelled = booking
-        return f"Cancelada. {tools.booking_line({**booking, **cancelled})}"
+        return f"Cancelada. {helpers.booking_line({**booking, **cancelled})}"
 
     async def _reload(self, tc: TenantContext) -> dict[str, str] | None:
         """The booking as the system holds it right now, kept on the context for the next turn."""

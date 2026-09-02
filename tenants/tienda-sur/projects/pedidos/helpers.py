@@ -1,51 +1,10 @@
-"""What the stages hand the model, and what they hand the shop's systems.
-
-The tools themselves are methods of the stage that owns them (`stages/`), so a
-reader opens one file and sees the model's whole surface for that step of the
-call. This module holds the pieces those tools share: turning an order row into
-a line the model can read aloud, the sentence the customer has to say yes to,
-the SMS a cancellation ends with, the incident lines the helpdesk answers with,
-and the things that can be told to the model when a tool cannot do what was
-asked.
-
-Pure functions, no context and no I/O, which is why every rule below is a
-one-line unit test.
-"""
+"""Pure helpers the stages share: parse what the caller said, word what the systems answered."""
 
 from convo.lang import es
 
 from ...adapters import ticketbook
+from . import messages
 
-RETURN_POLICY = (
-    "cuando le llegue tiene 30 días para devolverlo gratis: pide la devolución en «Mis "
-    "pedidos», imprime la etiqueta prepagada y lo deja en Correos o en un punto MRW, y el "
-    "dinero le vuelve en cuanto la prenda llegue al almacén"
-)
-
-NOT_FOUND = (
-    "No aparece ningún pedido con esos datos. Pídele que te repita el número de pedido, o el "
-    "móvil con el que lo hizo, por si se ha oído mal. Si sigue sin aparecer, dile que lo "
-    "compruebe en «Mis pedidos» de la web o que escriba a hola@tiendasur.es."
-)
-NOT_CONFIRMED = (
-    "El cliente no ha confirmado, así que no se ha cancelado nada y el pedido sigue tal cual. "
-    "Pregúntale qué prefiere hacer."
-)
-NOTICE_FAILED = (
-    "El SMS de confirmación no ha podido salir, así que el pedido NO se ha cancelado y sigue "
-    "exactamente como estaba: nada se ha tocado. Díselo con esas dos ideas —no se ha cancelado "
-    "y no ha perdido nada— y pídele un número de móvil válido al que podamos escribirle, "
-    "porque sin ese aviso la cancelación no se da por hecha."
-)
-CANCEL_FAILED = (
-    "El almacén no ha podido parar el pedido y no se ha cancelado nada: sigue tal y como "
-    "estaba. Díselo, sin culpar al cliente, y ofrécele intentarlo otra vez."
-)
-
-# The shop's rule, as the information sheet states it: only an order still in the warehouse
-# can be stopped. It is written here as well as in the order system on purpose — the system
-# is the last word on what may happen to an order, and this is what the conversation needs
-# in order to explain itself before it asks anybody for a yes.
 CANCELLABLE = ("preparando",)
 
 STATUS_NOTES = {
@@ -54,16 +13,6 @@ STATUS_NOTES = {
     "entregado": "ya está entregado, así que lo que cabe es una devolución",
     "cancelado": "el pedido ya está cancelado y el importe está de vuelta",
 }
-
-NO_TICKET = (
-    "No consta ninguna incidencia con esos datos. Pídele que te repita el número —empieza por "
-    "TS-T y son cuatro cifras— o el móvil con el que llamó, por si se ha oído mal. Si sigue sin "
-    "aparecer, ofrécele abrirle una nueva ahora mismo."
-)
-NO_SUBJECT = (
-    "Todavía no te ha contado qué le pasa, así que no hay nada que escribir en la incidencia. "
-    "Pregúntaselo con una sola pregunta y ábrela cuando te lo haya dicho."
-)
 
 
 def ticket_subject(text: str | None) -> str:
@@ -155,13 +104,13 @@ def cannot_cancel(order: dict[str, str]) -> str:
 
     The refusal and the way out in one string, because they are one thing to say:
     a customer who hears "no se puede" and nothing else has been given a problem
-    instead of an answer. The policy sentence is `RETURN_POLICY`, quoted from the
+    instead of an answer. The policy sentence is `messages.RETURN_POLICY`, quoted from the
     shop's own information sheet so the two can never drift apart.
     """
     return (
         f"Ese pedido está {order['status']} y ya no se puede cancelar: "
         f"{STATUS_NOTES.get(order['status'], '')}. Díselo sin rodeos, en una frase, y ofrécele "
-        f"la devolución gratuita: {RETURN_POLICY}. No le prometas ninguna cancelación."
+        f"la devolución gratuita: {messages.RETURN_POLICY}. No le prometas ninguna cancelación."
     )
 
 
