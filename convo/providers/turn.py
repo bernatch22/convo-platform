@@ -1,10 +1,6 @@
 """Turn taking: Silero VAD and the local turn detector, both on CPU, no downloads.
 
-`inference.VAD` is a native binary (livekit-local-inference) and
-`inference.TurnDetector()` is the v1-mini audio model that ships with the
-SDK and runs locally when no LiveKit Cloud inference is configured
-(`local_fallback=True`). `min_silence_duration` stays at 0.25 s: below it
-the session refuses to start.
+Decisions: docs/decisions/convo.providers.turn.md
 """
 
 from livekit.agents import inference

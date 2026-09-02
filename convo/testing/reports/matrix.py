@@ -1,29 +1,6 @@
 """The eval matrix: the same goldens, N models, one table that says where they differ.
 
-The LLM is a slot, and a platform that says so has to be able to show it. This
-module is the "show it": it reads what DeepEval already produced for each model
-— one `EvaluationResult` per model, from the SAME `goldens.json` — and turns it
-into a metric × model table plus the list of goldens the models disagreed on.
-
-Nothing here scores anything. Every number is a `MetricData` DeepEval wrote,
-which is what keeps the matrix honest: a comparison that re-judged the runs with
-a second criterion would be measuring the criterion, not the models.
-
-Two numbers per cell, and both are needed. The **pass rate** is what CI gates
-on, and on a suite of eleven goldens it moves in steps of nine points, so a
-model that is worse everywhere can tie one that is worse nowhere. The **mean
-score** is the continuous half — it separates "0.72 on a 0.7 threshold" from
-"0.95" — and it is meaningless on its own, because a metric with a 1.0
-threshold (the DAGs) only ever scores 1.0 or 0.0.
-
-The divergences are the point of the exercise. A golden that passes on one model
-and fails on the other is a finding to write down, never a golden to soften: the
-suite is the fixed thing and the model is the variable, and the moment a golden
-is edited so a specific model passes it, the matrix stops comparing anything.
-
-Open source note: the reusable part is the shape — read a run per model, join on
-(metric, case), report the cells and the disagreements. Nothing here knows what
-a clinic is.
+Decisions: docs/decisions/convo.testing.reports.matrix.md
 """
 
 from collections.abc import Mapping, Sequence
@@ -100,12 +77,7 @@ class Matrix:
 
 
 def read(result: Any) -> list[Score]:
-    """Every (metric, golden) verdict of one DeepEval run, flattened.
-
-    `evaluate()` answers with one `TestResult` per test case, each carrying the
-    `MetricData` of every metric that scored it. A case DeepEval could not name
-    is keyed by its index, so two runs of the same goldens still line up.
-    """
+    """Every (metric, golden) verdict of one DeepEval run, flattened."""
     scores: list[Score] = []
     for index, test in enumerate(getattr(result, "test_results", []) or []):
         case = test.name or f"#{index}"
@@ -122,11 +94,7 @@ def read(result: Any) -> list[Score]:
 
 
 def build(runs: Mapping[str, Sequence[Score]]) -> Matrix:
-    """The matrix for `{model: scores}` — models in the order they were run.
-
-    Metrics are sorted by name so the table reads the same on every run: the
-    order `evaluate()` returns them in follows whichever case finished first.
-    """
+    """The matrix for `{model: scores}` — models in the order they were run."""
     models = list(runs)
     metrics = sorted({score.metric for scores in runs.values() for score in scores})
     cells = {
@@ -139,11 +107,7 @@ def build(runs: Mapping[str, Sequence[Score]]) -> Matrix:
 
 
 def divergences(runs: Mapping[str, Sequence[Score]]) -> list[Divergence]:
-    """Every (metric, golden) the models did not agree on, in metric then golden order.
-
-    Only pairs a model actually scored count as disagreement: a golden one run
-    never reached is missing evidence, not a difference between two models.
-    """
+    """Every (metric, golden) the models did not agree on, in metric then golden order."""
     verdicts: dict[tuple[str, str], dict[str, bool]] = {}
     for model, scores in runs.items():
         for score in scores:

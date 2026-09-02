@@ -78,13 +78,7 @@ def show_session(store: Store, session_id: str) -> int:
 
 
 def tail_session(store: Store, session_id: str | None = None, poll_s: float = 0.3) -> int:
-    """Follow a session live: each new event printed as it lands, with the wall clock.
-
-    Watching the pipeline breathe in the terminal: when the stt.final arrives,
-    when the state flips listening→thinking→speaking, when the first tts word
-    leaves, and each turn's ttft/e2e chips. With no id it waits for the newest
-    session — start it, then call the number. Ctrl+C ends it.
-    """
+    """Follow a session live: each new event printed as it lands, with the wall clock."""
     printed_for: str | None = None
     last_seq = 0
     try:
@@ -126,13 +120,7 @@ def _ended(store: Store, session_id: str) -> bool:
 
 
 def eval_session(store: Store, session_id: str, voice: bool = False) -> int:
-    """Score one stored session with its own project's conversational metrics (ring 3).
-
-    The same metrics the CI suite runs on goldens, on a call that really
-    happened: the log becomes a `ConversationalTestCase` and each metric prints
-    its score, its threshold and why. What the replay could not see is printed
-    with the score that suffers from it, never left for the reader to work out.
-    """
+    """Score one stored session with its own project's conversational metrics (ring 3)."""
     row = store.session(session_id)
     if row is None:
         print(f"no session {session_id!r}")
@@ -157,14 +145,7 @@ def eval_session(store: Store, session_id: str, voice: bool = False) -> int:
 
 
 def score_voice(store: Store, session_id: str) -> int:
-    """Score the recording of a session with the two offline voice metrics (ms-6).
-
-    They are detectors, not judges: `AudioIntegrityMetric` measures the agent's
-    own audio (clipping, dropouts, loops, an abrupt cutoff) and
-    `AgentResponsivenessMetric` reads the shape of the turns and whether every
-    answer arrived with sound. Neither calls a model, so this costs nothing and
-    needs no key — only the OGG the session recorded.
-    """
+    """Score the recording of a session with the two offline voice metrics (ms-6)."""
     from deepeval.metrics.voice import AgentResponsivenessMetric, AudioIntegrityMetric
 
     from convo.testing.callers.audio import recorded_path, voice_case_from
@@ -195,14 +176,7 @@ def score(metric: Any, case: Any, note: str | None = None) -> float:
 
 
 def score_session(store: Store, session_id: str, judge: bool = True) -> int:
-    """Score one finished session now (ring 4) and print the breakdown it wrote into the log.
-
-    The same function the control plane's sweeper runs, called by hand: the
-    four deterministic checks, then at most one judged metric under its cap.
-    `--free` runs the deterministic half alone and spends nothing. Asking twice
-    is safe — the second call prints the score the first one wrote, because
-    `session.score` is a log line and the log is append-only.
-    """
+    """Score one finished session now (ring 4) and print the breakdown it wrote into the log."""
     from convo.scoring.runner import score_session as run
 
     result = run(session_id, store, judge=judge)
@@ -270,13 +244,7 @@ def _score_line(payload: dict[str, Any]) -> str:
 
 
 def _explanation(metric: Any) -> list[str]:
-    """A metric's reason, or — for one built with `include_reason=False` — its node chain.
-
-    DeepEval's verbose log is the whole graph: every criterion, every rendered
-    block, the clinic's information sheet in full. An operator asking why a call
-    scored 0.0 wants the labels and the one-line reason each node wrote, so that
-    is what is kept and the rest is left for `deepeval test run -v`.
-    """
+    """A metric's reason, or — for one built with `include_reason=False` — its node chain."""
     if getattr(metric, "reason", None):
         return [_short(str(metric.reason))]
     lines = str(getattr(metric, "verbose_logs", "") or "").splitlines()

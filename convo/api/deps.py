@@ -23,11 +23,7 @@ Reader = Annotated[Store, Depends(open_store)]
 
 
 def effective(tenant: str, project: str, store: Store) -> tuple[Tenant, Project]:
-    """The registry's tenant and its project with the stored overrides already applied.
-
-    The same `core.state.overrides.apply` the router runs, so the console can
-    never show a pipeline different from the one the next call will use.
-    """
+    """The registry's tenant and its project with the stored overrides already applied."""
     known = load_registry().get(tenant)
     if known is None:
         raise HTTPException(404, f"unknown tenant {tenant!r}; known: {sorted(load_registry())}")

@@ -16,13 +16,7 @@ STATUS_NOTES = {
 
 
 def ticket_subject(text: str | None) -> str:
-    """The customer's own words as the helpdesk will store them — trimmed, never rewritten.
-
-    One line of indirection on purpose: the stage asks the project what a
-    subject is, and the project asks the system that has to hold it. A shop
-    that swaps `FakeTickets` for a real helpdesk with a 120-character field
-    changes one constant and the prompt above it stops promising more.
-    """
+    """The customer's own words as the helpdesk will store them — trimmed, never rewritten."""
     return ticketbook.subject_of(text)
 
 
@@ -41,13 +35,7 @@ def ticket_line(ticket: dict[str, str]) -> str:
 
 
 def opened_line(ticket: dict[str, str]) -> str:
-    """What the model is told the moment an incident exists: the number, and to read it out.
-
-    The number is the whole point of the turn — it is what the customer writes
-    on the back of an envelope and quotes on the next call — so the instruction
-    to say it out loud, digit by digit, is here and not left to the prompt: a
-    tool that returns an identifier nobody repeats has helped no one.
-    """
+    """What the model is told the moment an incident exists: the number, and to read it out."""
     return (
         f"Incidencia abierta con el número {ticket['ticket_id']}, en estado "
         f"{ticket['status']}. Dile el número despacio, dile que un compañero la mira y que "
@@ -76,14 +64,7 @@ def cancellable(order: dict[str, str]) -> bool:
 
 
 def confirmation_question(order: dict[str, str]) -> str:
-    """The sentence the customer has to say yes to, rendered by us and never by the model.
-
-    A confirmation the model writes is a confirmation the model can soften, and
-    "¿te lo cancelo entonces?" after three sentences about sizes is not consent
-    to stop an order. The words are built here from the row the order system
-    returned, so what the customer agrees to and what the platform cancels are
-    the same thing by construction.
-    """
+    """The sentence the customer has to say yes to, rendered by us and never by the model."""
     return (
         f"Te cancelo entonces el pedido {order['order_id']}, el de {order['total']}, "
         "y el importe te vuelve por donde lo pagaste. ¿Lo cancelo?"
@@ -100,13 +81,7 @@ def sms_text(order: dict[str, str]) -> str:
 
 
 def cannot_cancel(order: dict[str, str]) -> str:
-    """What the model is told when the warehouse can no longer stop an order.
-
-    The refusal and the way out in one string, because they are one thing to say:
-    a customer who hears "no se puede" and nothing else has been given a problem
-    instead of an answer. The policy sentence is `messages.RETURN_POLICY`, quoted from the
-    shop's own information sheet so the two can never drift apart.
-    """
+    """What the model is told when the warehouse can no longer stop an order."""
     return (
         f"Ese pedido está {order['status']} y ya no se puede cancelar: "
         f"{STATUS_NOTES.get(order['status'], '')}. Díselo sin rodeos, en una frase, y ofrécele "

@@ -1,17 +1,6 @@
 """The read side of the control plane: stored sessions as the console reads them.
 
-`api.py` is the door; this is what is behind it. Every function here takes a
-`Store` and returns plain dicts — no FastAPI, no SQL above the store, no
-knowledge of who is asking — so the same views feed the HTTP endpoints, a
-test, and one day a Postgres deploy without a line changing.
-
-The job process never calls this in production: it talks HTTP to `api.py` and
-the control plane is the only thing holding a database handle.
-
-`live` is the same read as `session`, one poll at a time: an SSE stream over
-the store with a `seq` cursor. A session's log is append-only and numbered, so
-"what is new" is a comparison, never a subscription — a client that vanishes
-costs nothing and a client that reconnects says which seq it had.
+Decisions: docs/decisions/convo.api.client.md
 """
 
 import asyncio
@@ -63,14 +52,7 @@ def event_view(event: Event) -> dict[str, Any]:
 async def live(
     store: Store, session_id: str, after: int = 0, poll_s: float = POLL_S
 ) -> AsyncIterator[str]:
-    """SSE frames for one session's events as they append, from `after` onwards.
-
-    Three event names reach the browser: `open` once (the row, so a client that
-    joined late can label the screen), `append` per log line, and `end` when
-    `session.end` lands — after which the stream closes itself. A comment line
-    goes out every `KEEPALIVE_S` of silence so a proxy does not reap an idle
-    call that is merely listening.
-    """
+    """SSE frames for one session's events as they append, from `after` onwards."""
     row = store.session(session_id)
     if row is None:
         yield _frame("error", {"error": f"no session {session_id}"})
@@ -94,29 +76,14 @@ async def live(
 
 
 def live_calls(store: Store, rooms: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """The SFU's live rooms, each matched — best effort — to the session that is logging it.
-
-    Two matches are possible and neither is a join the database could do. A web
-    room is named `<tenant>-<project>-<hex>` by `mint_session`, so its prefix
-    names the project. A phone room is named by the dispatch rule, so the only
-    honest key is the number: the caller's `sip.*` attributes are on the room
-    AND on the session's first event. Nothing matched leaves `session_id` null
-    — a call the console can watch but not yet read.
-    """
+    """The SFU's live rooms, each matched — best effort — to the session that is logging it."""
     running = [row for row in store.sessions() if row.outcome is None]
     numbers = {row.id: _sip_number(store, row) for row in running}
     return [{**room, **_match(running, numbers, room)} for room in rooms]
 
 
 def _match(running: list[SessionRow], numbers: dict[str, str | None], room: dict) -> dict:
-    """Which stored session this room is, by project prefix or by the caller's number.
-
-    An eval room is named `eval-<tenant>-<project>-<hex>`, so the prefix that
-    names its project is one word further in. Ring 2 asks this question of
-    itself mid-call — a synthetic caller hears what was said and needs the log
-    to know what was done — and a console that showed a synthetic call as
-    unreadable would be wrong for the same reason.
-    """
+    """Which stored session this room is, by project prefix or by the caller's number."""
     for row in running:
         named = room["room"].removeprefix(f"{EVAL_PREFIX}-")
         by_name = named.startswith(f"{row.tenant}-{row.project}-")
@@ -132,13 +99,7 @@ def _sip_number(store: Store, row: SessionRow) -> str | None:
 
 
 def _phone_of(events: list[Event]) -> str | None:
-    """The caller's number, or the trunk's when the caller withheld it; None when not a call.
-
-    Only `session.start` carries the SIP attributes, so this reads the first
-    event and stops. A null answer is the honest way to say "this session never
-    came in over the telephone" — it is what makes a phone row distinguishable
-    from a browser one in the call log, where nothing else would tell them apart.
-    """
+    """The caller's number, or the trunk's when the caller withheld it; None when not a call."""
     for event in events:
         sip = event.payload.get("sip") or {}
         for attribute in PHONE_ATTRS:
@@ -153,13 +114,7 @@ def _matches(row: SessionRow, tenant: str | None, project: str | None) -> bool:
 
 
 def _row_view(store: Store, row: SessionRow, events: list[Event] | None = None) -> dict[str, Any]:
-    """The list line: identity, envelope, and the two numbers read off the log itself.
-
-    `audio` is a look on disk and not a look in the log on purpose: the log
-    says where the OGG was AIMED, the disk says whether there is anything to
-    play. A killed job, a chat session and a project that opted out all
-    answer false, and the console needs no third state to draw a player.
-    """
+    """The list line: identity, envelope, and the two numbers read off the log itself."""
     events = store.events(row.id) if events is None else events
     return {
         "id": row.id,

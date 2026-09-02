@@ -1,7 +1,6 @@
 """Store: where session logs, routes and pinned prompt versions live.
 
-`Store` is a Protocol; `MemoryStore` is for tests and the harness, `SQLiteStore`
-for the laptop and the dev box. Postgres later is one more module here.
+Decisions: docs/decisions/convo.state.store.md
 """
 
 from convo.state.store.memory import MemoryStore

@@ -1,14 +1,6 @@
 """The ms-6 voice report: one recorded call, its event table, its scores, its golden.
 
-    uv run python -m core.testing.voice_report <session-id>
-
-Writes `tmp/reports/ms-6.html` with the OGG playable in the page, one row per
-agent turn with the latencies the framework measured, the two offline voice
-metrics with their defect breakdown, and the TTS golden read from
-`tmp/golden/golden.json` (written by `python -m core.testing.tts_golden`; it is
-read rather than re-run because ElevenLabs bills per character).
-
-Nothing here costs a model call: both voice metrics are DSP.
+Decisions: docs/decisions/convo.testing.reports.voice_report.md
 """
 
 import json
@@ -49,13 +41,7 @@ def build(session_id: str, store: Store, out: Path = OUT) -> Path:
 
 
 def turn_rows(events: list[Event]) -> list[dict]:
-    """One row per agent turn: when it took the floor, its latencies, what it said.
-
-    `answer_s` is the caller's line to the agent's first sound — the honest
-    end-to-end of a typed call. It is not the framework's `e2e_latency`, which
-    needs an end of utterance and so never appears without a microphone; the
-    greeting, which answers nobody, has none.
-    """
+    """One row per agent turn: when it took the floor, its latencies, what it said."""
     rows: list[dict] = []
     asked: int | None = None
     speaking: int | None = None

@@ -1,21 +1,6 @@
 """Identify: open the call, find out who is on the line, and hand it to the right stage.
 
-Five exits, and which one a call takes is a tool call in the run rather than a
-flag. `identify_patient` finds an existing cita and hands over to ChooseSlot;
-`start_new_booking` hands over to NewBooking for a caller who has none;
-`start_contact_update` hands over to UpdateContact; and `start_cancellation` and
-`start_attendance_confirmation` both hand over to CancelOrConfirm — two tools
-into one stage, because the model routes on a docstring and «quiero anularla»
-and «llamo para confirmar que voy» are opposite intents that one description
-would blur.
-
-The new-booking exit is deliberately NOT what a failed lookup does on its own: a
-misheard surname is the commonest error on a phone line, and routing the first
-miss straight into a new booking is how a patient ends up with two citas. The
-miss asks for the name again; the caller saying they want a new one is what
-moves the call. The same rule, harder, on the other three: a caller nobody found
-gets a refusal and no handoff — there is no record to change, no cita to cancel
-and none to confirm.
+Decisions: docs/decisions/tenants.clinica-norte.projects.reagendamiento.stages.identify.md
 """
 
 from convo.agents import RunContext, TenantAgent, function_tool
@@ -257,14 +242,7 @@ class Identify(TenantAgent):
         errand: str,
         refusal: str,
     ) -> str | tuple:
-        """The two exits that lead to CancelOrConfirm: same lookup, same refusal, one word apart.
-
-        Written once because the difference between them is genuinely one word.
-        They are still two TOOLS, and that is not a contradiction: the model
-        routes on a docstring, and «quiero anularla» and «llamo para confirmar
-        que voy» are opposite intents that one description would blur. What
-        happens after the routing is identical, so it lives here.
-        """
+        """The two exits that lead to CancelOrConfirm: same lookup, same refusal, one word apart."""
         tc = ctx.userdata
         patient = await tc.tools.call("find_patient", {"name": name, "phone": phone})
         if not patient:
@@ -276,17 +254,7 @@ class Identify(TenantAgent):
         return self.hand_off(CancelOrConfirm(tc))
 
     def _settle_summary(self, patient: dict) -> str:
-        """The note that tells the next stage its FIRST sentence, not just its facts.
-
-        Ms-20's prompt findings, applied: a stage handed a paragraph of context
-        and no opening decides its own, and both models opened by asking for a
-        name the previous stage had already taken. So the note ends with the
-        move — look the cita up, then read it back — and it deliberately does NOT
-        carry the day, the hour or the professional. That is the same discipline
-        as `_contact_summary` for a different reason: the next stage is required
-        to read those off the booking system in this call, and a stage that was
-        handed them would recite them instead.
-        """
+        """The note that tells the next stage its FIRST sentence, not just its facts."""
         errand = "anularla" if self.errand == CANCEL else "confirmar que va a acudir"
         return (
             f"Paciente identificado: {patient['patient']}, teléfono {patient['phone']}. "
@@ -295,14 +263,7 @@ class Identify(TenantAgent):
         )
 
     def _contact_summary(self, patient: dict) -> str:
-        """The one summary in this project that hands the next stage LESS than it holds.
-
-        A phone number is what UpdateContact is about to change and what it must
-        never read out, and the surest way to stop a stage saying something is to
-        keep it out of the stage. So the number crosses the handoff as its last
-        three digits and nothing else: a prompt paragraph can be argued with by a
-        model, a value it was never given cannot.
-        """
+        """The one summary in this project that hands the next stage LESS than it holds."""
         return (
             f"Paciente identificado: {patient['patient']}. El teléfono que consta en su ficha "
             f"{helpers.masked_phone(patient.get('phone'))} — esas cifras son lo único que sabes "

@@ -35,11 +35,7 @@ def list_routes(store: Store) -> int:
 
 
 def seed_routes(store: Store) -> int:
-    """Write the numbers this deployment owns, skipping every key already stored.
-
-    The same seed `api.py` runs at startup, by hand — for a laptop that never
-    starts the control plane and still wants the console to tell the truth.
-    """
+    """Write the numbers this deployment owns, skipping every key already stored."""
     written = lines.seed(store)
     if not written:
         print("nothing to seed: every known line is already a route")

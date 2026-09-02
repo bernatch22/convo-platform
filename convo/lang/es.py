@@ -1,7 +1,6 @@
 """Spanish calendar words: what a caller says, what the agent says, and the date between them.
 
-Pure functions that take the day as an argument, so every rule is a one-line
-unit test. Today's date never reaches the model (docs/decisions/001).
+Decisions: docs/decisions/convo.lang.es.md
 """
 
 import datetime

@@ -1,13 +1,6 @@
 """fake_job_context: the shape of a LiveKit job, for router tests that never touch a server.
 
-`core.router.resolve` reads five things — the job's `id`, `metadata` and
-dispatch `attributes`, the SIP `participant.attributes`, and the participants
-already in the room — and nothing else. This builds exactly those, as plain
-objects, so a test can say "a call to this number on this fleet" in one line.
-
-A real phone call is a **room** job: `job.participant` is empty and the caller
-is in the room. `room_participants=` builds that shape; `participant_attributes=`
-builds the participant-job shape. Both are real, so both are testable.
+Decisions: docs/decisions/convo.testing.fake_job.md
 """
 
 from dataclasses import dataclass, field

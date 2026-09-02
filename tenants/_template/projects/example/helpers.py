@@ -18,12 +18,7 @@ def cancellable(booking: dict[str, str]) -> bool:
 
 
 def confirmation_question(booking: dict[str, str]) -> str:
-    """The sentence the customer says yes to, rendered by us and never by the model.
-
-    A confirmation the model writes is one the model can soften. Building it
-    here, from the row the system returned, is what makes what the customer
-    agreed to and what the platform cancels the same thing by construction.
-    """
+    """The sentence the customer says yes to, rendered by us and never by the model."""
     return (
         f"Le cancelo entonces la reserva {booking['reference']}, la del "
         f"{booking['when']}. ¿La cancelo?"

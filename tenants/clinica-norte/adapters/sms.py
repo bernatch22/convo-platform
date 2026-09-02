@@ -1,18 +1,6 @@
 """FakeSms: the clinic's SMS gateway, which in the demo only remembers what it sent.
 
-The third step of a rebooking is telling the patient in writing, and it is a
-write like any other: catalogued, guarded, timed and logged. Keeping it behind
-an adapter is what lets the saga treat "send the SMS" as a step that can fail
-and be reasoned about, instead of a side effect buried in a stage.
-
-A phone number is personal data, so `send_sms` declares `pii_scope={"phone"}`
-in the project's catalog and the platform masks it before anything reaches a
-log. This fake still holds the number in memory — a test has to be able to
-assert who was written to — which is exactly the line a real gateway draws too.
-
-Open source note: replace `_send` with your provider's HTTP call and keep the
-capability name and the `{message_id, to}` result. Raise `ValueError` when the
-provider refuses; the platform turns it into a sentence the caller hears.
+Decisions: docs/decisions/tenants.clinica-norte.adapters.sms.md
 """
 
 from typing import Any
@@ -25,14 +13,7 @@ NOTHING_SENT = "the gateway returned nothing"
 
 
 def summarise_message(message: dict[str, str] | None) -> str:
-    """What `send_sms` may leave in the log: which message went out, to a masked number.
-
-    The BODY is deliberately not rendered. It names the patient by design
-    (`tools.sms_text`), and while the mask would blank the name, a summary
-    whose value depends on the mask having seen that exact spelling is a
-    summary waiting to leak. The id and the number are what an operator needs
-    to answer "did the patient get their text?".
-    """
+    """What `send_sms` may leave in the log: which message went out, to a masked number."""
     if not message:
         return NOTHING_SENT
     return f"message {message.get('message_id', '?')} sent to {message.get('to', '?')}"

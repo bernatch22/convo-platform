@@ -1,8 +1,6 @@
 """The HTML of the ms-6 voice report: one page, no assets but the audio next to it.
 
-Split from `voice_report` for the reason every report is split: the numbers are
-worth reading in isolation, and a template is not. Nothing here computes
-anything — it renders what it is handed.
+Decisions: docs/decisions/convo.testing.reports.voice_report_html.md
 """
 
 from typing import Any

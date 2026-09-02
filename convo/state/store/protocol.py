@@ -34,12 +34,7 @@ class Route:
 
 @dataclass(frozen=True)
 class PipelineOverride:
-    """One field of a project's pipeline set from the console instead of from git.
-
-    Voice, TTS model and greeting are the three a supervisor changes between
-    calls; the row is what makes the change survive without a deploy. The read
-    is one row per field, so the console can show when each was last touched.
-    """
+    """One field of a project's pipeline set from the console instead of from git."""
 
     tenant: str
     project: str
@@ -71,12 +66,7 @@ class MetricScore:
 
 @dataclass(frozen=True)
 class EvalRun:
-    """One `deepeval` run of one project's suite: what it scored and where its evidence is.
-
-    Stored the moment it starts (`status="running"`) so the console can watch it
-    land, then replaced by id when it ends. `suite` is free text on purpose —
-    ring 1 today, personas tomorrow — and nothing here knows which is which.
-    """
+    """One `deepeval` run of one project's suite: what it scored and where its evidence is."""
 
     id: str
     tenant: str

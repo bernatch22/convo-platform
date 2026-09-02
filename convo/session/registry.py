@@ -1,8 +1,6 @@
 """Registry of tenants found under tenants/. A broken tenant is unroutable, never fatal.
 
-core never imports a tenant statically: the package name is data and the
-folders are discovered on disk, so tests keep proving the runtime has no
-compile-time dependency on any customer.
+Decisions: docs/decisions/convo.session.registry.md
 """
 
 import importlib

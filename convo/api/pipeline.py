@@ -14,11 +14,7 @@ router = APIRouter()
 
 
 class PipelineUpdate(BaseModel):
-    """The fields the console may change between calls; anything else is refused.
-
-    `extra="forbid"`: a typo like `ttsModel` must come back as a 422 naming the
-    field, not be stored as an override nothing will ever read.
-    """
+    """The fields the console may change between calls; anything else is refused."""
 
     model_config = ConfigDict(extra="forbid")
 

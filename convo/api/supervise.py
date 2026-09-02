@@ -35,12 +35,7 @@ class SuperviseRequest(BaseModel):
 
 
 class EnteredRequest(BaseModel):
-    """A supervisor saying they are through the door; the SFU is asked whether it is true.
-
-    Nothing here is trusted beyond "look at this room for this identity". The
-    capability is read off the participant's signed attributes at the SFU, not
-    taken from this body — which is why there is no field for it.
-    """
+    """A supervisor saying they are through the door; the SFU is asked whether it is true."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -49,16 +44,7 @@ class EnteredRequest(BaseModel):
 
 
 class VerbRequest(BaseModel):
-    """One supervision verb, aimed at a live room from the control plane rather than a browser.
-
-    `identity` is the supervisor the SFU will be asked about; nothing here is
-    trusted beyond "look at this room for this identity". The agent asks the
-    same question again of the packet it receives.
-
-    `mode` is per-verb and deliberately one field: `inject` / `inject_and_speak`
-    for a steer, `cold` / `warm` for a transfer. Empty means "this verb's
-    default", which is the only value that is right for every verb.
-    """
+    """One supervision verb, aimed at a live room from the control plane rather than a browser."""
 
     model_config = ConfigDict(extra="forbid")
 

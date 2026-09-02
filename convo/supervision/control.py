@@ -1,47 +1,6 @@
 """The three verbs a supervisor aims at a live conversation: whisper, take the line, hand it back.
 
-`core.security.monitor` is the road a verb travels; this is what happens when
-it arrives. One `SupervisorControl` per job, built with the session it steers,
-hung on the `TenantContext` so every stage already carries it.
-
-**A whisper is never applied mid-generation.** The model is already streaming
-a sentence built from a context; swapping that context underneath it is how a
-tool call loses its result and the next request comes back 400. So a steer is
-QUEUED and flushed at a turn boundary — either immediately, when the floor is
-free, or from `TenantAgent.on_user_turn_completed`, which is the framework's
-own boundary and runs before the reply is generated. The swap itself mirrors
-`_enqueue_reply`: copy the context, add the note as a mid-conversation
-instruction, `sanitize_tool_pairing`, hand the whole thing to `update_chat_ctx`.
-
-**Whether the model then obeys it is not a matter of delivery.** That was
-measured, cell by cell, in `core.security.protocol` — read it before changing
-`NOTE_ROLE` or moving the note into a tool result, because the answer is the
-opposite of the one `core.dates_note` reached for the session date, and the
-lever that actually decides it is a paragraph in the project's cached prefix.
-
-**Takeover is a mute, not a pause.** There is no `session.pause()` in
-livekit-agents 1.7.1 (grepped; absent). What exists is the recipe below:
-`interrupt(force=True)` cuts the sentence in flight, `resume_false_interruption`
-is held off so the framework does not resume it by itself, and
-`TenantAgent.on_user_turn_completed` raises `StopResponse` while `muted` — so
-turns keep landing in the history and none of them is answered. That last part
-is the point: the STT stays on THROUGHOUT, which is what makes the human's
-interval readable at release. `deaf=True` is the opposite trade — audio input
-off, nothing transcribed, nothing to resume with — and it is the caller's
-choice, not the default, because "the agent comes back not knowing what was
-said" is a worse failure than "the agent overheard a card number" for every
-project that has not said otherwise.
-
-Known upstream limits, all three relevant here and all three cited on the card:
-agents#3820 (`generate_reply` only APPENDS, so a hard course-correction has to
-be the `update_chat_ctx` swap and not an instruction), #3645 (`StopResponse`
-skips the turn and nothing else), #5038 (interrupted text can be dropped from
-history — so `release` checks whether the interval is really there rather than
-assuming, and says so in the note when it is not).
-
-Open source note: the whole file is framework-coupled but tenant-free — a
-stranger gets human-in-the-loop steering for any livekit-agents deployment by
-copying this and `core.security.supervisor`.
+Decisions: docs/decisions/convo.supervision.control.md
 """
 
 import logging
@@ -111,11 +70,7 @@ class SupervisorControl:
         self._resume_was: bool | None = None
 
     async def apply(self, verb: str, identity: str, body: dict[str, Any] | None = None) -> dict:
-        """Run one verb on behalf of one identity — the single door both roads come in by.
-
-        The gate is here and not in either road, so an RPC from a browser and a
-        packet from the control plane are refused by exactly the same line.
-        """
+        """Run one verb on behalf of one identity — the single door both roads come in by."""
         if not is_supervisor(identity):
             raise NotASupervisor(f"{identity!r} is not a supervisor identity")
         body = body or {}
@@ -132,18 +87,7 @@ class SupervisorControl:
         raise UnknownVerb(f"unknown supervisor verb {verb!r}")
 
     async def steer(self, identity: str, text: str, mode: str = "") -> dict:
-        """Whisper a note to the agent: logged now, applied at the next turn boundary.
-
-        → `{"verb", "queued": bool, "spoke": bool}` — `queued` is True when the
-        agent was mid-sentence and the note is waiting for the boundary.
-
-        `mode` is the honest half of the API. `inject` bends the agent's next
-        answer — «no le pidas el teléfono», «búscalo por el móvil» — and it
-        cannot make the agent volunteer something the caller did not ask for,
-        because the stage prompt owns that turn. A note the supervisor wants
-        SAID («avísale de que hoy vamos con retraso») needs `inject_and_speak`,
-        which buys a turn of its own for it.
-        """
+        """Whisper a note to the agent: logged now, applied at the next turn boundary."""
         note = text.strip()
         mode = mode or "inject"
         if not note:
@@ -161,11 +105,7 @@ class SupervisorControl:
         return {"verb": STEER, "queued": not applied, "spoke": spoke}
 
     async def takeover(self, identity: str, deaf: bool = False) -> dict:
-        """The human takes the line: the agent stops speaking and stops answering.
-
-        → `{"verb", "muted", "deaf", "interrupted", "already"}`. Idempotent — a
-        second takeover from a desk that lost its websocket changes nothing.
-        """
+        """The human takes the line: the agent stops speaking and stops answering."""
         if self.muted:
             return {"verb": TAKEOVER, "muted": True, "deaf": self._deaf, "already": True}
         self.muted = True
@@ -189,14 +129,7 @@ class SupervisorControl:
         }
 
     async def release(self, identity: str) -> dict:
-        """Hand the line back, with the human's interval written into the agent's context.
-
-        → `{"verb", "muted": False, "heard": bool, "turns": int, "already"}`.
-        `heard` is False when nothing of the interval reached the history
-        (agents#5038) — the note the agent gets then says so instead of
-        pretending, because an agent that acts on an interval it never saw is
-        the worst outcome this verb has.
-        """
+        """Hand the line back, with the human's interval written into the agent's context."""
         if not self.muted:
             return {"verb": RELEASE, "muted": False, "heard": False, "turns": 0, "already": True}
         self.muted = False
@@ -221,18 +154,7 @@ class SupervisorControl:
         }
 
     async def transfer(self, identity: str, to: str, mode: str = COLD) -> dict:
-        """Hand the call to a human on a phone — blind (`cold`) or after a briefing (`warm`).
-
-        → `{"verb", "mode", "outcome", "to", "ok", …}`, the same payload the log
-        line carries. `ok=False` is an ANSWER, not an error: it means the
-        transfer did not happen and the caller is still here, being told so.
-        Only a refusal before anything was dialled raises, so a desk can tell
-        "your number was wrong" from "his phone was busy".
-
-        A warm transfer ends muted. Once the colleague and the caller can hear
-        each other the agent is a third voice in a two-person call, so the same
-        `release` that follows a takeover is what would bring it back.
-        """
+        """Hand the call to a human on a phone — blind (`cold`) or after a briefing (`warm`)."""
         if self.room is None:
             raise TransferRefused("this session has no room: there is no call to transfer")
         outcome = await Handover(self.tc, self.session, self.room).run(mode, to)
@@ -250,11 +172,7 @@ class SupervisorControl:
         return {"verb": TRANSFER, **outcome.as_payload()}
 
     async def flush(self, agent: Any = None) -> bool:
-        """Write every queued note into the agent's own context; call it only at a turn boundary.
-
-        False when there was nothing to write, or no agent to write it to — a
-        console run and a chat harness both reach this with neither.
-        """
+        """Write every queued note into the agent's own context; call it only at a turn boundary."""
         if not self.pending:
             return False
         agent = agent if agent is not None else self._agent()
@@ -287,12 +205,7 @@ class SupervisorControl:
         return said
 
     async def _interrupt(self) -> bool:
-        """Cut the sentence in flight; False when there was no running session to cut it on.
-
-        `force=True` is deliberate: a speech created with
-        `allow_interruptions=False` — a confirmation being read out, say — is
-        exactly the one a human taking the line most needs to stop.
-        """
+        """Cut the sentence in flight; False when there was no running session to cut it on."""
         try:
             await self.session.interrupt(force=True)
         except Exception as error:  # noqa: BLE001 — a session not running is not a failed takeover

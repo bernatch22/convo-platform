@@ -1,13 +1,6 @@
 """The read side of the eval runs: the list the console draws, and the diff between two of them.
 
-A score alone says nothing — 0.82 is good or bad depending on what the same
-suite scored yesterday. So every run this module hands out carries, per metric,
-the delta against the previous run of the SAME tenant, project and suite. That
-is the whole reason the runs are stored at all: a number you can compare.
-
-Plain dicts in, plain dicts out, a `Store` and nothing else — the same shape
-`core.control_plane` keeps, so an HTTP handler, a test and a CLI read
-identically.
+Decisions: docs/decisions/convo.evals.runs.md
 """
 
 from typing import Any
@@ -41,11 +34,7 @@ def find(store: Store, run_id: str) -> dict[str, Any] | None:
 
 
 def previous(runs: list[EvalRun], run: EvalRun) -> EvalRun | None:
-    """The scored run before this one of the same suite — what its numbers are compared against.
-
-    "Before" is by `started_at`, not by list position: a run filed by CI lands
-    out of order and would otherwise diff against a future.
-    """
+    """The scored run before this one of the same suite — what its numbers are compared against."""
     earlier = [
         row
         for row in runs

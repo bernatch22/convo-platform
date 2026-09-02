@@ -14,16 +14,7 @@ class Identify(TenantAgent):
         super().__init__(tc, instructions=stage_prompt(tc, "identify"))
 
     def summary(self) -> str:
-        """What OrderDesk needs: WHICH order this is, and deliberately not what state it is in.
-
-        Identity travels, state does not. The status, the delivery date and the
-        tracking code are the things that change and the things a cancellation
-        turns on, so the next stage reads them from the order system instead of
-        inheriting a sentence written a minute ago. Handed the whole row, the
-        model answered "¿por dónde va?" out of the note without consulting
-        anything — a right answer today and a stale one the first time a
-        warehouse is quicker than a conversation.
-        """
+        """What OrderDesk needs: WHICH order this is, and deliberately not what state it is in."""
         order = self.tc.customer
         if not order:
             # The only way out of this stage without an order is the ticket desk, and an

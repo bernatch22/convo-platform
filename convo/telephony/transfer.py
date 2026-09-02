@@ -1,37 +1,6 @@
 """The two ways a live call leaves this agent for a human: cold REFER, warm dial-in.
 
-**Cold** is one API call. `TransferSIPParticipant` makes `livekit-sip` send a
-SIP REFER on the caller's own leg; the carrier takes the call from there, the
-caller leaves the room and this job ends. It is the whole of a blind transfer
-and it needs nothing but a trunk that accepts REFER.
-
-**Warm** is hand-rolled, and it is hand-rolled for a reason that was measured
-rather than read: `MoveParticipant` — the RPC the framework's own
-`WarmTransferTask` is built on — answers `twirp error unknown: not
-implemented` on this server, so the supported path does not exist here. What
-does exist is `CreateSIPParticipant`, which dials a phone INTO the caller's
-room, and `core.telephony.isolation`, which makes the briefing inaudible to
-the caller while it happens. Those two are enough.
-
-**A failed transfer must leave the caller where they were.** That is the
-difference between an outcome and an accident, and it is why every failure
-below comes back as an `Outcome` with `ok=False` and a SIP status rather than
-an exception: the agent has to say something to somebody who is still on the
-line. `SipCallError.sip_status_code` is what makes that sentence specific — a
-486 is "he is on another call", a 603 on this trunk is very nearly always "the
-carrier refused the REFER", which is a deployment fault and not the caller's.
-
-What warm needs and this deployment does not yet have: an **outbound**
-(termination) trunk. `infra/box/README.md` says it plainly — the box's Twilio
-trunk has Origination and no Termination, so there is no id to put in
-`SIP_OUTBOUND_TRUNK_ID` and dialling out is refused at the door with
-`TransferRefused` instead of failing halfway through a call. Creating that
-trunk is a deliberate, human, out-of-band act (see the fraud checklist), not
-something this module does on the fly.
-
-Open source note: the whole file is tenant-free and framework-free — it talks
-to `livekit.api` and nothing else. A stranger gets cold and warm transfer for
-any self-hosted LiveKit SIP deployment by copying this and `isolation.py`.
+Decisions: docs/decisions/convo.telephony.transfer.md
 """
 
 import logging
@@ -138,12 +107,7 @@ class Outcome:
 
 
 async def cold(client: api.LiveKitAPI, room: str, caller: str, to: str) -> Outcome:
-    """REFER the caller's leg to a phone: the carrier takes the call and this job ends.
-
-    → an `Outcome`. `ok=False` always means the caller is STILL IN THE ROOM,
-    which is the only reason this returns instead of raising: somebody is
-    waiting to be spoken to.
-    """
+    """REFER the caller's leg to a phone: the carrier takes the call and this job ends."""
     target = dial_uri(to)
     request = api.TransferSIPParticipantRequest(
         participant_identity=caller, room_name=room, transfer_to=target, play_dialtone=True
@@ -161,14 +125,7 @@ async def cold(client: api.LiveKitAPI, room: str, caller: str, to: str) -> Outco
 
 
 class WarmLeg:
-    """The human's leg of a warm transfer: dialled into the caller's room, and inaudible to them.
-
-    Three moves, in this order and only this order: `dial` brings the human in
-    with the caller already cut off, `bridge` opens the three-way, and
-    `hang_up` undoes everything when the briefing decides against the transfer.
-    Each returns an `Outcome`, and a failed `dial` has already restored the
-    caller's audio before it returns.
-    """
+    """The human's leg of a warm transfer: dialled into the caller's room, and inaudible to them."""
 
     def __init__(self, client: api.LiveKitAPI, room: str, caller: str, to: str) -> None:
         # Both of these raise `TransferRefused`, and they raise HERE on purpose:
@@ -184,11 +141,7 @@ class WarmLeg:
         self.cut: list[str] = []
 
     async def dial(self, silenced: list[str]) -> Outcome:
-        """Ring the human and cut them out of the caller's ears the instant they answer.
-
-        `silenced` is what the choreography cut BEFORE dialling — the agent's
-        own track — so that a failure here can put it all back in one place.
-        """
+        """Ring the human and cut them out of the caller's ears the instant they answer."""
         target = self.number
         request = api.CreateSIPParticipantRequest(
             sip_trunk_id=self.trunk,
@@ -261,21 +214,12 @@ def dial_uri(to: str) -> str:
 
 
 def destination(to: str) -> str:
-    """Where this transfer goes: what the desk asked for, else the deployment's `TRANSFER_TO`.
-
-    The number is deployment data, not core's: a desk that names one wins, and
-    the env var exists so the demo has a mobile to ring without one.
-    """
+    """Where this transfer goes: what the desk asked for, else the deployment's `TRANSFER_TO`."""
     return ((to or "").strip() or os.getenv(TARGET_ENV, "").strip()).strip()
 
 
 def phone_number(to: str) -> str:
-    """E.164 only — what an outbound trunk dials. A `sip:` URI is a cold-transfer target.
-
-    `CreateSIPParticipant` takes a number, not a URI: a SIP destination needs
-    `sip_request_uri` and a trunk configured for it, which is a different
-    deployment and not something to guess at mid-call.
-    """
+    """E.164 only — what an outbound trunk dials. A `sip:` URI is a cold-transfer target."""
     target = dial_uri(to)
     if not target.startswith("tel:"):
         raise TransferRefused(f"{to!r} is a SIP URI: a warm leg dials E.164 numbers only")

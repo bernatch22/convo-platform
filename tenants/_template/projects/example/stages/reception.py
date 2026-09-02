@@ -14,12 +14,7 @@ class Reception(TenantAgent):
         super().__init__(tc, instructions=stage_prompt(tc, "reception"))
 
     def summary(self) -> str:
-        """What Desk needs: WHICH booking this is, and deliberately not what state it is in.
-
-        Identity travels, state does not. A status read a minute ago is a
-        status that may have changed; the next stage asks the system instead of
-        inheriting a sentence. TODO(copy): keep this line to identity only.
-        """
+        """What Desk needs: WHICH booking this is, and deliberately not what state it is in."""
         booking = self.tc.customer
         if not booking:
             return "Todavía no se ha localizado ninguna reserva."

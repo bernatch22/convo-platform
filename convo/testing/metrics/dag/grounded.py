@@ -1,9 +1,6 @@
 """Every fact the agent stated has a source — code first, and one judge call for the remainder.
 
-Three computed nodes and one judging node. Code extracts and matches
-(`core.testing.grounding`); the judge only ever sees the claims nothing
-accounted for, with the evidence attached underneath. A conversation where
-every hour came off the agenda costs no judge call at all.
+Decisions: docs/decisions/convo.testing.metrics.dag.grounded.md
 """
 
 from collections.abc import Callable
@@ -95,11 +92,7 @@ class LeftoverEvidenceNode(FactNode, ConversationalTaskNode):
 def grounded_facts_graph(
     stated: Stated, backing: Backing, criteria: str = IS_IT_SUPPORTED
 ) -> DeepAcyclicGraph:
-    """Did it state anything? → does the evidence match it? → ask, with the evidence attached.
-
-    `stated` and `backing` are the project's own `evals/grounding.py`: what its
-    agent can be wrong about, and what its call is allowed to know.
-    """
+    """Did it state anything? → does the evidence match it? → ask, with the evidence attached."""
     states = StatesAnyFactNode(
         stated, backing, criteria=STATES_ANY_FACT, label="states a checkable fact"
     )

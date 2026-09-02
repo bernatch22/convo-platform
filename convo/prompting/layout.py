@@ -1,8 +1,6 @@
 """The layout every stage prompt is rendered in: knowledge first, the view, then the protocols.
 
-The order is measured, not aesthetic (docs/decisions/002-prompt-layout.md): the
-knowledge block is the cached prefix, and the supervisor protocol is last because
-the final paragraph is the one that outranks the stage script.
+Decisions: docs/decisions/convo.prompting.layout.md
 """
 
 from convo.domain.context import TenantContext

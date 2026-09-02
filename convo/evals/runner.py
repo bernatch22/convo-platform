@@ -1,20 +1,6 @@
 """Run one project's eval suite on the box: one subprocess at a time, killed at fifteen minutes.
 
-An eval run is minutes of paid LLM traffic, so this is deliberately the most
-conservative thing in the codebase:
-
-- **one at a time.** A second request while a run is alive is refused, never
-  queued: a queue silently doubles a bill nobody watched being spent.
-- **a hard deadline.** A hung judge is killed at `DEADLINE_S` and the run is
-  stored as failed with the reason, so the box can never be left with a
-  forgotten pytest holding a provider connection open.
-- **nothing runs blind.** Every line the child writes is tee'd to
-  `tmp/evals/<run id>.log`, and the console reads its tail while it runs.
-
-The child inherits the box's provider keys from `.env` because a suite cannot
-judge anything without them. They travel into the child's environment and
-nowhere else: no handler echoes an environment and the only thing written to
-disk is the child's own output.
+Decisions: docs/decisions/convo.evals.runner.md
 """
 
 import asyncio
@@ -148,11 +134,7 @@ class EvalRunner:
 
 
 def child_env(results: Path) -> dict[str, str]:
-    """The box's environment, the `.env` keys the suite needs, and where to drop its scores.
-
-    `.env` first and the real environment over it: an operator who exported a
-    key for this process meant that key. Nothing here is ever logged.
-    """
+    """The box's environment, the `.env` keys the suite needs, and where to drop its scores."""
     loaded = dotenv_values(REPO_ROOT / ".env")
     env = {key: value for key, value in loaded.items() if value is not None}
     env.update(os.environ)
@@ -162,12 +144,7 @@ def child_env(results: Path) -> dict[str, str]:
 
 
 def metrics_of(results: Path) -> tuple[MetricScore, ...]:
-    """Per-metric scores out of the newest `test_run_*.json` deepeval wrote; () when none.
-
-    DeepEval already aggregates this for us under `metricsScores`: one row per
-    metric with every case's score and the pass/fail tally. Reading its own file
-    is what keeps this screen and `deepeval test run` from ever disagreeing.
-    """
+    """Per-metric scores out of the newest `test_run_*.json` deepeval wrote; () when none."""
     written = sorted(results.glob("test_run_*.json")) if results.is_dir() else []
     if not written:
         return ()

@@ -1,13 +1,6 @@
 """Self-registration: a run that finished anywhere tells the control plane it happened.
 
-The box can launch a run itself, but most runs are still started by a person or
-by CI (`deepeval test run`, `python -m core.testing.report`). Those are the runs
-worth comparing against, so they file themselves here instead of living only in
-somebody's terminal scrollback.
-
-A control plane that is not answering is not an error: the local run still
-produced its HTML and its exit code. `file_run` says whether the board heard
-it and never raises — an eval must not fail because a console was down.
+Decisions: docs/decisions/convo.evals.filing.md
 """
 
 import json
@@ -61,12 +54,7 @@ def file_run(
 
 
 def metrics_from(test_results: list[Any]) -> list[dict[str, Any]]:
-    """DeepEval's `EvaluationResult.test_results` folded into one row per metric.
-
-    Every case is scored by every metric, so the run's number for a metric is
-    the mean over its cases and its tally is how many of them cleared the
-    threshold — the same aggregation `deepeval test run` prints at the end.
-    """
+    """DeepEval's `EvaluationResult.test_results` folded into one row per metric."""
     scores: dict[str, list[float]] = {}
     passes: dict[str, int] = {}
     fails: dict[str, int] = {}

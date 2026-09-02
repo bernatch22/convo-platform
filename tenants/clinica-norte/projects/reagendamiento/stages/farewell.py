@@ -6,13 +6,7 @@ from convo.prompting import stage_prompt
 
 
 class Farewell(TenantAgent):
-    """Reads the new appointment back, mentions the SMS and says goodbye. No tools.
-
-    Deliberately toolless: everything this stage says it already knows from the
-    summary ChooseSlot left it. A stage that could still touch the agenda would
-    be a second chance to book something after the caller has been told the call
-    is over — which is exactly the bug the three-stage split exists to prevent.
-    """
+    """Reads the new appointment back, mentions the SMS and says goodbye. No tools."""
 
     def __init__(self, tc: TenantContext) -> None:
         super().__init__(tc, instructions=stage_prompt(tc, "farewell"))

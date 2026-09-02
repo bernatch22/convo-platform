@@ -8,11 +8,7 @@ Channel = Literal["voice", "chat"]
 
 
 class SessionMeta(BaseModel):
-    """What the dispatcher (JWT or SIP rule) tells the worker about a session.
-
-    Unknown fields are ignored on purpose: an older worker must keep starting
-    against a newer control plane.
-    """
+    """What the dispatcher (JWT or SIP rule) tells the worker about a session."""
 
     model_config = ConfigDict(extra="ignore")
 
