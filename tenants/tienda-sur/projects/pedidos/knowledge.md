@@ -1,15 +1,3 @@
-"""Stable knowledge of Tienda Sur, appended to the system prompt.
-
-Two reasons it lives here: the order desk needs it to answer well, and Claude
-Haiku 4.5 only caches prompt prefixes of 4096+ tokens — this block keeps the
-cached prefix above that floor. Keep it stable: never put dates, order numbers
-or anything per-request here, or every stage pays full price on every turn.
-
-The register is the shop's own: it speaks to customers as "tú", which is the
-whole point of having two tenants. Nothing in `core/` decides that.
-"""
-
-SHOP = """\
 INFORMACIÓN DE LA TIENDA (estable, úsala tal cual; no inventes nada que no esté aquí)
 
 Nombre: Tienda Sur. Tienda de ropa online, con sede y almacén en Sevilla. Vendemos
@@ -262,4 +250,3 @@ confirma que el pedido queda cancelado, que el importe vuelve por donde lo pagó
 5 días laborables y que le llega un SMS. Si el SMS no ha podido salir: se le dice la
 verdad —el pedido sigue en pie y no se ha cancelado nada— y se le pide un móvil válido.
 Si el cliente no confirma: no se cancela nada y se le pregunta qué prefiere hacer.
-"""

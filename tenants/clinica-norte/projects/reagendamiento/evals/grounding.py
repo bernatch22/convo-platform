@@ -17,7 +17,7 @@ import re
 from convo.lang import es
 from convo.testing.metrics import grounding
 
-from ..knowledge import CLINIC
+from ..project import PROJECT
 
 HOUR = "hora"
 PRICE = "precio"
@@ -82,7 +82,7 @@ def stated_data(turns: list) -> list[grounding.Datum]:
 
 def evidence_of(turns: list) -> grounding.Evidence:
     """The clinic's sheet, what the patient said, and every tool output of the call."""
-    return grounding.evidence_of(turns, CLINIC)
+    return grounding.evidence_of(turns, PROJECT.knowledge_seed)
 
 
 def unsupported(data: list[grounding.Datum], evidence: grounding.Evidence):

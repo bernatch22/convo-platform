@@ -21,8 +21,9 @@ and none to confirm.
 from convo.agents import RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
 from convo.lang import es
+from convo.prompting import stage_prompt
 
-from .. import prompts, tools
+from .. import tools
 
 # Which errand the caller turned out to want. It is not a routing flag — the handoff
 # already routed the call — but the one thing `summary()` cannot read off the patient:
@@ -68,7 +69,7 @@ class Identify(TenantAgent):
     """Greets, asks for the name and the phone, and routes to a change, a new cita or a datum."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.identify_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "identify"))
         self.errand = APPOINTMENT
 
     def summary(self) -> str:

@@ -24,8 +24,9 @@ nothing anybody could compensate it with: the number it replaced is not kept.
 
 from convo.agents import ConfirmTask, RunContext, TenantAgent, ToolError, function_tool
 from convo.domain.context import TenantContext
+from convo.prompting import prompt, stage_prompt
 
-from .. import prompts, tools
+from .. import tools
 
 CHANGED = (
     "El teléfono del paciente ha quedado cambiado en su ficha. Confírmaselo en una frase —a "
@@ -38,7 +39,7 @@ class UpdateContact(TenantAgent):
     """Reads the number on file back by its last digits, takes the new one and writes it."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.update_contact_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "update_contact"))
         self.changed_to: str | None = None
 
     def summary(self) -> str:
@@ -82,7 +83,7 @@ class UpdateContact(TenantAgent):
             question=tools.contact_confirmation_question(digits),
             tool="update_contact",
             args=args,
-            instructions=prompts.confirm_contact_instructions(),
+            instructions=prompt(tc, "confirm/contact"),
         )
         if not said_yes:
             return tools.CONTACT_NOT_CONFIRMED

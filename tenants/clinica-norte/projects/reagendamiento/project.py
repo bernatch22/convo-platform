@@ -43,6 +43,7 @@ nine o'clock and the agent said it".
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from convo.domain.catalog import ToolCatalog, platform_specs
 from convo.domain.context import Project, TenantContext
@@ -57,7 +58,6 @@ from ...adapters.agenda import (
     summarise_patient,
 )
 from ...adapters.sms import summarise_message
-from . import knowledge
 
 # The platform's own `find_availability` spec, re-declared with the one clause only a
 # clinic can write: what a free slot may say in the log. The renderer lives next to the
@@ -179,6 +179,9 @@ MESSAGES = {
 }
 
 
+HERE = Path(__file__).parent
+
+
 @dataclass
 class ReagendamientoProject(Project):
     """Project with an entry agent factory; voice and keyterms arrive with later milestones."""
@@ -241,5 +244,7 @@ PROJECT = ReagendamientoProject(
         )
     ),
     messages=MESSAGES,
-    knowledge_seed=knowledge.CLINIC,
+    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_tag="clinic_knowledge",
+    prompts=HERE / "prompts",
 )

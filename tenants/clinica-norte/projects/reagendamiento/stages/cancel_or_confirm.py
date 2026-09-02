@@ -30,8 +30,9 @@ to ask.
 
 from convo.agents import ConfirmTask, RunContext, TenantAgent, ToolError, function_tool
 from convo.domain.context import TenantContext
+from convo.prompting import prompt, stage_prompt
 
-from .. import prompts, tools
+from .. import tools
 
 CANCELLED = (
     "La cita ha quedado anulada y la hora ha vuelto a la agenda. Confírmaselo en una frase y "
@@ -49,7 +50,7 @@ class CancelOrConfirm(TenantAgent):
     """Looks the caller's cita up, reads it back, and either releases the hour or confirms it."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.cancel_or_confirm_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "cancel_or_confirm"))
         self.settled: str | None = None
 
     def summary(self) -> str:
@@ -109,7 +110,7 @@ class CancelOrConfirm(TenantAgent):
             question=tools.cancellation_question(appointment),
             tool="cancel_appointment",
             args=args,
-            instructions=prompts.confirm_cancellation_instructions(),
+            instructions=prompt(tc, "confirm/cancellation"),
         )
         if not said_yes:
             return tools.CANCEL_NOT_CONFIRMED

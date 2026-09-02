@@ -2,15 +2,16 @@
 
 from convo.agents import RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
+from convo.prompting import stage_prompt
 
-from .. import prompts, tools
+from .. import tools
 
 
 class Identify(TenantAgent):
     """Greets, asks for the order number (or the mobile), and looks the order up."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.identify_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "identify"))
 
     def summary(self) -> str:
         """What OrderDesk needs: WHICH order this is, and deliberately not what state it is in.

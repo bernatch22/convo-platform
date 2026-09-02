@@ -24,7 +24,7 @@ import re
 
 from convo.testing.metrics import grounding
 
-from ..knowledge import SHOP
+from ..project import PROJECT
 
 ORDER = "pedido"
 TICKET = "incidencia"
@@ -67,7 +67,7 @@ def stated_data(turns: list) -> list[grounding.Datum]:
 
 def evidence_of(turns: list) -> grounding.Evidence:
     """The shop's sheet, what the customer said, and every tool output of the call."""
-    return grounding.evidence_of(turns, SHOP)
+    return grounding.evidence_of(turns, PROJECT.knowledge_seed)
 
 
 def unsupported(data: list[grounding.Datum], evidence: grounding.Evidence):

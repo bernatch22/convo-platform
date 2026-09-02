@@ -1,11 +1,3 @@
-"""Stable knowledge of Clínica Norte, appended to the system prompt.
-
-Two reasons it lives here: reception needs it to answer well, and Claude Haiku
-only caches prompt prefixes of 4096+ tokens — this block keeps the cached
-prefix above that floor. Keep it stable: never put dates, times or ids here.
-"""
-
-CLINIC = """\
 INFORMACIÓN DEL CENTRO (estable, úsala tal cual; no inventes nada que no esté aquí)
 
 Nombre: Clínica Norte. Centro médico privado, ambulatorio, sin urgencias hospitalarias.
@@ -219,4 +211,3 @@ elija y se espera un sí explícito antes de apuntar nada. La diferencia está e
 pasa si el sistema rechaza la hora: en un cambio el paciente conserva la cita que ya
 tenía, y en una cita nueva no conserva nada, así que se le dice claramente que no le queda
 ninguna cita apuntada y se le ofrece otra hora.
-"""

@@ -11,9 +11,10 @@ one, send the SMS — and any failure puts the old appointment back.
 from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
 from convo.lang import es
+from convo.prompting import prompt, stage_prompt
 from convo.tools.saga import Saga, SagaFailed
 
-from .. import prompts, tools
+from .. import tools
 from .farewell import Farewell
 
 
@@ -21,7 +22,7 @@ class ChooseSlot(TenantAgent):
     """Offers the hours the agenda really has, and books the one the caller confirms."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.choose_slot_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "choose_slot"))
         self.offered: dict[str, dict[str, str]] = {}
         self.booked: dict[str, str] | None = None
 
@@ -105,7 +106,7 @@ class ChooseSlot(TenantAgent):
             question=tools.confirmation_question(slot),
             tool="book_slot",
             args=args,
-            instructions=prompts.confirm_instructions(),
+            instructions=prompt(tc, "confirm/move"),
         )
         if not said_yes:
             return tools.NOT_CONFIRMED

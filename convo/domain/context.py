@@ -7,6 +7,7 @@ session's `userdata` and reachable from every tool as `ctx.userdata`.
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from convo.domain.catalog import ToolCatalog
@@ -91,6 +92,8 @@ class Project:
     tools: ToolCatalog = field(default_factory=ToolCatalog)
     messages: dict[str, str] = field(default_factory=dict)
     knowledge_seed: str = ""
+    knowledge_tag: str = "knowledge"  # the XML tag the knowledge block is wrapped in
+    prompts: Path | None = None  # the project's prompts/ directory: one Markdown view per stage
     transfer_number: str | None = None  # E.164; None/"" = the agent is offered no transfer
     scoring: bool = True  # False = this project's finished calls are never scored (ms-13)
     recording: bool = True  # False = this project's calls keep no audio at all (ms-17)

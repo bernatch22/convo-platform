@@ -13,9 +13,10 @@ caller is told plainly that nothing is on the book.
 from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
 from convo.lang import es
+from convo.prompting import prompt, stage_prompt
 from convo.tools.saga import Saga, SagaFailed
 
-from .. import prompts, tools
+from .. import tools
 from .farewell import Farewell
 
 
@@ -23,7 +24,7 @@ class NewBooking(TenantAgent):
     """Asks what the cita is for, offers the hours the agenda really has, and writes one."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.new_booking_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "new_booking"))
         self.offered: dict[str, dict[str, str]] = {}
         self.specialty: str | None = None
         self.booked: dict[str, str] | None = None
@@ -109,7 +110,7 @@ class NewBooking(TenantAgent):
             question=tools.new_confirmation_question(slot),
             tool="create_appointment",
             args=args,
-            instructions=prompts.confirm_new_booking_instructions(),
+            instructions=prompt(tc, "confirm/new_booking"),
         )
         if not said_yes:
             return tools.NOT_CONFIRMED

@@ -14,15 +14,16 @@ declared on the spec (`restore_booking`) if a later step fails.
 
 from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
+from convo.prompting import prompt, stage_prompt
 
-from .. import prompts, tools
+from .. import tools
 
 
 class Desk(TenantAgent):
     """Reads the booking's real state back, and cancels it once the customer confirms."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.desk_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "desk"))
         self.cancelled: dict[str, str] | None = None
 
     def summary(self) -> str:
@@ -70,7 +71,7 @@ class Desk(TenantAgent):
             question=tools.confirmation_question(booking),
             tool="cancel_booking",
             args=args,
-            instructions=prompts.confirm_instructions(),
+            instructions=prompt(tc, "confirm/cancel"),
         )
         if not said_yes:
             return tools.NOT_CONFIRMED

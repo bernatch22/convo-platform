@@ -12,9 +12,10 @@ cancellation.
 
 from convo.agents import ConfirmTask, RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
+from convo.prompting import prompt, stage_prompt
 from convo.tools.saga import Saga, SagaFailed
 
-from .. import prompts, tools
+from .. import tools
 from .farewell import Farewell
 
 SMS_STEP = "send_sms"
@@ -24,7 +25,7 @@ class OrderDesk(TenantAgent):
     """Reads the order's real state back, and cancels it once the customer confirms."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.order_desk_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "order_desk"))
         self.cancelled: dict[str, str] | None = None
         self.problem: str | None = None
 
@@ -114,7 +115,7 @@ class OrderDesk(TenantAgent):
             question=tools.confirmation_question(order),
             tool="cancel_order",
             args=args,
-            instructions=prompts.confirm_instructions(),
+            instructions=prompt(tc, "confirm/cancel_order"),
         )
         if not said_yes:
             return tools.NOT_CONFIRMED

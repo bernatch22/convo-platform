@@ -2,15 +2,16 @@
 
 from convo.agents import RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
+from convo.prompting import stage_prompt
 
-from .. import prompts, tools
+from .. import tools
 
 
 class Reception(TenantAgent):
     """Greets, asks for the booking reference, and looks it up."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.reception_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "reception"))
 
     def summary(self) -> str:
         """What Desk needs: WHICH booking this is, and deliberately not what state it is in.

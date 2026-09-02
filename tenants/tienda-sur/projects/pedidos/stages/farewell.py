@@ -2,8 +2,7 @@
 
 from convo.agents import TenantAgent
 from convo.domain.context import TenantContext
-
-from .. import prompts
+from convo.prompting import stage_prompt
 
 
 class Farewell(TenantAgent):
@@ -17,7 +16,7 @@ class Farewell(TenantAgent):
     """
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.farewell_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "farewell"))
 
     def summary(self) -> str:
         """The last stage of the call; nothing downstream reads this, but the shape holds."""

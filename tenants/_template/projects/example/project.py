@@ -17,14 +17,13 @@ refusal would have been the honest answer.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from convo.domain.catalog import ToolCatalog
 from convo.domain.context import Project, TenantContext
 from convo.domain.tools import SideEffect, ToolSpec
 from convo.telephony.human import TRANSFER_TO_HUMAN
 from convo.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
-
-from . import knowledge
 
 FIND_BOOKING = ToolSpec(
     name="find_booking",
@@ -63,6 +62,9 @@ MESSAGES = {
 }
 
 
+HERE = Path(__file__).parent
+
+
 @dataclass
 class ExampleProject(Project):
     """Project with an entry agent factory; the stages are the phases of the call."""
@@ -91,5 +93,7 @@ PROJECT = ExampleProject(
     # business with nobody on the other end of it.
     transfer_number="",
     messages=MESSAGES,
-    knowledge_seed=knowledge.BUSINESS,
+    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_tag="business_knowledge",
+    prompts=HERE / "prompts",
 )

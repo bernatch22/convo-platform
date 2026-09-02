@@ -28,15 +28,16 @@ no existing golden moved.
 
 from convo.agents import RunContext, TenantAgent, function_tool
 from convo.domain.context import TenantContext
+from convo.prompting import stage_prompt
 
-from .. import prompts, tools
+from .. import tools
 
 
 class TicketDesk(TenantAgent):
     """Opens an incident with the customer's own words, and reads back the one they ask for."""
 
     def __init__(self, tc: TenantContext) -> None:
-        super().__init__(tc, instructions=prompts.ticket_desk_prompt(tc))
+        super().__init__(tc, instructions=stage_prompt(tc, "ticket_desk"))
         self.opened: dict[str, str] | None = None
         self.asking: str | None = None
 

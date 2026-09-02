@@ -18,7 +18,7 @@ import re
 
 from convo.testing.metrics import grounding
 
-from ..knowledge import BUSINESS
+from ..project import PROJECT
 
 REFERENCE = "reserva"
 PRICE = "precio"
@@ -45,4 +45,4 @@ def stated_data(turns: list) -> list[grounding.Datum]:
 
 def evidence_of(turns: list) -> grounding.Evidence:
     """The business's sheet, what the customer said, and every tool output of the call."""
-    return grounding.evidence_of(turns, BUSINESS)
+    return grounding.evidence_of(turns, PROJECT.knowledge_seed)

@@ -17,6 +17,7 @@ spoken failure instead of a refusal, and the refusal is the honest answer.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from convo.domain.catalog import ToolCatalog
 from convo.domain.context import Project, TenantContext
@@ -25,7 +26,6 @@ from convo.telephony.human import TRANSFER_TO_HUMAN
 from convo.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL
 
 from ...adapters.tickets import summarise_ticket
-from . import knowledge
 
 FIND_ORDER = ToolSpec(
     name="find_order",
@@ -91,6 +91,9 @@ MESSAGES = {
 }
 
 
+HERE = Path(__file__).parent
+
+
 @dataclass
 class PedidosProject(Project):
     """Project with an entry agent factory; the stages are the three phases of the call."""
@@ -129,5 +132,7 @@ PROJECT = PedidosProject(
         TRANSFER_TO_HUMAN,
     ),
     messages=MESSAGES,
-    knowledge_seed=knowledge.SHOP,
+    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_tag="shop_knowledge",
+    prompts=HERE / "prompts",
 )
