@@ -72,7 +72,7 @@ PROJECT = ExampleProject(
     # business with nobody on the other end of it.
     transfer_number="",
     messages=MESSAGES,
-    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_seed=(HERE / "prompts" / "knowledge.md").read_text(),
     knowledge_tag="business_knowledge",
     prompts=HERE / "prompts",
 )

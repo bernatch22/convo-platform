@@ -17,7 +17,7 @@ The system as it is: `ARCHITECTURE.md`. Why each module is the way it is:
 ```
 convo/        the engine, ONE package: cli/ domain/ agents/ prompting/ tools/ session/ providers/
               state/ telephony/ supervision/ scoring/ observability/ lang/ api/ evals/ testing/
-tenants/      the apps: <id>/tenant.py, adapters/, projects/<p>/{project.py, knowledge.md,
+tenants/      the apps: <id>/tenant.py, adapters/, projects/<p>/{project.py, prompts/knowledge.md,
               messages.py, helpers.py, stages/*.py, prompts/*.md, evals/}
 tests/        unit + tests/evals (DeepEval); tests/fixtures/ shared fakes
 docs/         decisions/ evals.md prompts.md tenants.md deck.pdf

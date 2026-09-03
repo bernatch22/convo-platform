@@ -108,7 +108,7 @@ PROJECT = PedidosProject(
         TRANSFER_TO_HUMAN,
     ),
     messages=MESSAGES,
-    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_seed=(HERE / "prompts" / "knowledge.md").read_text(),
     knowledge_tag="shop_knowledge",
     prompts=HERE / "prompts",
 )

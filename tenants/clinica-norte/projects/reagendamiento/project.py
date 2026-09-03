@@ -194,7 +194,7 @@ PROJECT = ReagendamientoProject(
         )
     ),
     messages=MESSAGES,
-    knowledge_seed=(HERE / "knowledge.md").read_text(),
+    knowledge_seed=(HERE / "prompts" / "knowledge.md").read_text(),
     knowledge_tag="clinic_knowledge",
     prompts=HERE / "prompts",
 )

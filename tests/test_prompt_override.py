@@ -9,7 +9,7 @@ from convo.testing import fake_context
 
 pytestmark = pytest.mark.unit
 
-CLINIC = Path("tenants/clinica-norte/projects/reagendamiento/knowledge.md").read_text()
+CLINIC = Path("tenants/clinica-norte/projects/reagendamiento/prompts/knowledge.md").read_text()
 
 
 def test_the_seed_from_git_opens_every_stage_prompt_by_default() -> None:

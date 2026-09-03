@@ -5,7 +5,7 @@ sheet, the shop policy) — first, byte for byte, because Claude Haiku 4.5 only
 caches a prefix of 4,096+ tokens and only while it is identical. Where that
 block comes from is a two-layer rule:
 
-1. **The seed lives in git.** `knowledge.md` next to the project is read into
+1. **The seed lives in git.** `prompts/knowledge.md` next to the project is read into
    `Project.knowledge_seed` at import; every deploy carries it and every test
    renders it.
 2. **A pinned row overrides it without a deploy.** `python -m convo versions pin

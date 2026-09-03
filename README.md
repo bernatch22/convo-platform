@@ -85,7 +85,7 @@ convo routes add cc +14176743169 clinica-norte reagendamiento voice
 
 # the knowledge block: git is the seed, a pinned version overrides it without a deploy
 convo versions list
-convo versions pin clinica-norte reagendamiento v3 tenants/clinica-norte/projects/reagendamiento/knowledge.md
+convo versions pin clinica-norte reagendamiento v3 tenants/clinica-norte/projects/reagendamiento/prompts/knowledge.md
 
 # the eval rings a person runs (ring 1 in CI runs through pytest and deepeval, below)
 convo evals report clinica-norte reagendamiento                    # ring 1 on one project
@@ -253,7 +253,7 @@ convo/            the engine, one installable package
 tenants/          the businesses: _template/, clinica-norte/, tienda-sur/
   <id>/tenant.py            id, name, region, build_adapters()
   <id>/adapters/            one class per system the business runs
-  <id>/projects/<p>/        project.py · knowledge.md · messages.py · helpers.py
+  <id>/projects/<p>/        project.py · prompts/knowledge.md · messages.py · helpers.py
                             stages/*.py · prompts/*.md (+ _partials/ and one <stage>/confirm.md per stage that asks) · evals/
 tests/            unit tests (ring 1) and tests/evals (DeepEval); tests/fixtures/ shared fakes
 docs/             decisions/, evals.md, prompts.md, tenants.md, deck.pdf
