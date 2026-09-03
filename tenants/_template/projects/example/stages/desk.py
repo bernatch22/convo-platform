@@ -62,7 +62,7 @@ class Desk(TenantAgent):
             question=helpers.confirmation_question(booking),
             tool="cancel_booking",
             args=args,
-            instructions=prompt(tc, "confirm/cancel"),
+            instructions=prompt(tc, "desk/confirm"),
         )
         if not said_yes:
             return messages.NOT_CONFIRMED

@@ -147,7 +147,10 @@ across a handoff. The arriving stage writes one prose line about what happened
 before into its own context, prefixed with a fixed instruction not to greet
 again. What the caller already said travels; the whole transcript does not.
 
-**Prompts are views.** A stage's prompt is `prompts/<stage>.md`. The layout
+**Prompts are views.** A stage's prompt is `prompts/<stage>.md`; the paragraphs
+several stages share are partials under `prompts/_partials/`, and a stage that asks
+for consent keeps that question's instruction beside it as `prompts/<stage>/confirm.md`.
+The layout
 (`convo/prompting/layout.py`) renders every prompt the same way:
 
 ```

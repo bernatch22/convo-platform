@@ -1,7 +1,7 @@
 """The clinic's stage prompts are composed from shared partials, never copied.
 
 A rescheduling and a new booking are two conversations with one middle, and a
-paragraph written twice drifts. So `prompts/_reception/*.md` holds the shared
+paragraph written twice drifts. So `prompts/_partials/*.md` holds the shared
 blocks and each view includes them. What this suite pins is that the
 composition really is composition: every shared partial appears in the views
 that need it word for word and exactly once, in the declared order, and stays
@@ -22,17 +22,22 @@ pytestmark = pytest.mark.unit
 
 PROMPTS = Path("tenants/clinica-norte/projects/reagendamiento/prompts")
 SHARED = [
-    "_reception/speaks_to_the_patient.md",
-    "_reception/never_answers_without_the_agenda.md",
-    "_reception/a_named_day_is_always_a_lookup.md",
-    "_reception/offers_what_came_back.md",
-    "_reception/the_tool_asks_for_the_yes.md",
-    "_reception/says_hours_the_way_people_do.md",
-    "_reception/only_the_hours_the_agenda_gave.md",
-    "_reception/outside_the_appointment.md",
+    "_partials/speaks_to_the_patient.md",
+    "_partials/never_answers_without_the_agenda.md",
+    "_partials/a_named_day_is_always_a_lookup.md",
+    "_partials/offers_what_came_back.md",
+    "_partials/the_tool_asks_for_the_yes.md",
+    "_partials/says_hours_the_way_people_do.md",
+    "_partials/only_the_hours_the_agenda_gave.md",
+    "_partials/outside_the_appointment.md",
 ]
 BOOKING_VIEWS = ("choose_slot", "new_booking")
-CONFIRM_VIEWS = ("confirm/move", "confirm/new_booking", "confirm/contact", "confirm/cancellation")
+CONFIRM_VIEWS = (
+    "choose_slot/confirm",
+    "new_booking/confirm",
+    "update_contact/confirm",
+    "cancel_or_confirm/confirm",
+)
 
 
 def paragraphs(view: str) -> list[str]:
@@ -63,7 +68,7 @@ def test_no_shared_paragraph_was_left_behind_as_a_second_copy(name: str) -> None
 
 def test_the_thursday_lesson_is_one_paragraph_and_both_stages_read_it() -> None:
     """The rule that cost a card to learn: a day the caller names is always a lookup."""
-    lesson = shared("_reception/a_named_day_is_always_a_lookup.md")
+    lesson = shared("_partials/a_named_day_is_always_a_lookup.md")
 
     assert "en cuanto el paciente nombre uno, consulta y ofrece" in lesson
     assert all(lesson in render(PROMPTS, view) for view in BOOKING_VIEWS)
@@ -71,28 +76,28 @@ def test_the_thursday_lesson_is_one_paragraph_and_both_stages_read_it() -> None:
 
 def test_choose_slot_includes_exactly_these_partials_in_this_order() -> None:
     assert includes(PROMPTS, "choose_slot") == [
-        "_reception/speaks_to_the_patient.md",
-        "_reception/never_answers_without_the_agenda.md",
-        "_reception/a_named_day_is_always_a_lookup.md",
-        "_reception/offers_what_came_back.md",
-        "_reception/the_tool_asks_for_the_yes.md",
-        "_reception/says_hours_the_way_people_do.md",
-        "_reception/only_the_hours_the_agenda_gave.md",
-        "_reception/outside_the_appointment.md",
+        "_partials/speaks_to_the_patient.md",
+        "_partials/never_answers_without_the_agenda.md",
+        "_partials/a_named_day_is_always_a_lookup.md",
+        "_partials/offers_what_came_back.md",
+        "_partials/the_tool_asks_for_the_yes.md",
+        "_partials/says_hours_the_way_people_do.md",
+        "_partials/only_the_hours_the_agenda_gave.md",
+        "_partials/outside_the_appointment.md",
     ]
     assert len(paragraphs("choose_slot")) == 11
 
 
 def test_new_booking_includes_exactly_these_partials_in_this_order() -> None:
     assert includes(PROMPTS, "new_booking") == [
-        "_reception/speaks_to_the_patient.md",
-        "_reception/never_answers_without_the_agenda.md",
-        "_reception/a_named_day_is_always_a_lookup.md",
-        "_reception/offers_what_came_back.md",
-        "_reception/the_tool_asks_for_the_yes.md",
-        "_reception/says_hours_the_way_people_do.md",
-        "_reception/only_the_hours_the_agenda_gave.md",
-        "_reception/outside_the_appointment.md",
+        "_partials/speaks_to_the_patient.md",
+        "_partials/never_answers_without_the_agenda.md",
+        "_partials/a_named_day_is_always_a_lookup.md",
+        "_partials/offers_what_came_back.md",
+        "_partials/the_tool_asks_for_the_yes.md",
+        "_partials/says_hours_the_way_people_do.md",
+        "_partials/only_the_hours_the_agenda_gave.md",
+        "_partials/outside_the_appointment.md",
     ]
     assert len(paragraphs("new_booking")) == 10
 
@@ -119,8 +124,8 @@ def test_no_confirmation_prompt_tutea_the_patient_it_is_about_to_write_for(view:
 def test_the_contact_stage_shares_how_the_clinic_speaks_and_nothing_about_the_agenda() -> None:
     """The one stage that never reads the agenda carries no rule about a tool it lacks."""
     assert includes(PROMPTS, "update_contact") == [
-        "_reception/speaks_to_the_patient.md",
-        "_reception/outside_the_appointment.md",
+        "_partials/speaks_to_the_patient.md",
+        "_partials/outside_the_appointment.md",
     ]
     assert len(paragraphs("update_contact")) == 6
 
@@ -138,17 +143,17 @@ def test_the_hour_rule_is_shared_by_three_stages_and_the_booking_rule_by_two() -
     """A stage that reads an hour back but books nothing needs one half of the old paragraph."""
     settling = includes(PROMPTS, "cancel_or_confirm")
 
-    assert "_reception/says_hours_the_way_people_do.md" in settling
-    assert "_reception/only_the_hours_the_agenda_gave.md" not in settling
+    assert "_partials/says_hours_the_way_people_do.md" in settling
+    assert "_partials/only_the_hours_the_agenda_gave.md" not in settling
     for view in BOOKING_VIEWS:
-        assert "_reception/only_the_hours_the_agenda_gave.md" in includes(PROMPTS, view)
+        assert "_partials/only_the_hours_the_agenda_gave.md" in includes(PROMPTS, view)
 
 
 def test_the_settling_stage_includes_exactly_these_partials_in_this_order() -> None:
     assert includes(PROMPTS, "cancel_or_confirm") == [
-        "_reception/speaks_to_the_patient.md",
-        "_reception/says_hours_the_way_people_do.md",
-        "_reception/outside_the_appointment.md",
+        "_partials/speaks_to_the_patient.md",
+        "_partials/says_hours_the_way_people_do.md",
+        "_partials/outside_the_appointment.md",
     ]
     assert len(paragraphs("cancel_or_confirm")) == 9
 

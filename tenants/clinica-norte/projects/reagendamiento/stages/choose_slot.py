@@ -103,7 +103,7 @@ class ChooseSlot(TenantAgent):
             question=helpers.confirmation_question(slot),
             tool="book_slot",
             args=args,
-            instructions=prompt(tc, "confirm/move"),
+            instructions=prompt(tc, "choose_slot/confirm"),
         )
         if not said_yes:
             return messages.NOT_CONFIRMED

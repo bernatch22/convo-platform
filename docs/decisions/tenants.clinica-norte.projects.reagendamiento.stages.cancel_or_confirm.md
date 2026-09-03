@@ -18,7 +18,7 @@ nothing against it: only `cancel_appointment` is irreversible here, so the pair
 stays unambiguous. And the conversation genuinely is one conversation — the cita
 is looked up, read back and agreed to identically for both — so two stages would
 have meant two copies of the read-back drifting apart, which is precisely what
-the `prompts/_reception/` partials exists to prevent. What parts is the last sentence: an
+the `prompts/_partials/` partials exists to prevent. What parts is the last sentence: an
 hour released, or an hour written down as spoken for.
 
 **Why the cita is looked up here rather than inherited.** `Identify.summary()`

@@ -85,7 +85,7 @@ class CancelOrConfirm(TenantAgent):
             question=helpers.cancellation_question(appointment),
             tool="cancel_appointment",
             args=args,
-            instructions=prompt(tc, "confirm/cancellation"),
+            instructions=prompt(tc, "cancel_or_confirm/confirm"),
         )
         if not said_yes:
             return messages.CANCEL_NOT_CONFIRMED

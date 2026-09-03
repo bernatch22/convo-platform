@@ -1456,7 +1456,7 @@ nothing: the Thursday lesson failing on the one day the model believes it
 already knows. The sentence that fixes it — a day you give up for closed is
 consulted like any other, because the sheet says when the centre OPENS and only
 the agenda knows what is free — went into the shared prompt block both booking
-stages compose from (`prompts/_reception/a_named_day_is_always_a_lookup.md`, included by both booking prompts), and Tool Correctness on Haiku went
+stages compose from (`prompts/_partials/a_named_day_is_always_a_lookup.md`, included by both booking prompts), and Tool Correctness on Haiku went
 from 14/16 to 17/17. Softening the golden would have hidden a rule the platform
 actually depends on.
 

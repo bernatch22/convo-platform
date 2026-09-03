@@ -64,7 +64,7 @@ class UpdateContact(TenantAgent):
             question=helpers.contact_confirmation_question(digits),
             tool="update_contact",
             args=args,
-            instructions=prompt(tc, "confirm/contact"),
+            instructions=prompt(tc, "update_contact/confirm"),
         )
         if not said_yes:
             return messages.CONTACT_NOT_CONFIRMED

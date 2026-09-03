@@ -254,7 +254,7 @@ tenants/          the businesses: _template/, clinica-norte/, tienda-sur/
   <id>/tenant.py            id, name, region, build_adapters()
   <id>/adapters/            one class per system the business runs
   <id>/projects/<p>/        project.py · knowledge.md · messages.py · helpers.py
-                            stages/*.py · prompts/*.md (+ confirm/, and a _partials folder such as _reception/) · evals/
+                            stages/*.py · prompts/*.md (+ _partials/ and one <stage>/confirm.md per stage that asks) · evals/
 tests/            unit tests (ring 1) and tests/evals (DeepEval); tests/fixtures/ shared fakes
 docs/             decisions/, evals.md, prompts.md, tenants.md, deck.pdf
 infra/            box/ (systemd, Caddy, deploy scripts), compose/, seed/, scripts/

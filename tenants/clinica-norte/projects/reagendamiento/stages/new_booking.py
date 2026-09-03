@@ -105,7 +105,7 @@ class NewBooking(TenantAgent):
             question=helpers.new_confirmation_question(slot),
             tool="create_appointment",
             args=args,
-            instructions=prompt(tc, "confirm/new_booking"),
+            instructions=prompt(tc, "new_booking/confirm"),
         )
         if not said_yes:
             return messages.NOT_CONFIRMED

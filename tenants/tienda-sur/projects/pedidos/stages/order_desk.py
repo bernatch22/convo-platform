@@ -93,7 +93,7 @@ class OrderDesk(TenantAgent):
             question=helpers.confirmation_question(order),
             tool="cancel_order",
             args=args,
-            instructions=prompt(tc, "confirm/cancel_order"),
+            instructions=prompt(tc, "order_desk/confirm"),
         )
         if not said_yes:
             return messages.NOT_CONFIRMED

@@ -28,7 +28,7 @@ ui/           React console
 Mapping, so the vocabulary stays fixed: router → `convo/session/router.py`;
 controller → a stage (`stages/x.py`, a `TenantAgent`); model → an adapter;
 view → `prompts/x.md`, rendered in the layout `convo/prompting/layout.py` with
-partials `prompts/_reception/*.md`; `lib/` → `convo/lang/`; `bin/` → `convo/cli/`.
+partials `prompts/_partials/*.md`; `lib/` → `convo/lang/`; `bin/` → `convo/cli/`.
 
 ## Invariants the tests enforce
 
