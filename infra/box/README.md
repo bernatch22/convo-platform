@@ -1,6 +1,6 @@
 # convo-box — the phone path
 
-How a call from a mobile reaches a worker running on a laptop, and how to
+How a call from a mobile reaches a convo.worker running on a laptop, and how to
 rebuild every piece of it. The box itself (SFU, SIP, Redis) is `setup.sh`;
 this file is the telephone that plugs into it.
 
@@ -25,9 +25,9 @@ this file is the telephone that plugs into it.
   │                                       roomConfig.agents = [ agent_name "cc" ]
   ▼  the SIP participant joins with sip.trunkPhoneNumber, sip.callID, …
   livekit-server 1.9.1   creates the room, dispatches the fleet
-  ▼  ws://lk.bernardocastro.dev:7880   (the worker dialled OUT to here)
-  laptop   python -m convo worker dev
-       core/sip.py     reads the caller's sip.* attributes off the ROOM
+  ▼  ws://lk.bernardocastro.dev:7880   (the convo.worker dialled OUT to here)
+  laptop   python -m convo convo.worker dev
+       convo/session/sip.py     reads the caller's sip.* attributes off the ROOM
        convo/session/router.py  store.route("cc", "+14176743169")  →  clinica-norte /
                        reagendamiento / voice     ← the ONLY tenant decision
 ```
@@ -39,13 +39,13 @@ table and no LiveKit change at all.
 ## Rebuild it
 
 ```bash
-uv run python scripts/twilio_trunk.py --number +14176743169 --dry-run \
+uv run python infra/scripts/twilio_trunk.py --number +14176743169 --dry-run \
     --twilio-env ~/pinecall/sdk-server/.env.production      # read, create nothing
-uv run python scripts/twilio_trunk.py --number +14176743169 \
+uv run python infra/scripts/twilio_trunk.py --number +14176743169 \
     --twilio-env ~/pinecall/sdk-server/.env.production      # create what is missing
 uv run python -m convo routes add cc +14176743169 clinica-norte reagendamiento voice
 uv run python -m convo routes list
-env -u TENANT -u PROJECT uv run python -m convo worker dev        # then call the number
+env -u TENANT -u PROJECT uv run python -m convo convo.worker dev        # then call the number
 ```
 
 The script is idempotent: it reads first and creates only what is missing, so
@@ -81,7 +81,7 @@ the trunk and credentials; this card is inbound only, so neither exists yet.
 A **cold transfer** is `livekit-sip` sending a SIP REFER on the caller's own
 leg. Whether that REFER is honoured is entirely the carrier's decision, and on
 an Elastic SIP Trunk it is two properties on the Trunk resource. Neither is set
-by anything in this repo — `scripts/twilio_trunk.py` **reads and reports** them
+by anything in this repo — `infra/scripts/twilio_trunk.py` **reads and reports** them
 and prints the command below, because switching them on costs money on every
 transfer and a script that mutates a trunk's call settings is exactly the shape
 of the 2026 fraud incident.
@@ -98,12 +98,12 @@ it is the value LiveKit's own docs tell you to set.)
 
 ```bash
 # read — this is what the script prints for you on every run
-twilio api trunking v1 trunks fetch --sid TKxxxxxxxx
+twilio convo.api.app trunking v1 trunks fetch --sid TKxxxxxxxx
 curl -s -u $TWILIO_ACCOUNT_SID:$TWILIO_AUTH_TOKEN \
   https://trunking.twilio.com/v1/Trunks/TKxxxxxxxx | jq '.transfer_mode, .transfer_caller_id'
 
 # write — a human runs this, deliberately, once
-twilio api trunking v1 trunks update --sid TKxxxxxxxx \
+twilio convo.api.app trunking v1 trunks update --sid TKxxxxxxxx \
   --transfer-mode enable-all --transfer-caller-id from-transferee
 curl -X POST https://trunking.twilio.com/v1/Trunks/TKxxxxxxxx \
   --data-urlencode "TransferMode=enable-all" \
@@ -126,7 +126,7 @@ What Twilio documents about the SIP conversation, and what it does not:
   contains exactly two status codes and both are `202`. That a refused REFER
   comes back `603 Declined` is field evidence (livekit/sip#234 — same Twilio
   elastic trunk, closed with no published diagnosis), which is why
-  `core/telephony/transfer.py` maps 603 to `rejected` and attaches a hint
+  `convo/telephony/transfer.py` maps 603 to `rejected` and attaches a hint
   pointing here rather than asserting a cause.
 - **Refer-To:** `tel:+34600111222` or `sip:+34600111222@<trunk>.pstn.twilio.com`
   — for PSTN the `sip:` form *must* use your Termination domain. We send the
@@ -174,20 +174,20 @@ Every layer can be checked from the laptop, and only the last one needs a human:
 
 ```bash
 # 1. the trunk, the URI and the attachment, from Twilio itself
-uv run python scripts/twilio_trunk.py --number +14176743169 --dry-run --twilio-env …
+uv run python infra/scripts/twilio_trunk.py --number +14176743169 --dry-run --twilio-env …
 # 2. livekit-sip is up and armed
 ssh convo-box 'sudo docker ps; sudo docker logs --tail 50 convo-sip-1'
-# 3. the route row exists on the db the worker reads
+# 3. the route row exists on the db the convo.worker reads
 uv run python -m convo routes list
-# 4. the worker registered with the SFU
-env -u TENANT -u PROJECT uv run python -m convo worker dev   # "registered worker … agent_name=cc"
+# 4. the convo.worker registered with the SFU
+env -u TENANT -u PROJECT uv run python -m convo convo.worker dev   # "registered convo.worker … agent_name=cc"
 # 5. the whole path, minus the audio — see below
-uv run python scripts/sip_probe.py
+uv run python infra/scripts/sip_probe.py
 uv run python -m convo sessions list
 # 6. only now, and only for the audio: dial the number from a mobile
 ```
 
-`scripts/sip_probe.py` sends the INVITE Twilio would send. A `200 OK` proves
+`infra/scripts/sip_probe.py` sends the INVITE Twilio would send. A `200 OK` proves
 the trunk admitted the number, the rule opened a `call-…` room and `cc` was
 dispatched; the session log then shows which tenant `store.route` resolved and
 what the agent said. It sends no RTP, so the audio is the one thing left for
@@ -211,8 +211,8 @@ atiende recepción."* — €0.008 per probe.
   asks for the agent when the room is created, so `ctx.job.participant` is
   empty and `sip.trunkPhoneNumber` is on a participant *in the room*. Reading
   it off the job routes every call to the default tenant instead
-  (`core/sip.py` exists for exactly this).
-- **`TENANT` in the environment beats the phone.** Run the worker with
+  (`convo/session/sip.py` exists for exactly this).
+- **`TENANT` in the environment beats the phone.** Run the convo.worker with
   `env -u TENANT -u PROJECT` or the console's tenant answers the call.
 - **Twilio will not let you test it with a call of your own.** Dialling the
   trunk's number from another number on the *same* Twilio account is refused
@@ -231,14 +231,14 @@ atiende recepción."* — €0.008 per probe.
   `track_subscribed` / `track_unsubscribed` on the cut-off participant: the
   Python SDK fires neither for a server-side revocation, the `AudioStream` just
   goes quiet, and the SFU logged `revoking subscription` the whole time.
-  `scripts/isolation_probe.py` counts received audio frames instead, which is
+  `infra/scripts/isolation_probe.py` counts received audio frames instead, which is
   the only measurement that answers the question — run it against the dev
   compose and read the table. It also measures what the events could never
   have told you: **the cut takes about 220 ms per stream to bite**, which is
   the warm transfer's one remaining leak and is documented as such in
-  `core/telephony/transfer.py`.
+  `convo/telephony/transfer.py`.
 - **The routes table is a file.** `CONVO_DB` (default `tmp/convo.db`) is
-  relative to the working directory: add the route and run the worker from
+  relative to the working directory: add the route and run the convo.worker from
   the same directory, or the number has no route.
 
 ## The nightly: ring 2 as a habit
@@ -299,7 +299,7 @@ the call path and does its Opus encoding in a daemon thread. Nothing about it
 touches the SFU, and nothing about it needs a GPU.
 
 ```
-CONVO_RECORDINGS=/var/lib/convo/recordings        # in /etc/default/convo-worker
+CONVO_RECORDINGS=/var/lib/convo/recordings        # in /etc/default/convo-convo.worker
    /var/lib/convo/recordings/<session_id>/audio.ogg
 ```
 
@@ -316,7 +316,7 @@ curl -sf -H "Authorization: Bearer $RECORDINGS_TOKEN" \
 
 - **A recording is PII.** It is a customer's voice, their name, and often their
   telephone number spoken out loud. It never enters git (`recordings/`, `*.ogg`
-  and `tmp/` are all ignored), it is never a static mount, and `api.py` is the
+  and `tmp/` are all ignored), it is never a static mount, and `convo.api.app.py` is the
   only door: `GET /sessions/{id}/recording`, which composes the path from a
   validated session id and refuses one it has no session row for.
 - **Set `RECORDINGS_TOKEN` on any box reachable from outside its own network.**
@@ -339,7 +339,7 @@ curl -sf -H "Authorization: Bearer $RECORDINGS_TOKEN" \
 - **A tenant can refuse to be recorded.** `Project.recording = False` in the
   project's own `project.py` and that project's calls write no OGG at all — the
   console then shows no player on its sessions, which is the visible proof.
-  `RECORD=0` in the worker's environment does the same for a whole deploy.
+  `RECORD=0` in the convo.worker's environment does the same for a whole deploy.
 - **A supervisor takeover is NOT in the recording.** The tap wraps the agent
   session's audio IO, and `RoomIO` links exactly one remote participant, so the
   OGG holds the caller and the agent and nobody else. A human who takes the line

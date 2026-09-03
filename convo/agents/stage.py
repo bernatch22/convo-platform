@@ -49,7 +49,7 @@ class TenantAgent(Agent):
     ) -> None:
         # The platform's own verbs are layered here, not declared as methods, so
         # that one of them can be ABSENT: a project with no `transfer_number`
-        # must never be shown a transfer tool it cannot run (`core.agents.human`).
+        # must never be shown a transfer tool it cannot run (`convo.agents.human`).
         platform = transfer_tools(tc)
         super().__init__(
             instructions=instructions,

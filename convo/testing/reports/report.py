@@ -131,7 +131,7 @@ def text_only() -> None:
 
 def _parse(args: list[str]) -> argparse.Namespace:
     """tenant, project, and `--model` once per model — default: the platform's own."""
-    parser = argparse.ArgumentParser(prog="core.testing.report", description=__doc__)
+    parser = argparse.ArgumentParser(prog="convo evals report", description=__doc__)
     parser.add_argument("tenant")
     parser.add_argument("project")
     parser.add_argument(

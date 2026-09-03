@@ -9,7 +9,7 @@ comments, commit messages and this file in English.
 runtime that talks. Control, state, tools, audit and tenancy live in the
 backend, never in the prompt.
 
-Design and evidence: `REPORT.md`. Why each module is the way it is:
+The system as it is: `ARCHITECTURE.md`. Why each module is the way it is:
 `docs/decisions/<module>.md`. Each taskops card carries its own spec.
 
 ## Layout (Rails-shaped, standard Python)
@@ -72,7 +72,7 @@ partials `prompts/_reception/*.md`; `lib/` → `convo/lang/`; `bin/` → `convo/
 - Context summary across handoffs happens in `TenantAgent.on_enter` (handoff
   does not copy history).
 - Event log is append-only with a per-session `seq`; the stage is appended
-  **during** the call (SIGKILL-safe). `on_session_end` persists the report.
+  **during** the call (SIGKILL-safe). A shutdown callback writes the report and `session.end`.
 - Every voice call keeps its audio through the framework's `RecorderIO`;
   `convo/session/recordings.py` is the ONLY module that composes a recording
   path. Recordings hold PII: out of git, served only by

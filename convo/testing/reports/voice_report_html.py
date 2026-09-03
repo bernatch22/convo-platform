@@ -146,11 +146,11 @@ def _golden(golden: dict[str, Any] | None, assets: dict[str, str]) -> str:
 def _commands(session_id: str) -> str:
     return f"""<h2>Para reproducirlo</h2><pre>
 python worker.py console --record   # con micrófono, la de verdad
-python -m core.testing.record clinica-norte reagendamiento   # sin micrófono, la de aquí
+convo evals record clinica-norte reagendamiento   # sin micrófono, la de aquí
 python -m convo sessions show {session_id}
 python -m convo sessions eval {session_id} --voice
-python -m core.testing.tts_golden
-python -m core.testing.voice_report {session_id}
+convo evals golden
+python -m convo.testing.reports.voice_report {session_id}
 pytest -m unit tests/test_audio_split.py
 deepeval test run tests/evals/test_voice_deepeval.py</pre>"""
 

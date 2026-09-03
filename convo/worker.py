@@ -61,7 +61,7 @@ async def entrypoint(ctx: JobContext) -> None:
     if audio is not None:
         # Written the moment the recorder is up, not at the end: the pointer has
         # to survive the SIGKILL the audio itself now survives, and its `t_ms`
-        # is what `core.testing.audio` reads as sample 0 of the OGG.
+        # is what `convo.testing.callers.audio` reads as sample 0 of the OGG.
         record_event(tc, "audio.start", {"path": str(audio)})
 
 

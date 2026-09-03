@@ -29,7 +29,7 @@ CANCEL_BOOKING = ToolSpec(
 )
 # The platform's own verb, not this business's: handing the live call to a person.
 # Declaring it here is the opt-in; `transfer_number` below is what turns it on, and an
-# empty one means the model is never offered the tool at all (`core.telephony.human`).
+# empty one means the model is never offered the tool at all (`convo.telephony.human`).
 #
 # The undo of a cancellation is a WRITE, never an irreversible: putting a booking back the
 # way the customer left it must not need a second yes from them.

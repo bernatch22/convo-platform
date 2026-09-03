@@ -20,10 +20,10 @@ from convo.testing.callers.speaker import VirtualMicrophone
 
 # The control plane this harness calls. An override exists because the nightly
 # run does not talk to a laptop: `CONVO_API` points it at the box.
-DEFAULT_API = os.getenv("CONVO_API", "http://localhost:8090")
+DEFAULT_API = os.getenv("CONVO_API", "http://127.0.0.1:8090")
 # The caller must never sound like the project it is calling, and both of the
 # fleet's projects speak with a peninsular woman — so the fallback voice for a
-# call made with no persona is a peninsular man (`core.testing.personas.ALEX`).
+# call made with no persona is a peninsular man (`convo.testing.callers.personas.ALEX`).
 # Flash is the latency profile: a synthetic caller wants to be understood
 # quickly, not to be expressive.
 CALLER_VOICE = ALEX

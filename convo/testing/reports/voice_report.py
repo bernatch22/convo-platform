@@ -99,7 +99,7 @@ def scores(store: Store, session_id: str) -> list[dict]:
 def main(argv: list[str]) -> int:
     """CLI: one session id; writes tmp/reports/ms-6.html and prints where it went."""
     if len(argv) < 2:
-        print("usage: python -m core.testing.voice_report <session-id>")
+        print("usage: python -m convo.testing.reports.voice_report <session-id>")
         return 2
     print(build(argv[1], SQLiteStore()))
     return 0

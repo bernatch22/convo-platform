@@ -2,7 +2,7 @@
 
 One deploy, many businesses. `tenants/clinica-norte/` speaks to patients as
 *usted* and moves appointments; `tenants/tienda-sur/` tutea and cancels orders;
-they run in the same worker, on the same registry, router, session, executor and
+they run in the same convo.worker, on the same registry, router, session, executor and
 event log. **No file under `convo/` names either of them** — the registry finds
 tenants by folder and imports each one by name, in a try/except, so a tenant
 that fails to import is unroutable rather than fatal

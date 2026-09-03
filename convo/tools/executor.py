@@ -15,7 +15,7 @@ from convo.state.log import record
 from convo.tools import guard
 from convo.tools.messages import FAILURE, NO_ADAPTER, TIMEOUT, UNKNOWN_TOOL, sentence
 
-if TYPE_CHECKING:  # avoid an import cycle: core.context declares the executor it carries
+if TYPE_CHECKING:  # avoid an import cycle: convo.domain.context declares the executor it carries
     from convo.adapters.base import Adapter
     from convo.domain.context import TenantContext
 

@@ -1,4 +1,4 @@
-"""Opening and closing a session's log: the two ends of `core.state`, in one file.
+"""Opening and closing a session's log: the two ends of `convo.state`, in one file.
 
 Decisions: docs/decisions/convo.state.attach.md
 """

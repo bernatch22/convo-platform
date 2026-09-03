@@ -23,7 +23,7 @@ OVERRIDABLE = (
 # empty row has to reach the project, not be ignored as noise. Everywhere else
 # "" is a value nobody chose — an empty voice builds no TTS and the call is
 # mute — so a blank row is ignored here as well as refused by
-# `core.pipeline.overridable`, and a project stored empty before that rule
+# `convo.session.pipeline.overridable`, and a project stored empty before that rule
 # existed cannot silence a call after this deploy.
 BLANKABLE = ("greeting", "transfer_number")
 

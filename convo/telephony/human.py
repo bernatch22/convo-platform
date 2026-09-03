@@ -33,7 +33,7 @@ TRANSFER_TO_HUMAN = ToolSpec(
 NOT_DECLARED = (
     f"this project does not declare {TOOL!r} in its tool catalog, so no number will make the "
     "agent offer it. That is a deploy decision, not a console one: add the spec to the "
-    "project's catalog (core.telephony.human.TRANSFER_TO_HUMAN) and redeploy."
+    "project's catalog (convo.telephony.human.TRANSFER_TO_HUMAN) and redeploy."
 )
 
 NO_NUMBER = (
@@ -115,7 +115,7 @@ def view(project: Project) -> dict:
 # paragraph that repeats the docstring's trigger rules is pure noise on every
 # stage, including the stages that will never transfer anybody. So the trigger
 # ("úsala cuando…") and the outcome handling live in the DOCSTRING
-# (`core.agents.human.transfer_to_human`), where the model reads them at the
+# (`convo.agents.human.transfer_to_human`), where the model reads them at the
 # moment it is deciding, and what stays here is the one thing a tool
 # description cannot express: the announcement is a spoken TURN, and it has to
 # happen before the line moves. Positive, with its motivation attached, because

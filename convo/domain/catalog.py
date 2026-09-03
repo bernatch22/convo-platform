@@ -13,7 +13,7 @@ FIND_AVAILABILITY = ToolSpec(
     timeout_s=5.0,
 )
 
-# `TenantAgent.fecha_y_hora_actual` — the name lives here so `core.dates_note`,
+# `TenantAgent.fecha_y_hora_actual` — the name lives here so `convo.agents.clock`,
 # which writes the session's clock reading into the chat context, and the eval
 # bridge, which must not count it, read one declaration instead of two strings.
 CLOCK = ToolSpec(

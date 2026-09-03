@@ -302,7 +302,7 @@ def _kill(child: subprocess.Popen) -> None:
 
 def _parser() -> argparse.ArgumentParser:
     """The night's knobs: where to call, what to spend, how long to wait, what to run."""
-    parser = argparse.ArgumentParser(prog="python -m core.testing.nightly")
+    parser = argparse.ArgumentParser(prog="convo evals nightly")
     parser.add_argument("--api", default=os.getenv(API_ENV, DEFAULT_API))
     parser.add_argument("--console", default=None, help="where to file the run (default: --api)")
     parser.add_argument("--budget", type=int, default=BUDGET, help="live calls tonight may spend")

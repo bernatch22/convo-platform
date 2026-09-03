@@ -2,10 +2,10 @@
 
 USAGE = """usage: convo evals <verb> [args]
 
-  report  <tenant> <project> [--model M]   ring 1 on one project, HTML under tmp/reports
-  nightly [--only t/p] [--budget EUR]      ring 2 against the deployed fleet, on a budget
-  record  <tenant> <project>               one recorded call through the real pipeline
-  golden  [args]                           regenerate the TTS goldens the voice ring replays
+  report  <tenant> <project> [--model M ...]    ring 1 on one project; report under tmp/reports
+  nightly [--only t/p] [--budget N] [--dry-run]  ring 2 against a deployed fleet, N calls at most
+  record  [<tenant> <project>]                  one recorded call through the real voice pipeline
+  golden                                        regenerate the TTS goldens under tmp/golden
 """
 
 

@@ -22,14 +22,14 @@ consent, grounded facts, register — and share not one sentence of criteria.
 
 ---
 
-## 1. The three rings
+## 1. The four rings
 
 | Ring | What is evaluated | When | Status |
 |---|---|---|---|
 | **1** | Per-project goldens in text, plus simulated conversations | CI, every push (`evals` job, gated on `ANTHROPIC_API_KEY`) | live since ms-1; this document |
 | **2** | **Voice.** Offline: a recorded call scored by DeepEval's voice metrics (`sessions eval <id> --voice`). Live: a synthetic caller who really speaks into a real LiveKit room | offline on demand; live **nightly on the box, 04:00 Europe/Madrid** (ms-13) | offline since ms-6 — §3.9; live since ms-13 — §3.11, §3.12; nightly since ms-13 — §3.14 |
 | **3** | **Stored real sessions** replayed through the same metrics | on demand, `python -m convo sessions eval <id>` | live since ms-4 for consent; for grounding since ms-7, once tool results carried a summary — §3.6 |
-| **4** | **Every call, automatically.** Four checks decided by code plus at most one Haiku call, written into the call's own log | unasked, by `api.py`, within a minute of the caller hanging up | live since ms-13 — §3.13 |
+| **4** | **Every call, automatically.** Four checks decided by code plus at most one Haiku call, written into the call's own log | unasked, by `convo.api.app.py`, within a minute of the caller hanging up | live since ms-13 — §3.13 |
 
 The metrics are the same in every ring. A ring changes where the conversation
 comes from, never how it is judged. Rings 1-3 are things a person runs; ring 4
@@ -410,7 +410,7 @@ itself through — which is the thing §3.5 exists to prevent.
   register half, landed here because two tenants with opposite registers are
   what makes the metric worth writing.
 
-### 3.8 No cross-tenant leakage (ConversationalDAG) — one worker, two businesses
+### 3.8 No cross-tenant leakage (ConversationalDAG) — one convo.worker, two businesses
 
 - **Kind:** one deterministic node, then at most one judge call. 1.0 or 0.0.
 - **Runs on:** one golden per project (the one marked `leakage` in
@@ -422,7 +422,7 @@ itself through — which is the thing §3.5 exists to prevent.
   sentence around it was doing. Node 2 is the language question: did it stay in
   its own business and redirect politely, or did it play along with a request it
   has no system for?
-- **Why it exists:** "nothing in `core/` knows a clinic from a shop" is an
+- **Why it exists:** "nothing in `convo/` knows a clinic from a shop" is an
   architectural claim, and a claim is worth a metric. The registry, the router,
   the session, the executor and the log are shared; the only thing keeping one
   business out of another's answers is that the context was built from one
@@ -486,7 +486,7 @@ event, because `turn.agent` is written when the item is COMMITTED — after its
 audio played out — plus a 250 ms tail so the decay is inside the clip and does
 not read as `abrupt_cutoff`. `tts.word`'s `t1` is deliberately not used: it is
 relative to its own websocket chunk and cannot address the file
-(`core/observability/voice.py:TimedWords`). `tests/test_audio_split.py` pins
+(`convo/observability/voice.py:TimedWords`). `tests/test_audio_split.py` pins
 all of this on a synthetic stereo WAV, with no provider and no model.
 
 **The TTS golden is a duration, not a transcript.** `python -m
@@ -513,7 +513,7 @@ human's.
   nada". A streaming STT is a language model with a microphone; over a silent
   line it invents, and the invention is different every time, so a blocklist of
   hallucinated phrases is a diary, not a fix.
-- **What is measured instead.** `core/stt_gate.py` reads the RMS level of the
+- **What is measured instead.** `convo/session/stt_gate.py` reads the RMS level of the
   very frames going into the STT, tracks the LINE's own noise floor (fast to
   fall, slow to rise, so speech cannot lift it) and accepts a transcript only
   when the last `max_lag_s` seconds carried at least `min_voiced_ms` above that
@@ -552,10 +552,10 @@ human's.
   (`convo/testing/speaker.py:VirtualMicrophone`), speaks each line with
   ElevenLabs, reads both sides off `lk.transcription` and hangs up, returning a
   `Transcript` of DeepEval `Turn`s with audio and latency on each.
-- **Why the room comes from `api.py`.** DeepEval's `LiveKitConnector` signs its
+- **Why the room comes from `convo.api.app.py`.** DeepEval's `LiveKitConnector` signs its
   own join token and dispatches with `RoomAgentDispatch(agent_name=…)` and **no
   metadata** (`voice/connectors/providers/livekit.py:179`). A room it opens by
-  itself therefore reaches a worker that cannot tell which tenant is calling.
+  itself therefore reaches a convo.worker that cannot tell which tenant is calling.
   `POST /evals/rooms` makes the dispatch server-side, with the same
   `SessionMeta` JSON `/token` puts inside the JWT, and hands back a ticket that
   carries **no** `RoomConfiguration` — a second dispatch would seat two agents
@@ -590,8 +590,8 @@ human's.
   registered under the same `FLEET` share every dispatch: run a harness against
   a private `FLEET` or the job lands in somebody else's process.
 - **How to see it:** three terminals —
-  `docker compose -f infra/compose/dev.yml up`, `uv run python -m convo api --port
-  8090`, `python -m convo worker dev` — then `converse(...)` from a fourth.
+  `docker compose -f infra/compose/dev.yml up`, `uv run python -m convo convo.api.app --port
+  8090`, `python -m convo convo.worker dev` — then `converse(...)` from a fourth.
 
 ### 3.12 Two personas, and the goldens that turn a call into a suite
 
@@ -622,7 +622,7 @@ human's.
   transcript, `flaky=True`), and `consent` on the LOG case: the same call
   rebuilt from its append-only log through `convo.testing.replay`, ring 3's own
   reader, over `GET /sessions/<id>`. The session is identified DURING the call
-  by `GET /live-calls` (`core.control_plane._match` now strips the `eval-`
+  by `GET /live-calls` (`convo.convo.api.app.client._match` now strips the `eval-`
   prefix), because the room is gone the moment we hang up. `grounded` is
   deliberately NOT a ring-2 policy: it needs tool OUTPUTS as evidence and the
   log keeps result shapes, never contents.
@@ -657,30 +657,30 @@ human's.
   `import core` fails. `pythonpath = ["."]` in `pyproject.toml` is what makes a
   per-project suite runnable from a bare checkout.
 - **How to see it:** four terminals —
-  `docker compose -f infra/compose/dev.yml up`, `FLEET=cc uv run python -m convo api
-  --port 8090`, `FLEET=cc python -m convo worker dev`, then
+  `docker compose -f infra/compose/dev.yml up`, `FLEET=cc uv run python -m convo convo.api.app
+  --port 8090`, `FLEET=cc python -m convo convo.worker dev`, then
   `deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py -s`.
   Two workers on one `FLEET` share every dispatch, so a second harness needs a
-  `FLEET` of its own and `CONVO_API` pointed at its own `api.py`.
+  `FLEET` of its own and `CONVO_API` pointed at its own `convo.api.app.py`.
 
 ### 3.13 Ring 4 — every call scores itself when it ends
 
-- **What it is:** `core/scoring/`. When a session's log stops, the control
+- **What it is:** `convo/scoring/`. When a session's log stops, the control
   plane reads it back, asks four questions code can answer and at most one a
   judge can, and appends the verdict to the same append-only log as
   `session.score` with the next `seq`. The console shows it as a chip in the
   call log and a breakdown on the session; `python -m convo sessions show <id>`
   prints the same rows.
 - **Nothing runs in the job process.** The job dies with the call, so it is
-  not asked to do anything on the way out — not even a POST. `api.py` runs a
-  sweeper (`core/scoring/sweeper.py`, every 10 s, three sessions a tick) that
+  not asked to do anything on the way out — not even a POST. `convo.api.app.py` runs a
+  sweeper (`convo/scoring/sweeper.py`, every 10 s, three sessions a tick) that
   looks for finished, unscored sessions. A poll beats a callback for one
   reason: a job killed by the box — SIGKILL, OOM, a redeploy mid-call — never
   gets to tell anybody it is gone, and those are exactly the calls somebody
   wants a score for. `report.finished` therefore has three clauses: the row was
   closed, the log ends in `session.end`, or the log has been silent for
   `STALE_S` (120 s), which is what a dropped call looks like from here.
-- **The four free checks** (`core/scoring/checks.py`), in the order an auditor
+- **The four free checks** (`convo/scoring/checks.py`), in the order an auditor
   asks them:
 
   | Check | Decided by | Fails when |
@@ -705,7 +705,7 @@ human's.
   It is skipped when the transcript has **under three non-empty turns** (a
   wrong number is not a conversation), when there is no key, and when the
   **estimated worst case exceeds the cap** — input from the rendered prompt,
-  output at its ceiling, both priced from `core.observability.prices`, the same
+  output at its ceiling, both priced from `convo.observability.prices`, the same
   table `session.end` is billed with. The transcript is first cut to the last
   40 turns at 400 characters each, so a forty-minute call and a two-minute call
   cost the same to score. The euros written into the log are then the REAL ones
@@ -715,7 +715,7 @@ human's.
   spends a second model call turning the criteria into steps — on every session,
   forever — and paraphrases them differently each run. The steps are project
   data (`evals/scoring.py`), so the clinic asks about an appointment moved and
-  the shop about an order found; `core.scoring.judge.DEFAULT_STEPS` is the
+  the shop about an order found; `convo.scoring.judge.DEFAULT_STEPS` is the
   general version a project inherits by writing nothing.
 - **The score is a log line, and that is the whole of the concurrency story.**
   `session.score` takes `max(seq) + 1` and `events` has `(session_id, seq)` as
@@ -733,7 +733,7 @@ human's.
   judge **0.0014 €** (0.14 cents), scored **5 s** after the call ended.
   A hang-up on the greeting: **0 €**, judge skipped, deterministic checks still
   written.
-- **How to see it:** `uv run python -m convo api --port 8090` in one terminal,
+- **How to see it:** `uv run python -m convo convo.api.app --port 8090` in one terminal,
   `python -m convo console` in another; hang up, wait ten seconds, then
   `python -m convo sessions list` and `python -m convo sessions show <id>` —
   the last row of the log is the score. `python -m convo sessions score <id>`
@@ -776,7 +776,7 @@ human's.
   on convo-box installed by `infra/box/deploy_api.sh`. Every night at 04:00
   Europe/Madrid `convo-evals.timer` fires a oneshot that calls the DEPLOYED
   fleet — rooms minted at the box's own `POST /evals/rooms`, agent answered by
-  `convo-worker` — and leaves `tmp/evals/<date>.log`, one HTML page at
+  `convo-convo.worker` — and leaves `tmp/evals/<date>.log`, one HTML page at
   `tmp/evals/<date>/index.html`, one line per suite in `tmp/evals/index.tsv`,
   and one row per suite on the console (`POST /evals/runs`).
 - **The budget is arithmetic done before a euro is spent.** One ring-2 golden
@@ -1068,7 +1068,7 @@ its suites in `tenants/<tenant>/projects/<project>/evals/suites.json`:
 
 The key is the suite id the console shows on its Run button; the value is the
 single path `deepeval test run` accepts. Ring 2's personas plug in here as one
-more key when ms-13 lands — nothing in `core/evals/` special-cases ring 1, and
+more key when ms-13 lands — nothing in `convo/evals/` special-cases ring 1, and
 a project that declares nothing simply has no button.
 
 ### Reading the datasets on screen (ms-17)
@@ -1130,7 +1130,7 @@ position so a run filed late by CI never diffs against a future.
 
   The fix is a seam and not a golden. `ToolSpec.infrastructure` is a DECLARED
   flag — the platform's plumbing, not the customer's business —
-  `core.tools.catalog.CLOCK` carries it, and `infrastructure_names()` derives
+  `convo.domain.catalog.CLOCK` carries it, and `infrastructure_names()` derives
   the set from the flag rather than from a list of names written somewhere
   else, so a project that declares plumbing of its own is answered too.
   `convo.testing.deepeval.business_calls` applies it, and it applies to
@@ -1180,7 +1180,7 @@ position so a run filed late by CI never diffs against a future.
   (Reception line, Order desk line, or Keeps the register on a stray "te"),
   which is why it went unnoticed until two models ran side by side. The date is
   now a paired `fecha_y_hora_actual` call and result inserted before the first
-  turn (`core/dates_note.clock_reading`): a tool result is evidence, not
+  turn (`convo/agents/clock.clock_reading`): a tool result is evidence, not
   speech, so there is nothing to answer, and it stays out of the cached system
   prefix. Measured against dropping the note and letting the model call the
   clock itself — that fixes the opening line too, but costs a tool round-trip
@@ -1212,7 +1212,7 @@ position so a run filed late by CI never diffs against a future.
   `tests/test_supervisor_note.py`).
 
   The second: what actually beat the whisper was the **stage prompt**, and the
-  fix is a paragraph in the cached prefix — `core.security.protocol.SUPERVISOR_PROTOCOL`,
+  fix is a paragraph in the cached prefix — `convo.prompting.protocols.SUPERVISOR_PROTOCOL`,
   appended by every project's `stage_prompt` — that tells the persona these
   instructions exist and outrank its own script. Fixed text, so it rides inside
   the ≥4096-token prefix and costs nothing per turn.
@@ -1284,7 +1284,7 @@ the platform will serve, and a table that says where the two disagree.
 ### How a model is chosen
 
 The model is **project data** (`Project.llm_model`), the same field a console
-override writes, and `core/providers/llm.py` dispatches on the name's family —
+override writes, and `convo/providers/llm.py` dispatches on the name's family —
 `claude-*` builds the Anthropic plugin, `gpt-*` the OpenAI one.
 `ALLOWED_MODELS` is the short list of models somebody priced and measured, and
 it is not a suggestion.
@@ -1565,7 +1565,7 @@ keep, and the caller waits for a voice that never arrives. The instinct
 "a project without the verb should be told nothing" is half a rule. Naming the
 TOOL there would be the ms-20 mistake in reverse (§4 and `test_prompts.py`: a
 rule about a tool the model does not have is the surest way to have it reach
-for one), so `core.telephony.human.protocol` grew a third answer that names the
+for one), so `convo.telephony.human.protocol` grew a third answer that names the
 SITUATION instead — there is nobody on this line to pass you to — and both
 models then answer honestly («por aquí atienden personas, y esa soy yo», Haiku;
 «te ayudo yo mismo aquí», gpt). Silence is not honesty.

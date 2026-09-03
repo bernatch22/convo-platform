@@ -6,7 +6,7 @@ hard way, the decisions we took and why, where the project stands, and what
 comes next. Written so that a person or an agent picking the project up cold
 understands how we got here.
 
-How to try things lives in `README.md`; the design in `REPORT.md`; how the
+How to try things lives in `README.md`; the design in `ARCHITECTURE.md`; how the
 agent is measured in `docs/evals.md`; per-card detail on the board. Generated artifacts (DeepEval HTML, recordings, usage
 sheets) live under `tmp/reports/` and are not versioned.
 

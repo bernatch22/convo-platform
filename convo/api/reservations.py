@@ -44,7 +44,7 @@ async def outcomes(
 
     `series` covers every day of the window, empty days included, so a bar
     strip has a stable axis; `rows` is newest first and capped by `limit`.
-    There is no rollup table — see `core/outcomes.py` for why.
+    There is no rollup table — see `convo/state/outcomes.py` for why.
     """
     return core_outcomes.outcomes(store, tenant=tenant, project=project, days=days, limit=limit)
 
@@ -81,7 +81,7 @@ async def reservations(
     an operator asked for: who is coming, when, with whom, and whether that
     booking still stands. A patient's name is not in our log and must not be —
     it is in the clinic's booking system, which is where this goes to get it
-    (`core.registry` → the tenant's adapters → `list_records`).
+    (`convo.session.registry` → the tenant's adapters → `list_records`).
 
     `shape` is the business's own word for its records (`appointments`,
     `orders`) and `labels` its own column headings: a project whose systems
@@ -94,7 +94,7 @@ async def reservations(
     mean. `session`, `verb` and `confirmed` are the join with `/outcomes`: the
     call that last touched this record inside the window, matched on the
     identifier the log's summary carries verbatim. Null means no call in the
-    window touched it — see `core/business.py` for why that join is on an id
+    window touched it — see `convo/domain/business.py` for why that join is on an id
     and not on a name.
     """
     known = load_registry().get(tenant)

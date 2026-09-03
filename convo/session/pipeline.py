@@ -155,7 +155,7 @@ def overridable(field: str, value: str) -> str | None:
         return (
             f"{value!r} is not a model this platform runs: the allowed models are "
             f"{list(llm.ALLOWED_MODELS)}. Every one of them is priced in "
-            "core/observability/prices.py and measured in the evals; an unpriced model would "
+            "convo/observability/prices.py and measured in the evals; an unpriced model would "
             "spend money no session report could account for."
         )
     if field == "tts_model" and value in tts.FORBIDDEN_MODELS:

@@ -34,7 +34,7 @@ STEER_MODES = ("inject", "inject_and_speak")
 # (the same tool-result shape that carries the session date lands 1/3 here). It also
 # keeps the note out of the top-level `system` param, so the cached prefix survives it.
 # The paragraph that makes the model rank it above the stage script lives in
-# `core.security.protocol.SUPERVISOR_PROTOCOL`, inside that cached prefix.
+# `convo.prompting.protocols.SUPERVISOR_PROTOCOL`, inside that cached prefix.
 NOTE_ROLE = "system"
 
 _HANDED_BACK = "Un supervisor humano tomó la línea y habló con el cliente. "

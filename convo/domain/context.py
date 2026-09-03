@@ -45,9 +45,9 @@ class Project:
     # somebody else pick up, which is what a handoff IS — so the voice belongs to the
     # project's data like every other one, never to the stage's code.
     stage_voices: dict[str, str] = field(default_factory=dict)
-    tts_model: str | None = None  # None = the platform default; see core/providers/tts.py
-    stt_provider: str = "soniox"  # soniox | deepgram; see core/providers/stt.py
-    llm_model: str | None = None  # None = the platform default; see core/providers/llm.py
+    tts_model: str | None = None  # None = the platform default; see convo/providers/tts.py
+    stt_provider: str = "soniox"  # soniox | deepgram; see convo/providers/stt.py
+    llm_model: str | None = None  # None = the platform default; see convo/providers/llm.py
     language: str = "es"
     greeting: str = ""  # spoken verbatim on session start (no LLM turn); "" = the model opens
     keyterms: list[str] = field(default_factory=list)
@@ -88,7 +88,7 @@ class TenantContext:
     customer: dict[str, Any] | None = None
     pii_values: set[str] = field(default_factory=set)
     prev_agent: Any = None
-    # The live session's supervision state (`core.security.control.SupervisorControl`),
+    # The live session's supervision state (`convo.supervision.control.SupervisorControl`),
     # or None where no second human can reach the call: the console, a harness,
     # an offline eval. Every stage carries it because every stage may be the one
     # holding the floor when a human takes the line.

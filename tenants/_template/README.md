@@ -3,7 +3,7 @@
 This folder is a working tenant. It imports, it routes, it runs a call and it
 has its own evals; the only thing wrong with it is that the business is made up.
 Copy it, rename it, replace every `TODO(copy)`, and you have a second business
-running on the same worker as the first — with no change anywhere in `convo/`.
+running on the same convo.worker as the first — with no change anywhere in `convo/`.
 
 The two demo tenants next door are the same shape, filled in:
 `tenants/clinica-norte/` (a clinic, speaks *usted*) and `tenants/tienda-sur/`
@@ -36,7 +36,7 @@ uv run convo console --tenant <your-id> --project example --text
 | `adapters/bookings.py` | one class per system: `capabilities()` and `execute(capability, args)`. Replace the fakes with your HTTP calls and nothing above changes |
 | `projects/<p>/project.py` | the use case: a `ToolSpec` per capability (`side_effect`, `idempotency_key`, `compensation`, `timeout_s`), the voice, the failure sentences, the knowledge seed |
 | `projects/<p>/knowledge.md` | the stable sheet the prompt opens with. **Make it longer than 4096 tokens** or Haiku 4.5 caches nothing, and never put a date or a reference in it |
-| `projects/<p>/prompts/` | one Markdown view per stage (role, `<instructions>`, `<examples>`), `confirm/*.md` for what ConfirmTask asks with, `_partials` for paragraphs stages share. The register — *usted* or *tú* — lives here and nowhere else |
+| `projects/<p>/prompts/` | one Markdown view per stage (role, `<instructions>`, `<examples>`), `confirm/*.md` for what ConfirmTask asks with, a `_`-prefixed folder such as `_reception/` for paragraphs stages share. The register — *usted* or *tú* — lives here and nowhere else |
 | `projects/<p>/stages/` | one `TenantAgent` per phase of the call, each with its own `@function_tool` methods. A tool's docstring **is** the schema the model reads |
 | `projects/<p>/helpers.py` | the pure helpers the stages share: how a row is read aloud, how a spoken hour is parsed |
 | `projects/<p>/messages.py` | every sentence a tool hands the model when it cannot do what was asked, and the four failure sentences |

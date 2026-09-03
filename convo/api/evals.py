@@ -173,7 +173,7 @@ async def eval_runs(
 
 @router.post("/evals/runs")
 async def file_eval_run(body: EvalRunIn, store: Reader) -> dict[str, Any]:
-    """Register a run that finished somewhere else — a laptop, CI, `core.testing.report`.
+    """Register a run that finished somewhere else — a laptop, CI, `convo evals report`.
 
     Returns the same object one line of `GET /evals/runs` holds, diff included,
     so the caller sees at once whether it improved on the last one.

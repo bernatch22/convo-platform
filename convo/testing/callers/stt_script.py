@@ -44,7 +44,7 @@ class ScriptedSTT(stt.STT):
 
     @property
     def provider(self) -> str:
-        return "core.testing"
+        return "convo.testing"
 
     def stream(
         self,
