@@ -3,9 +3,9 @@
 A multi-tenant conversational platform for contact centers: one deployment,
 many businesses, each answering its own phone number and web chat with its own
 voice, tools and rules. Built on self-hosted [LiveKit](https://livekit.io)
-(SFU, SIP and Agents). Every AI vendor is a slot: Claude Haiku or GPT for the
-language model, Soniox or Deepgram for speech-to-text, ElevenLabs for
-text-to-speech, chosen per project and changeable from the console.
+(SFU, SIP and Agents). Every AI vendor is a slot: Claude Haiku 4.5 or GPT 5.4
+mini for the language model, Soniox or Deepgram for speech-to-text, ElevenLabs
+for text-to-speech, chosen per project and changeable from the console.
 
 The thesis: the language model is a swappable interface driver. Control,
 state, tools, audit and tenancy live in the platform and never in a prompt.
