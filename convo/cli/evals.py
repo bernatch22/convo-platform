@@ -14,7 +14,9 @@ def main(argv: list[str]) -> int:
     if not argv:
         print(USAGE)
         return 2
-    verb, rest = argv[0], argv[1:]
+    verb = argv[0]
+    # Each module keeps its own argparse and expects the full argv, program name first.
+    rest = [f"convo evals {verb}", *argv[1:]]
     if verb == "report":
         from convo.testing.reports import report
 
