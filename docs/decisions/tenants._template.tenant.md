@@ -5,7 +5,7 @@ The reasoning that used to live in the docstrings of `tenants/_template/tenant.p
 ## module
 
 A tenant is a customer of the platform: its own systems (adapters), its own use
-cases (projects) and nothing else. `core/` never imports this package — the
+cases (projects) and nothing else. `convo/` never imports this package — the
 registry finds it on disk by folder name — so everything here is data the
 runtime carries, not code the runtime depends on.
 

@@ -15,8 +15,8 @@ It costs nothing: no LLM, no STT, no keys. It exists because the Board is a
 screen about calls that BOOKED something, and a laptop that has only ever been
 talked to has none.
 
-    CONVO_DB=tmp/board-demo.db uv run python scripts/seed_board_demo.py
-    CONVO_DB=tmp/board-demo.db uv run uvicorn api:app --port 8090
+    CONVO_DB=tmp/board-demo.db uv run python infra/scripts/seed_board_demo.py
+    CONVO_DB=tmp/board-demo.db uv run convo api
     open http://localhost:8090/t/clinica-norte/reagendamiento/board
 
 Point `CONVO_DB` at a throwaway file, never at a store holding real calls.

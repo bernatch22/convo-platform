@@ -21,7 +21,7 @@ Two questions, in the order of what they cost:
    language question, and the only judge call: an agent that invents a booking
    system it does not have leaks nothing by name and is still wrong.
 
-The scan is `core.testing.register.slips`, the same whole-word pass over
+The scan is `convo.testing.metrics.register.slips`, the same whole-word pass over
 flattened text the register check uses, so «norte» never trips on «Clínica
 Norte» and an accent or a full stop in a doctor's name never hides a leak.
 

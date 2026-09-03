@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/telephony/handover.p
 
 ## module
 
-`core.telephony.transfer` knows how to move a call. This knows what everybody
+`convo.telephony.transfer` knows how to move a call. This knows what everybody
 hears while it happens, and it exists because the two failure modes of a
 transfer are both about sound, not about SIP:
 
@@ -16,7 +16,7 @@ transfer are both about sound, not about SIP:
 - **A briefing the caller can hear.** The warm path cuts the agent's audio to
   the caller BEFORE it dials anybody, so the summary the model gives the
   colleague is spoken into a line the caller is no longer subscribed to
-  (`core.telephony.isolation`, measured). The bridge at the end is the same
+  (`convo.telephony.isolation`, measured). The bridge at the end is the same
   call, undone.
 
 Warm ends in a takeover, and that is deliberate: once the human and the caller
@@ -39,7 +39,7 @@ as it was and the desk should be told so instead of the caller.
 
 The same one API call as `run(COLD, …)` with two things deliberately
 missing. There is no hold line, because the agent announced the handover
-itself in the turn that called the tool — `core.telephony.human.PROTOCOL`
+itself in the turn that called the tool — `convo.telephony.human.PROTOCOL`
 is what teaches it to, and a platform line on top of it is the same
 sentence said twice on a phone call. And there is no `_explain`, because
 the tool's own return value is what tells the caller: a failure comes
@@ -56,7 +56,7 @@ to them instead: `CreateSIPParticipant` dials the project's number and
 the human who answers arrives as one more participant in the same room.
 No hold line and no briefing — the agent announced the handover in the
 turn that called the tool, and once the two can hear each other its only
-remaining job is silence (`core.adapters.human` mutes it).
+remaining job is silence (`convo.adapters.human` mutes it).
 
 → an `Outcome`. Raises `TransferRefused` only when nothing was even
 attempted — no outbound trunk on this box (the message names

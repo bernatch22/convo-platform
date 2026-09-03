@@ -6,14 +6,14 @@ The reasoning that used to live in the docstrings of `convo/api/app.py`; the cod
 
 The worker never opens a database or takes a business decision; this process
 does. One router per resource under `convo/api/`; every handler opens its own
-store (docs/decisions/004-one-store-per-request.md).
+store.
 
     convo api   # or: uvicorn convo.api.app:app --port 8090
 
 ## lifespan
 
 The seed runs once, at startup, and only writes a number the store does not
-already carry (`core.telephony.lines.seed`): the control plane owns the
+already carry (`convo.telephony.lines.seed`): the control plane owns the
 number → project table, so a fresh database must not answer "no line" for a
 number that has been ringing for weeks.
 

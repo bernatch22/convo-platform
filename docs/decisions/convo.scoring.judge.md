@@ -20,7 +20,7 @@ Three gates stand in front of it, in the order they are cheapest to check:
    the end of a call is where completion is visible.
 3. **The worst case is priced before it is bought.** Input estimated from the
    rendered prompt, output assumed at its ceiling, both at the same
-   `core.observability.prices` table `session.end` is priced with. Over the cap
+   `convo.observability.prices` table `session.end` is priced with. Over the cap
    → the judge does not run and the log says so, with both numbers.
 
 The euros written into `session.score` are then the REAL ones, from the token

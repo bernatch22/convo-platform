@@ -29,7 +29,7 @@ server-side `list_participants` sees it perfectly. So road 1 alone would log
 nothing for a listening supervisor — the invisibility is real, and road 2 is
 what keeps it auditable anyway.
 
-The trust boundary is the same one `core.security.supervisor` states: a packet
+The trust boundary is the same one `convo.supervision.supervisor` states: a packet
 whose `participant` is None came from a server SDK holding the API key, and
 nothing a participant sends can look like that (measured too,
 `tmp/probe_channel.py`). A `{"verb": "join"}` from a browser arrives with an
@@ -37,7 +37,7 @@ identity attached and is dropped.
 
 The other four verbs — `steer`, `takeover`, `release`, `transfer` — are the
 same idea pointed the other way: they DO change the conversation, so they reach
-`core.security.control.SupervisorControl` and never touch the session from
+`convo.supervision.control.SupervisorControl` and never touch the session from
 here. Two roads again, and on purpose:
 
 3. `supervisor.steer` / `.takeover` / `.release` / `.transfer` as **RPC** on the agent's own
@@ -45,14 +45,14 @@ here. Two roads again, and on purpose:
    the trust anchor works: the SFU puts `caller_identity` on the invocation
    off the JWT it verified, so `is_supervisor` is asking about a signature and
    not about a field somebody typed. The RPC method names ARE the audit kinds
-   in `core.security.supervisor` — one string, one verb, one log line.
+   in `convo.supervision.supervisor` — one string, one verb, one log line.
 4. the same `supervisor` topic as the join, for a control plane that would
    rather whisper server-side (an escalation rule, a compliance trigger) than
    hold a browser open. Same `participant is None` anchor, same handler.
 
 Open source note: "log the second human, tell the agent nothing" is the whole
 of live-monitoring compliance for any LiveKit deployment. The reusable half is
-this file plus `core.security.supervisor`; the tenant half is only which log
+this file plus `convo.supervision.supervisor`; the tenant half is only which log
 the event lands in.
 
 ## SupervisorWatch

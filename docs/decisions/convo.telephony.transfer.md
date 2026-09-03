@@ -14,7 +14,7 @@ rather than read: `MoveParticipant` — the RPC the framework's own
 `WarmTransferTask` is built on — answers `twirp error unknown: not
 implemented` on this server, so the supported path does not exist here. What
 does exist is `CreateSIPParticipant`, which dials a phone INTO the caller's
-room, and `core.telephony.isolation`, which makes the briefing inaudible to
+room, and `convo.telephony.isolation`, which makes the briefing inaudible to
 the caller while it happens. Those two are enough.
 
 **A failed transfer must leave the caller where they were.** That is the
@@ -58,7 +58,7 @@ own track — so that a failure here can put it all back in one place.
 
 ## destination
 
-The number is deployment data, not core's: a desk that names one wins, and
+The number is deployment data, not the platform's: a desk that names one wins, and
 the env var exists so the demo has a mobile to ring without one.
 
 ## phone_number

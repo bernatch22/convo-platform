@@ -8,8 +8,8 @@ The reasoning that used to live in the docstrings of `convo/testing/reports/repo
 view: it runs the same goldens through the same cases and the same metrics and
 writes a self-contained HTML under tmp/reports/deepeval/. Usage:
 
-    uv run python -m core.testing.report clinica-norte reagendamiento
-    uv run python -m core.testing.report tienda-sur pedidos --model claude-haiku-4-5 \
+    uv run python -m convo.testing.reports.report clinica-norte reagendamiento
+    uv run python -m convo.testing.reports.report tienda-sur pedidos --model claude-haiku-4-5 \
         --model gpt-5.4-mini
 
 The metrics are the project's own (`evals/metrics.py`), never a copy kept here:
@@ -28,7 +28,7 @@ the model turn is what costs money, and running the goldens twice to score them
 twice would double the bill for identical evidence.
 
 Given more than one `--model`, every model answers the same `goldens.json`,
-untouched, and the run ends on the metric × model table (`core.testing.matrix`).
+untouched, and the run ends on the metric × model table (`convo.testing.reports.matrix`).
 A golden that only passes on one model is a finding for the report, never a
 golden to rewrite until both models pass it: soften it and the matrix stops
 comparing anything.

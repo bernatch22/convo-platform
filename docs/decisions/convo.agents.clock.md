@@ -36,7 +36,8 @@ question and, two times in three, an audible "espere un momento, le digo la
 fecha exacta" before an answer the session already had at second zero.
 
 Open source note: Spanish only because both demo tenants speak it; a project
-in another language overrides `Project.date_note` with its own renderer.
+in another language needs its own word lists behind `convo.agents.clock.date_note`;
+there is no per-project hook yet.
 
 ## clock_reading
 

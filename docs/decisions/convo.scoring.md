@@ -13,7 +13,7 @@ as a chip next to the price.
 Three rules shape everything in this package:
 
 1. **Nothing happens in the job process.** The job dies with the call; the
-   scorer lives in `api.py` and reads the log back from the store. Not one line
+   scorer lives in `convo/api/app.py` and reads the log back from the store. Not one line
    of this runs while somebody is on the phone.
 2. **Deterministic first, judge last.** Consent, register, cross-tenant leakage
    and provider errors are decided by code over the log — free, instant, and
@@ -24,5 +24,5 @@ Three rules shape everything in this package:
    so a second scorer that raced the first loses and nothing is edited.
 
 Import cost is deliberate: this package's top level touches no `deepeval`, so
-`api.py` starts in the same time it always did. `runner.score_session` pulls the
+`convo/api/app.py` starts in the same time it always did. `runner.score_session` pulls the
 judge stack in on the first call it makes.

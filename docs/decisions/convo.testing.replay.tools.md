@@ -10,7 +10,7 @@ and since ms-7 "what came back" is a real sentence whenever the tool's
 `ToolSpec` declared a `result_summary`, instead of the shape and an apology.
 
 That summary is the whole reason a replayed call can be scored for grounding.
-`core.testing.grounding.evidence_of` reads `ToolCall.output`, so an hour the
+`convo.testing.metrics.grounding.evidence_of` reads `ToolCall.output`, so an hour the
 agenda offered is evidence the moment the agenda's summary is in the log, and a
 metric that used to score every real session 0.0 on its own blindness now
 scores what the agent actually did.

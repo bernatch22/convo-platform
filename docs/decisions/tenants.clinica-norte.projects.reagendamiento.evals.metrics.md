@@ -8,7 +8,7 @@ One small explicit list, in the project folder next to its goldens: what counts
 as a good reply for a clinic's reception ("usted", two or three sentences, never
 invents an hour) is not what counts for a shop's returns desk, and a threshold
 is a business decision, not a platform default. `tests/evals/` and
-`core.testing.report` both build their metrics from here, so the CI gate and the
+`convo.testing.reports.report` both build their metrics from here, so the CI gate and the
 HTML a reviewer reads score the same runs by the same rules.
 
 Every factory returns a fresh instance: a DeepEval metric keeps the score,
@@ -37,7 +37,7 @@ the judge attributed it to the model, mined the tool docstring for a
 workflow and failed the turn for "asking permission before the tool
 executes". Three rewordings did not move it, because nothing was wrong.
 A turn the platform speaks in does not belong in this suite; what it does
-belongs to `tests/test_stages.py`, which counts the calls, and to the
+belongs to the `tests/test_stages_*.py` suites, which count the calls, and to the
 consent DAG, which reads the log. That golden was withdrawn, not softened.
 
 It grew a third half in the same milestone, for the same reason and one card
@@ -85,7 +85,7 @@ it did has to guess at that too.
 ## no_false_success
 
 The one judgement in this project that had to leave the unit ring. It was a
-`.judge(...)` inside `tests/test_stages.py`, and across two consecutive full
+`.judge(...)` inside the stage tests (today `tests/test_stages_model.py`), and across two consecutive full
 runs of `pytest -m unit` it failed once and passed once on the same code: a
 gate that flips is not a gate. What it was really doing there was asking a
 model for an opinion in a suite whose whole value is that it asks for none.
@@ -205,7 +205,7 @@ session code; the only thing that keeps its carriers and its order numbers
 out of this call is that the context was built from this project's data.
 That is a claim about the runtime, so it is measured and not asserted in a
 docstring. Word list and criterion in `dag.py`, graph in
-`core.testing.leakage`.
+`convo.testing.metrics.leakage`.
 
 `threshold=1.0`: naming another business, or pretending to track anything,
 has no partial credit.

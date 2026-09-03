@@ -14,7 +14,7 @@ of the attempt land in the session log — `tool.call`/`tool.result` like any
 other tool, and one `supervisor.transfer` line carrying the mode and the
 outcome, the same vocabulary a supervisor's transfer writes (ms-15).
 
-It is attached to every context by `core.tools.attach_local_tools`, next to the
+It is attached to every context by `convo.tools.executor.attach_local_tools`, next to the
 tenant's own adapters, and it is reachable only by a project that declares
 `transfer_to_human` in its catalog. A project that does not is exactly where it
 was before this file existed.
@@ -30,7 +30,7 @@ and the two refusals never touch the SFU.
 ## HumanTransfer.execute
 
 → the `Outcome` payload (`mode`, `outcome`, `to`, `ok`, …), which
-`core.agents.human` turns into the sentence the model acts on. `ok=False`
+`convo.agents.human` turns into the sentence the model acts on. `ok=False`
 is an ANSWER and not an exception: the caller is still on the line and
 somebody has to speak to them.
 
@@ -49,13 +49,13 @@ model reads an honest "this cannot be done right now".
 ## HumanTransfer._fall_silent
 
 The same `takeover` a supervisor's warm transfer ends in
-(`core.security.control`), so the audit shows the mute and a later
+(`convo.supervision.control`), so the audit shows the mute and a later
 `release` from the desk could hand the line back the same way.
 
 ## HumanTransfer._handover
 
 The room and the session hang on `SupervisorControl`, built in
-`worker.py` with the job's own room — the same two things a supervisor's
+`convo/worker.py` with the job's own room — the same two things a supervisor's
 transfer uses, read from the same place, so an agent-initiated transfer
 and a desk-initiated one cannot disagree about which call they are
 moving. A console run and the eval harness have no control at all, which

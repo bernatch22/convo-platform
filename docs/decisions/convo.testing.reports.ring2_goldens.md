@@ -23,14 +23,13 @@ preference:
                  the latency of every turn, and it is `flaky=True`, because a
                  packet loss is not a regression.
   the LOG case   the same call rebuilt from its append-only event log, through
-                 `core.testing.replay` — ring 3's reader, pointed at a session
+                 `convo.testing.replay` — ring 3's reader, pointed at a session
                  that ended a second ago. Consent is a fact about what the
                  platform DID (`book_slot` ran; `cancel_order` ran), and only
                  the log has it.
 
-Grounding is deliberately not offered as a ring-2 policy. It needs the tool
-OUTPUTS as evidence, and the log records the shape of a result and never its
-contents (PII) — `replay`'s docstring carries the whole argument. Asked here it
+Grounding is still not offered as a ring-2 policy; `docs/decisions/convo.testing.replay.md`
+says what the log does and does not carry of a tool result. Asked here it
 would fail every correct call, which is how a metric stops being run.
 
 Open source note: nothing below is a clinic or a shop. `POLICIES` names the three

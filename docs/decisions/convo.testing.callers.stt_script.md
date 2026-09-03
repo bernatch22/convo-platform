@@ -13,7 +13,7 @@ human's call AJ_rt86KogpPxDa — comfort noise on the line and a confident
 `ScriptedMicrophone` is the other half: an `AudioInput` that plays a fixed line
 of frames into the session and then holds the line open, the way a silent
 caller does. `comfort_noise` and `speech` build those frames at a level, which
-is the only property `core.stt_gate` reads.
+is the only property `convo.session.stt_gate` reads.
 
 Together they exercise the whole audio path the framework really runs —
 `AgentSession` → `AudioRecognition` → `Agent.stt_node` → the gate — without a

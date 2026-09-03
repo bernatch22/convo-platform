@@ -10,7 +10,7 @@ one input, one output, a flat list of `ToolCall`s. This module is the only
 place that knows how to get from one to the other, so a project's eval suite
 reads goldens and metrics and nothing else.
 
-Deliberately NOT re-exported from `core.testing`: importing deepeval drags in a
+Deliberately NOT re-exported from `convo.testing`: importing deepeval drags in a
 judge stack that the unit ring must not pay for on every `pytest -m unit`.
 A suite that scores imports this module by name; the harness stays free of it.
 
@@ -80,7 +80,7 @@ clinic's ms-18 matrix on gpt-5.4-mini, a divergence that was never a
 behaviour difference.
 
 What counts as infrastructure is DECLARED, never matched: a `ToolSpec` with
-`infrastructure=True`, which today is `core.tools.catalog.CLOCK` and
+`infrastructure=True`, which today is `convo.domain.catalog.CLOCK` and
 tomorrow is whatever a project marks. Nothing here knows a tool name.
 
 ## call_named
@@ -140,8 +140,8 @@ supposed to be, not just what was said.
 
 ## project_evals
 
-Imported the way `core.registry` imports a tenant — by name, at call time —
-so core still compiles with no customer folder on disk, and a tenant
+Imported the way `convo.session.registry` imports a tenant — by name, at call time —
+so `convo/` still compiles with no customer folder on disk, and a tenant
 directory name with a hyphen in it is still reachable.
 
 ## project_metrics
@@ -158,7 +158,7 @@ a graph that has none. What such a metric still has is its chain, buried in
 a verbose log that also contains every criterion and every rendered block.
 These are the lines a person reads; the rest is for `deepeval test run -v`.
 
-`convo/sessions.py` keeps its own copy of the filter on purpose: the CLI
+`convo/cli/sessions.py` keeps its own copy of the filter on purpose: the CLI
 must list and show sessions with no judge stack installed, so it never
 imports this module at the top.
 

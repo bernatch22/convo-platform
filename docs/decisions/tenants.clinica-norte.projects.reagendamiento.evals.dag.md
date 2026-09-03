@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `tenants/clinica-norte/proj
 
 ## module
 
-The shapes live in `core.testing.dag` — was the irreversible tool run and was
+The shapes live in `convo.testing.metrics.dag` — was the irreversible tool run and was
 the line before it a yes; does every stated fact have a source; does the agent
 stay in the register the business speaks. What a clinic owns is what those
 questions are asked ABOUT: `book_slot` is the write that moves an appointment,
@@ -45,12 +45,12 @@ own.
 ## any_write_consent_graph
 
 This is the graph a STORED session is scored by, and it has to watch all
-three because nobody tells `convo sessions eval` which errand the call was.
+four because nobody tells `convo sessions eval` which errand the call was.
 Separate metrics would each report 1.0 on a call the others were about — the
-graph ends at its first node when its write did not run — and three greens,
-two of them measuring nothing, is worse than no metric at all.
+graph ends at its first node when its write did not run — and four greens,
+three of them measuring nothing, is worse than no metric at all.
 
 It is also the line a new verb joins: ms-20's `update_contact` and
 `cancel_appointment` became part of the clinic's consent policy by being
 added to `IRREVERSIBLE_TOOLS`, and nothing else in this file or in
-`core.testing.dag` moved.
+`convo.testing.metrics.dag` moved.

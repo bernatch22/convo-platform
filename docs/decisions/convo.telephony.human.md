@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/telephony/human.py`;
 
 ## module
 
-`core.security.control` already lets a supervisor move a call from the desk.
+`convo.supervision.control` already lets a supervisor move a call from the desk.
 This is the other half the spec asks for: the agent itself deciding «le paso
 con un compañero» because the caller asked for one, or because what they need
 is not something reception can do.
@@ -19,17 +19,17 @@ the prompt all read one declaration:
 - **a tool that cannot work is not offered.** No number means the model never
   sees `transfer_to_human` in its tool list, and the console greys the verb out
   with the sentence a PUT would be refused with. That is the same
-  `unavailable_reasons` idiom `core.pipeline` uses for a provider whose key
+  `unavailable_reasons` idiom `convo.session.pipeline` uses for a provider whose key
   this box does not carry, and it is the opposite of a runtime surprise: a
   transfer that fails in the middle of a call costs a caller their patience,
   and one that was never possible costs them nothing.
 - **the words.** The paragraph that teaches a stage to announce the handover
   before it happens, and the three sentences the tool answers with.
 
-Framework-free on purpose: it imports `core.telephony.transfer` for the E.164
-rule and nothing else, so `core.pipeline` — which every console read goes
+Framework-free on purpose: it imports `convo.telephony.transfer` for the E.164
+rule and nothing else, so `convo.session.pipeline` — which every console read goes
 through — does not drag the agent runtime in behind it. The half that touches
-livekit is `core.adapters.human` (the run) and `core.agents.human` (the door
+livekit is `convo.adapters.human` (the run) and `convo.agents.human` (the door
 the model knocks on).
 
 ## refusal
@@ -53,7 +53,7 @@ Three answers, and the third is the one that was measured. A project that
 declares the spec and names a number is taught the verb; one that declares
 it and names nobody is taught that there IS nobody, which is a fact about
 the deployment and not a rule about a tool it does not have; and a project
-that never declared it is told nothing at all, because core does not invent
+that never declared it is told nothing at all, because `convo/` does not invent
 policy for a business that has not asked the question.
 
 The middle case exists because of one shop golden on 2026-08-31. Asked
@@ -64,7 +64,7 @@ is not honesty. Naming the TOOL there would be the other mistake — a rule
 about a verb the model does not have is the surest way to have it reach for
 one — so the paragraph names the situation instead.
 
-Spanish, like `core.security.protocol.SUPERVISOR_PROTOCOL` and for the same
+Spanish, like `convo.prompting.protocols.SUPERVISOR_PROTOCOL` and for the same
 reason: both demo tenants are. A project in another language writes its own
 paragraph and appends that instead.
 

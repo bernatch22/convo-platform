@@ -6,9 +6,9 @@ The reasoning that used to live in the docstrings of `tenants/_template/projects
 
 What counts as a good reply is a business decision, and so is every threshold:
 a clinic's tolerance for tuteo is not a shop's. That is why this file is here
-and not in `core/`.
+and not in `convo/`.
 
-`tests/evals/` and `core.testing.report` both build their metrics from this
+`tests/evals/` and `convo.testing.reports.report` both build their metrics from this
 module, so the CI gate and the HTML a reviewer reads score the same runs by the
 same rules.
 

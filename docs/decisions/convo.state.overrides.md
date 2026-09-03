@@ -13,8 +13,8 @@ involved.
 
 Only the fields in `OVERRIDABLE` can be set this way. A value the platform
 refuses to run is still refused where it is built: an override naming a
-forbidden TTS model is neutralised by `core.providers.tts.tts_model` and one
-naming an STT provider we do not have by `core.providers.stt.provider_for`,
+forbidden TTS model is neutralised by `convo.providers.tts.tts_model` and one
+naming an STT provider we do not have by `convo.providers.stt.provider_for`,
 and the control plane refuses to store either in the first place.
 
 ## apply

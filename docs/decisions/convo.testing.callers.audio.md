@@ -5,14 +5,14 @@ The reasoning that used to live in the docstrings of `convo/testing/callers/audi
 ## module
 
 Two callers, one vocabulary. Ring 3 (`voice_case_from`) reads the stereo OGG a
-finished call left behind; ring 2 (`core.testing.ring2`) has no file at all —
+finished call left behind; ring 2 (`convo.testing.reports.ring2`) has no file at all —
 it holds a live track and builds a `Timeline` as the frames arrive. Both end
 at `audio_clip`, which is the only place in the codebase that decides what an
 `Audio` on a turn looks like, `start_time` included.
 
 The ring-3 half, in full:
 
-`core.testing.replay` rebuilds what was SAID from the append-only log. This
+`convo.testing.replay` rebuilds what was SAID from the append-only log. This
 adds what was HEARD: the stereo OGG a `--record` call leaves behind, cut into
 one clip per agent turn and hung on the turns the replay already built, so
 DeepEval's `AudioIntegrityMetric` and `AgentResponsivenessMetric` have
@@ -29,7 +29,7 @@ Three facts make the cut possible, and all three are in the log:
 What is deliberately NOT used: `tts.word`'s `t1`. ElevenLabs sends alignment
 relative to each websocket chunk and the framework never rebases it, so `t1`
 is a word's place inside its own chunk and cannot address the file. See
-`core.observability.voice.TimedWords`.
+`convo.observability.voice.TimedWords`.
 
 The caller's channel (L) is whatever the microphone put there — silence on an
 offline run, where the caller typed. User turns therefore get no `Audio` at

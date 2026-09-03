@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `tenants/tienda-sur/project
 
 ## module
 
-The machinery is `core.testing.simulator`, shared with the clinic next door. What
+The machinery is `convo.testing.callers.simulator`, shared with the clinic next door. What
 lives here is the shop's half of it, and only that: three personas, three
 goldens, the two tool names that settle a cancellation, and the seeded order each
 call starts from.

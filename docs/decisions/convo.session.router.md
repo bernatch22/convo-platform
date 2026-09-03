@@ -14,7 +14,7 @@ answers wins:
 3. the SIP caller's attributes — `sip.trunkPhoneNumber` (the number the
    caller dialled) looked up in the `routes` table for this fleet; a phone
    number is a route, never a project. A call is a *room* job, so the caller
-   is found in the room, not on `ctx.job.participant` (`core/sip.py`).
+   is found in the room, not on `ctx.job.participant` (`convo/session/sip.py`).
 4. the environment — `TENANT` / `PROJECT`, the console's way of choosing. It
    also shortens step 3: with `TENANT` set there is nobody to wait for, so a
    caller already in the room still wins but no budget is spent looking.

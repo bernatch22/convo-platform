@@ -5,7 +5,7 @@ The reasoning that used to live in the docstrings of `tenants/clinica-norte/proj
 ## module
 
 The machinery — extract, match, escalate the remainder — is
-`core.testing.grounding`, shared by every tenant. What lives here is the half
+`convo.testing.metrics.grounding`, shared by every tenant. What lives here is the half
 that is a clinic: an hour said the way a receptionist says it, a professional's
 title, a street, and the clinic's own information sheet as the first source of
 every answer.

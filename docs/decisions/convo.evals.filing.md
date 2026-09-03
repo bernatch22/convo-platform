@@ -5,7 +5,7 @@ The reasoning that used to live in the docstrings of `convo/evals/filing.py`; th
 ## module
 
 The box can launch a run itself, but most runs are still started by a person or
-by CI (`deepeval test run`, `python -m core.testing.report`). Those are the runs
+by CI (`deepeval test run`, `python -m convo.testing.reports.report`). Those are the runs
 worth comparing against, so they file themselves here instead of living only in
 somebody's terminal scrollback.
 

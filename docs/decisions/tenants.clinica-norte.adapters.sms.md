@@ -21,7 +21,7 @@ provider refuses; the platform turns it into a sentence the caller hears.
 ## summarise_message
 
 The BODY is deliberately not rendered. It names the patient by design
-(`tools.sms_text`), and while the mask would blank the name, a summary
+(`helpers.sms_text`), and while the mask would blank the name, a summary
 whose value depends on the mask having seen that exact spelling is a
 summary waiting to leak. The id and the number are what an operator needs
 to answer "did the patient get their text?".

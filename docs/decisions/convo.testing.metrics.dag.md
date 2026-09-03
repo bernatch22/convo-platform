@@ -16,12 +16,12 @@ their vocabulary is not (the third, the register scan, is `register.py`):
   yes? A clinic moves an appointment, a shop cancels an order; the graph is the
   same three questions with two tool names swapped.
 - `grounded.py` — does every checkable claim have a source? Code extracts and
-  matches (`core.testing.grounding`), and the one judge call only ever sees what
+  matches (`convo.testing.metrics.grounding`), and the one judge call only ever sees what
   was left over, with the evidence attached.
 
 `nodes.py` holds what both are built from: the transcript params, the two
 scores, and `DeterministicNode` — a node that computes its answer instead of
-generating it. All three are re-exported here, so `from core.testing import dag`
+generating it. All three are re-exported here, so `from convo.testing import dag`
 and every `dag.<name>` a project writes keep working unchanged.
 
 What a project still owns: its knowledge block, the words it can be wrong

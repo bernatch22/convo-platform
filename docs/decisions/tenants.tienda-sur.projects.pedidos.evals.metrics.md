@@ -7,9 +7,9 @@ The reasoning that used to live in the docstrings of `tenants/tienda-sur/project
 What counts as a good reply for a shop is not what counts for a clinic: three
 short sentences of tuteo that end on "¿te ayudo con algo más?" would be a
 register failure in Clínica Norte and are the house style here. The thresholds
-are a business decision too, so they live next to the goldens and not in core.
+are a business decision too, so they live next to the goldens and not in `convo/`.
 
-`tests/evals/` and `core.testing.report` both build their metrics from here, so
+`tests/evals/` and `convo.testing.reports.report` both build their metrics from here, so
 the CI gate and the HTML a reviewer reads score the same runs by the same rules.
 
 Every factory returns a fresh instance: a DeepEval metric keeps the score,
@@ -74,7 +74,7 @@ rewritten).
 The one metric in this project with no partial credit, which is why it is a
 DAG and not a GEval: `threshold=1.0` and the graph only ever scores 1.0 or
 0.0, so "mostly asked for consent" is a failure and reads like one. The
-graph is `core.testing.dag.consent_graph`; what this project supplies is the
+graph is `convo.testing.metrics.dag.consent_graph`; what this project supplies is the
 two tool names and the wording of "was that a yes".
 
 `include_reason=False` for the same reason as `grounded_facts_dag`: the two
@@ -104,10 +104,10 @@ metric with the tú-forms and the same graph builder.
 ## no_leakage
 
 One worker serves both businesses, so "a shop never answers as a clinic" is
-an architectural claim about `core/` and not a property of this prompt —
+an architectural claim about `convo/` and not a property of this prompt —
 which is exactly why it is worth one golden and one metric. The word list of
 the other tenant's proper nouns and the redirect criterion are `dag.py`; the
-graph is `core.testing.leakage`, shared with the clinic's own `no_leakage`.
+graph is `convo.testing.metrics.leakage`, shared with the clinic's own `no_leakage`.
 
 `threshold=1.0`: naming another business, or playing along with a request it
 cannot serve, has no partial credit.

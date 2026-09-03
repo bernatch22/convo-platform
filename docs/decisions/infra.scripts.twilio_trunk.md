@@ -5,11 +5,11 @@ The reasoning that used to live in the docstrings of `infra/scripts/twilio_trunk
 ## module
 
 Four resources, in two systems, that together make a PSTN number ring our
-worker. Run it as often as you like: every step reads first and creates only
+convo.worker. Run it as often as you like: every step reads first and creates only
 what is missing, so a second run prints the same ids and changes nothing.
 
-    uv run python scripts/twilio_trunk.py --number +14176743169 --dry-run
-    uv run python scripts/twilio_trunk.py --number +14176743169
+    uv run python infra/scripts/twilio_trunk.py --number +14176743169 --dry-run
+    uv run python infra/scripts/twilio_trunk.py --number +14176743169
 
     Twilio   Elastic SIP Trunk           the carrier side of the call
              └ Origination URI           sip:lk.bernardocastro.dev;transport=udp

@@ -11,7 +11,7 @@ that catches the failures a business actually cares about, and the one judge
 call after them is the exception, not the pipeline.
 
 Two of the four are the ring-1 scanners reused verbatim, deliberately:
-`core.testing.register.slips` and `core.testing.leakage.mentions` are the same
+`convo.testing.metrics.register.slips` and `convo.testing.metrics.leakage.mentions` are the same
 whole-word passes over flattened text that score the goldens, so a rule that
 fails in CI fails on a real call for the same reason and with the same wording.
 A second implementation would have drifted within a milestone.

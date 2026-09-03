@@ -10,7 +10,7 @@ the delta against the previous run of the SAME tenant, project and suite. That
 is the whole reason the runs are stored at all: a number you can compare.
 
 Plain dicts in, plain dicts out, a `Store` and nothing else — the same shape
-`core.control_plane` keeps, so an HTTP handler, a test and a CLI read
+`convo.api.client` keeps, so an HTTP handler, a test and a CLI read
 identically.
 
 ## previous

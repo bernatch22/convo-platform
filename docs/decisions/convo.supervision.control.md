@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/supervision/control.
 
 ## module
 
-`core.security.monitor` is the road a verb travels; this is what happens when
+`convo.supervision.monitor` is the road a verb travels; this is what happens when
 it arrives. One `SupervisorControl` per job, built with the session it steers,
 hung on the `TenantContext` so every stage already carries it.
 
@@ -18,9 +18,9 @@ own boundary and runs before the reply is generated. The swap itself mirrors
 instruction, `sanitize_tool_pairing`, hand the whole thing to `update_chat_ctx`.
 
 **Whether the model then obeys it is not a matter of delivery.** That was
-measured, cell by cell, in `core.security.protocol` — read it before changing
+measured, cell by cell, in `convo.prompting.protocols` — read it before changing
 `NOTE_ROLE` or moving the note into a tool result, because the answer is the
-opposite of the one `core.dates_note` reached for the session date, and the
+opposite of the one `convo.agents.clock` reached for the session date, and the
 lever that actually decides it is a paragraph in the project's cached prefix.
 
 **Takeover is a mute, not a pause.** There is no `session.pause()` in
@@ -45,7 +45,7 @@ assuming, and says so in the note when it is not).
 
 Open source note: the whole file is framework-coupled but tenant-free — a
 stranger gets human-in-the-loop steering for any livekit-agents deployment by
-copying this and `core.security.supervisor`.
+copying this and `convo.supervision.supervisor`.
 
 ## SupervisorControl.apply
 

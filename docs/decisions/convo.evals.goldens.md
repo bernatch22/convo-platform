@@ -25,10 +25,10 @@ personas) is reported with `dataset: null` and no goldens: the screen says
 where they live instead of pretending they are not there.
 
 Ring 2 is the one suite no project declares in `suites.json`: it is discovered
-by convention (`evals/test_ring2.py`, the same convention `core.testing.nightly`
+by convention (`evals/test_ring2.py`, the same convention `convo.testing.reports.nightly`
 walks) and files its runs under the id `ring2`.
 
-Everything here is a file read under `tenants/`, so `core` keeps the rule the
+Everything here is a file read under `tenants/`, so `convo/` keeps the rule the
 whole runtime keeps: it does not import any tenant module, and a project with a
 broken `evals/` answers with an empty suite rather than a stack trace.
 

@@ -6,8 +6,8 @@ The reasoning that used to live in the docstrings of `convo/api/auth.py`; the co
 
 Tenant isolation lives in this module, not in the SFU: a LiveKit API key can
 sign for any room, so the exact-string room grant minted here is the fence.
-The JWT also carries `RoomAgentDispatch(agent_name=FLEET, metadata=SessionMeta)`
-— the same JSON `core.router.resolve` reads — so who a session is for is
+The JWT also carries `RoomAgentDispatch(agent_name=fleet(), metadata=SessionMeta)`
+— the same JSON `convo.session.router.resolve` reads — so who a session is for is
 decided once, at the door, and travels with the room.
 
 `mint_observer` is the second ticket this module signs: the same fence, with
@@ -50,7 +50,7 @@ The third ticket, and the one an eval harness needs. `mint_session` puts
 the dispatch inside the JWT, which only works for a client that joins with
 the token we minted; DeepEval's `LiveKitConnector` signs its own token and
 cannot carry metadata, so an eval room is dispatched server-side
-(`core.rooms.create_eval_room`) and the caller is handed this instead.
+(`convo.session.rooms.create_eval_room`) and the caller is handed this instead.
 
 It therefore carries NO `RoomConfiguration`: the room already dispatches,
 and a second dispatch would put two agents in one room, both greeting.
@@ -61,7 +61,7 @@ and a second dispatch would put two agents in one room, both greeting.
 
 The identity is the trust anchor: the SFU puts it on every packet and RPC
 the supervisor sends, the agent gates on it with
-`core.security.supervisor.is_supervisor`, and nothing in a payload can
+`convo.supervision.supervisor.is_supervisor`, and nothing in a payload can
 forge it. A signed `{"role": "supervisor", "cap": …}` attribute rides
 along so a reader that already trusts the identity can also see which
 powers were handed out, without decoding the grants.

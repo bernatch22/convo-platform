@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/domain/business.py`;
 
 ## module
 
-`core/outcomes.py` answers *what did the platform do* — irreversible calls
+`convo/state/outcomes.py` answers *what did the platform do* — irreversible calls
 counted off the append-only log, whose summaries were PII-filtered on the way
 in and stay that way. That is the transactional reading, and it is the right
 one for an auditor. It is the wrong one for the person running the contact
@@ -17,10 +17,10 @@ name was masked before it was written — the platform is not the place a
 patient's name is stored. The reservation, name and all, lives where it has
 always lived: in the BUSINESS system. So this module goes and asks it.
 
-**The route.** `api.py` → `core.registry` → the tenant's own adapters. The
-registry is the one door core is allowed to open onto `tenants/` (it imports
+**The route.** `convo/api/reservations.py` → `convo.session.registry` → the tenant's own adapters. The
+registry is the one door `convo/` is allowed to open onto `tenants/` (it imports
 each in try/except, and `tests/test_core_isolation.py` keeps every other file
-in core honest). From there it is one capability, `LIST_RECORDS`, declared by
+in `convo/` honest). From there it is one capability, `LIST_RECORDS`, declared by
 EVERY adapter that has a view to offer — a shop keeps its orders in one system
 and its incidents in another, and those are two tables and not a longer one.
 Nothing here knows what a clinic books or a shop ships: each adapter answers
@@ -57,7 +57,7 @@ while a business had one kind of record. It stopped being right the moment
 a shop kept orders in one system and incidents in another: the second view
 is not a longer table, it is a DIFFERENT table — its own shape, its own
 column headings, its own words for a state — and merging the two would have
-meant core deciding which of the business's vocabularies wins. So the read
+meant `convo/` deciding which of the business's vocabularies wins. So the read
 returns them all and the console draws one table each.
 
 The flat `shape`/`labels`/`rows` of the answer stay the first view. Not

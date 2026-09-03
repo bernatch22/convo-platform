@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/testing/reports/reco
 
 ## module
 
-    uv run python -m core.testing.record clinica-norte reagendamiento
+    uv run python -m convo.testing.reports.record clinica-norte reagendamiento
 
 The caller's lines are typed (the list below); the agent's are synthesised by
 the project's real ElevenLabs voice and played, in real time, into the stereo
@@ -17,5 +17,5 @@ offline voice metrics never look at the caller's channel, so sending it
 anything would be paying for silence. The key is dropped from the environment
 here so the session cannot open a Soniox stream by accident, which also means
 **no `stt.final` events in this log**. The trade is written down in
-`docs/evals.md` §3.9; `python worker.py console --record` is the run that has
+`docs/evals.md` §3.9; `convo console --record` is the run that has
 them, and it needs a human with a microphone.

@@ -20,7 +20,7 @@ not business, so no stage overrides them.
 The platform's own verbs reach a stage two different ways, and the difference
 is whether they can be ABSENT. The clock is a method: every stage of every
 project has it, forever. The transfer is layered into `tools=` at construction
-(`core.agents.human`), because a project that names no `transfer_number` must
+(`convo.agents.human`), because a project that names no `transfer_number` must
 never be shown a tool it cannot run — the model cannot reach for a verb it was
 never given.
 
@@ -40,7 +40,7 @@ date reaches the model in front of, so `_read_the_clock` runs first.
 
 A streaming STT invents sentences over a silent line — Soniox put a
 final "Thank you." into the human's call AJ_rt86KogpPxDa while nobody
-had spoken, and the agent answered it. `core.stt_gate` measures the very
+had spoken, and the agent answered it. `convo.session.stt_gate` measures the very
 frames going into the STT and refuses a transcript with no voiced audio
 behind it; the refusal is a `stt.phantom` line in the log, never a
 silent drop, because a gate nobody can audit is worse than the bug.
@@ -75,7 +75,7 @@ caller hears the human and not the agent (agents#3645).
 The last filter is the old one: "vale" while the agent is mid-sentence
 is agreement, not a question, and a reply to it is a filler the caller
 hears as a mistake. It cannot cancel the interruption —
-`core.barge_in` documents where each of the two filters sits in the
+`convo.session.barge_in` documents where each of the two filters sits in the
 framework's turn pipeline, and why `InterruptionOptions.min_words` is
 the one that saves the audio.
 
@@ -106,5 +106,5 @@ byte-identical) and a model with no calendar invents one when asked
 "¿hoy qué día es?" — it said "viernes" on a Saturday, on a real call.
 It cannot be a system message either: the framework rewrites every
 system item after the first into a USER message, and Haiku then opened
-the call by answering it. `core.dates_note` carries the measurement and
+the call by answering it. `convo.agents.clock` carries the measurement and
 the why; here it is two paired tool items, written before the greeting.

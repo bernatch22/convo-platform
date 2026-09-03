@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/testing/metrics/grou
 
 ## module
 
-Half of `core.testing.grounding` — the half that reads what the AGENT said. An
+Half of `convo.testing.metrics.grounding` — the half that reads what the AGENT said. An
 `Extractor` is a regex plus the keys a match has to be found under, so a project
 declares its own vocabulary (professional titles for a clinic, order numbers and
 carriers for a shop) and inherits the three every project needs: clock hours,

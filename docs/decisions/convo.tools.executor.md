@@ -12,11 +12,12 @@ be a sentence a caller could hear in the project's language — never a stack
 trace, never an internal identifier, never the name of a system. Every other
 failure (an undeclared tool, a missing adapter, an adapter blowing up, a
 timeout) is translated here into exactly that, and the real cause goes to the
-log instead. Which sentence is spoken comes from `core.tools.messages`, so a
+log instead. Which sentence is spoken comes from `convo.tools.messages`, so a
 project chooses its own register.
 
-This module is the only file in `core/tools` that imports livekit: `contract`,
-`guard`, `catalog` and `messages` stay framework-agnostic, so porting the
+This module is the only file in `convo/tools` that imports livekit: `confirm`,
+`guard`, `messages` and `saga` stay framework-agnostic (the contract and the
+catalog live in `convo/domain/`), so porting the
 platform to another agent runtime means rewriting this file alone.
 
 ## LocalExecutor

@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/testing/metrics/grou
 
 ## module
 
-The other half of `core.testing.grounding` — the half that reads everything
+The other half of `convo.testing.metrics.grounding` — the half that reads everything
 EXCEPT the agent's own claims. `evidence_of` collects the project's knowledge
 block, what the caller said (a customer reading their order number out is the
 source for the agent repeating it), and the output of every tool the call ran.

@@ -11,7 +11,7 @@ conversation: every subsequent turn carries the same broken history and fails
 the same way. The pairing is therefore an invariant of anything we hand to
 `Agent.update_chat_ctx`, and this module is where it is enforced.
 
-Why it exists at all, given `core.providers.llm` says the framework already
+Why it exists at all, given `convo.providers.llm` says the framework already
 does this: the framework's `group_tool_calls` runs at REQUEST time, on a copy,
 one layer below us. It saves the request; it does not save the history. What a
 supervisor's whisper does is different in kind — it takes the agent's context,

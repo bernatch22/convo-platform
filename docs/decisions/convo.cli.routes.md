@@ -4,5 +4,5 @@ The reasoning that used to live in the docstrings of `convo/cli/routes.py`; the 
 
 ## seed_routes
 
-The same seed `api.py` runs at startup, by hand — for a laptop that never
+The same seed `convo/api/app.py` runs at startup, by hand — for a laptop that never
 starts the control plane and still wants the console to tell the truth.

@@ -11,8 +11,7 @@ of moving appointments, and its goldens are in its own folder.
 
     deepeval test run tenants/tienda-sur/projects/pedidos/evals/test_ring2.py
 
-Needs the dev stack up — `docker compose -f infra/compose/dev.yml up`, `uvicorn
-api:app --port 8090`, `python worker.py dev` — plus `ANTHROPIC_API_KEY`,
+Needs the dev stack up — `docker compose -f infra/compose/dev.yml up`, `convo api`, `convo worker dev` — plus `ANTHROPIC_API_KEY`,
 `ELEVENLABS_API_KEY` and `SONIOX_API_KEY`. `CONVO_API` points it at another
 control plane; the nightly run uses it to call the box.
 

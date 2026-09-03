@@ -27,7 +27,7 @@ own join token and dispatches with `RoomAgentDispatch(agent_name=…)` and
 **no metadata** (`voice/connectors/providers/livekit.py:179`), so a room it
 opens on its own reaches an agent that cannot tell which tenant called.
 Dispatching from here instead puts the same `SessionMeta` JSON a web token
-carries into `ctx.job.metadata`, where `core.router.resolve` already reads
+carries into `ctx.job.metadata`, where `convo.session.router.resolve` already reads
 it — the harness then joins a room whose agent is already on its way.
 
 The name is prefixed `eval-` so a synthetic call is one glance apart from a
@@ -40,9 +40,9 @@ round-trip, not two.
 
 ## client
 
-`api.LiveKitAPI()` reads the environment itself and raises when `LIVEKIT_URL`
+`livekit.api.LiveKitAPI()` reads the environment itself and raises when `LIVEKIT_URL`
 is unset — which on a laptop running the dev compose is not "unconfigured",
-it is "the defaults". `core.auth.mint_session` has always fallen back to
+it is "the defaults". `convo.api.auth.mint_session` has always fallen back to
 `ws://localhost:7880` + devkey/secret, and a console that can hand out a
 token for a room it then cannot list is the wrong kind of surprising. A key
 that is wrong for the server still arrives as `RoomsUnreachable`.

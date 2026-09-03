@@ -27,11 +27,11 @@ evidence.
   written out there, and it was paid for on the box.
 
 What a night leaves behind — the page, the index line and the row on the
-console — is `core.testing.nightly_report`.
+console — is `convo.testing.reports.nightly_report`.
 
-    uv run python -m core.testing.nightly                    # the whole fleet
-    uv run python -m core.testing.nightly --only tienda-sur/pedidos --budget 2
-    uv run python -m core.testing.nightly --dry-run          # what it would spend
+    uv run python -m convo.testing.reports.nightly                    # the whole fleet
+    uv run python -m convo.testing.reports.nightly --only tienda-sur/pedidos --budget 2
+    uv run python -m convo.testing.reports.nightly --dry-run          # what it would spend
 
 `CONVO_API` is the control plane the suites call to mint their rooms; on the
 box it is the local api, so the calls land on the DEPLOYED fleet. `--console`

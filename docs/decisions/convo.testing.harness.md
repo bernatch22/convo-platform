@@ -16,13 +16,13 @@ last one, which is what a simulated patient (ms-3 evals) does.
 Since ms-6 it has a third mode. `live_conversation(..., record=path)` still
 types the caller's lines, but the agent's are SPOKEN by the project's TTS into
 the stereo OGG the framework writes for a real call — the file the offline
-voice metrics score. The audio machinery lives in `core.testing.speaker`; this
+voice metrics score. The audio machinery lives in `convo.testing.callers.speaker`; this
 module only decides when to switch it on.
 
 ## model_under_test
 
 A name the platform will not run RAISES here, and does not fall back the way
-`core.providers.llm.llm_model` does for a running call. The fallback is right
+`convo.providers.llm.llm_model` does for a running call. The fallback is right
 on the phone — a typo in a stored override must not take a project off the
 air — and wrong in an eval, where it would quietly measure Haiku, write
 `gpt-5.4-mini` at the top of the report and leave nobody any the wiser.
@@ -31,7 +31,7 @@ air — and wrong in an eval, where it would quietly measure Haiku, write
 
 `today` is fixed so a test can name the date it expects ("el jueves" is
 2026-09-03) without the assertion rotting overnight; wired with the tenant's
-adapters and a local executor exactly as `core.router.resolve` wires one.
+adapters and a local executor exactly as `convo.session.router.resolve` wires one.
 
 `llm_model` (or `$CONVO_EVAL_MODEL`) puts the run on another allowed model.
 It travels as project data through the same field a console override writes,
@@ -75,7 +75,7 @@ answering, so the transcript scored afterwards is one nobody ever had.
 stereo OGG the framework writes for a real call, with the caller's channel
 silent because the caller typed. `audio.start` is appended at the moment
 sample 0 is written, so every later `t_ms` in the log is also an offset
-into that file — see `core.testing.audio`.
+into that file — see `convo.testing.callers.audio`.
 
 ## run_conversation
 

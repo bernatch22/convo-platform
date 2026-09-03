@@ -2,7 +2,7 @@
 
 One deploy, many businesses. `tenants/clinica-norte/` speaks to patients as
 *usted* and moves appointments; `tenants/tienda-sur/` tutea and cancels orders;
-they run in the same convo.worker, on the same registry, router, session, executor and
+they run in the same worker, on the same registry, router, session, executor and
 event log. **No file under `convo/` names either of them** — the registry finds
 tenants by folder and imports each one by name, in a try/except, so a tenant
 that fails to import is unroutable rather than fatal
@@ -24,14 +24,14 @@ scans its own register.
 | **knowledge** | the seed/override rule and the version pinned into every session (`docs/prompts.md`) | the knowledge block itself — over 4096 tokens, dateless, id-free |
 | **words on failure** | the four failure kinds (`UNKNOWN_TOOL`, `NO_ADAPTER`, `TIMEOUT`, `FAILURE`) and when each is said | what each of them sounds like in this business's voice (`Project.messages`) |
 | **state** | the append-only event log, the per-session `seq`, the session report, re-engagement | nothing: a tenant never writes to the log directly |
-| **evals** | the metric *shapes* — consent, grounded facts, register, leakage (`convo/testing/`) — the harness, the bridge, the report | its goldens, its metrics module, its thresholds, its extractors, the criteria wording, the register and neighbour word lists |
+| **evals** | the metric *shapes* — consent, grounded facts, register, leakage (`convo/testing/metrics/`) — the harness, the bridge, the report | its goldens, its metrics module, its thresholds, its extractors, the criteria wording, the register and neighbour word lists |
 | **routing** | `routes` and `project_versions` in the store, the dispatch rules, the numbers | nothing: a phone number is a route the platform holds, never a project constant |
 
 The rule behind the table: **the platform owns shapes, a tenant owns words.**
 When a project finds itself writing a graph node, a retry loop or a router
 branch, the shape is missing from `convo/` and belongs there — with the words
-left behind in the tenant. Ms-5 is that lift: `dag.py` in both demo tenants is
-~70 lines of constants and four one-line factories, and the two read as
+left behind in the tenant. Ms-5 is that lift: `dag.py` in the two demo tenants is
+110-150 lines of constants and four to eight one-line factories, and the two read as
 translations of each other.
 
 ## The two directions it can break

@@ -15,13 +15,13 @@ on by returning the next stage from a tool — so the transition is a thing that
 happened, recorded in the run, and not a flag somebody set.
 
 The two booking stages read the agenda the same way on purpose: the prompt
-paragraphs are shared (`prompts/reception.py`) and the hour helpers are shared
+paragraphs are shared (`prompts/_reception/` partials) and the hour helpers are shared
 (`helpers.py`). What each owns alone is what its errand owns alone — a cita to
 release, or a patient with nothing to fall back on.
 
 CancelOrConfirm shares three paragraphs and no tool with them. It reads no
 agenda — there is no hour to choose, only the one the caller already has — so
-what it takes from `reception.py` is how the clinic speaks, how it says an hour
+what it takes from the `prompts/_reception/` partials is how the clinic speaks, how it says an hour
 out loud, and what it does with everything that is not the errand. What it owns
 alone is the rule the two verbs are built on: the cita is looked up before it is
 read back, every time, and the lookup can only ever find the caller's own.

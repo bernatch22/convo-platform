@@ -4,12 +4,12 @@ The reasoning that used to live in the docstrings of `convo/prompting/protocols.
 
 ## module
 
-`core.security.control` is the machinery; this is the language half, kept apart
+`convo.supervision.control` is the machinery; this is the language half, kept apart
 because a project's prompt imports it and nothing else in supervision.
 
 **A whisper is not a document, it is somebody talking.** That sentence is the
 whole finding of `tk-bc0122`, measured on Haiku 4.5 across both demo projects,
-3 runs per cell, and it is the opposite of what `core.dates_note` found for the
+3 runs per cell, and it is the opposite of what `convo.agents.clock` found for the
 session date — for a reason worth keeping in mind:
 
 - the date only had to be AVAILABLE, so it goes in as a paired tool call and

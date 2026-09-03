@@ -5,7 +5,7 @@ The reasoning that used to live in the docstrings of `convo/telephony/__init__.p
 ## module
 
 `lines` is the origin side — which number reaches which project, read from the
-same `routes` table `core/router.py` resolves an inbound call with, so the
+same `routes` table `convo/session/router.py` resolves an inbound call with, so the
 console can never claim a line a caller would not actually land on.
 
 `transfer` holds the two LiveKit SIP moves — a cold REFER that hands the
@@ -16,5 +16,5 @@ without their client's cooperation. `handover` is the choreography: what the
 caller hears, what the human hears, and what the log ends up saying.
 
 Nothing here imports `tenants/`, and nothing here decides WHO may transfer:
-that gate is `core.security.control.SupervisorControl.apply`, one door for
+that gate is `convo.supervision.control.SupervisorControl.apply`, one door for
 every supervision verb.

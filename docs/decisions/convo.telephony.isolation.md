@@ -12,7 +12,7 @@ their side to ask them to be quiet.
 
 So the cut has to be server-side, and it has to hold against a subscriber that
 joined with `autoSubscribe`. **Measured on this box** (livekit-server v1.9.1,
-`scripts/isolation_probe.py`, three RTC peers publishing a continuous tone and
+`infra/scripts/isolation_probe.py`, three RTC peers publishing a continuous tone and
 counting the frames each one actually receives):
 
 ```

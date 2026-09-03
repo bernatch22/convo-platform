@@ -10,6 +10,6 @@ durable when it returns, and two triggers refuse UPDATE and DELETE on
 `events`. ``routes`, `project_versions` and
 `pipeline_overrides` are the three small tables the router reads before a
 session starts, and `eval_runs` is what the console's evals screen reads.
-Postgres later is this same interface over a pool in `api.py`; the job process
+Postgres later is this same interface over a pool in `convo/api/app.py`; the job process
 never opens a database of its own in production, but on a laptop the file is
 the control plane.

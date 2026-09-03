@@ -5,7 +5,7 @@ The reasoning that used to live in the docstrings of `convo/testing/metrics/dag/
 ## module
 
 Three computed nodes and one judging node. Code extracts and matches
-(`core.testing.grounding`); the judge only ever sees the claims nothing
+(`convo.testing.metrics.grounding`); the judge only ever sees the claims nothing
 accounted for, with the evidence attached underneath. A conversation where
 every hour came off the agenda costs no judge call at all.
 

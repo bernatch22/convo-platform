@@ -15,8 +15,8 @@ has `(session_id, seq)` as its primary key with append-only triggers over it,
 so two scorers racing the same call end with one row and one loser — no lock,
 no flag column, no window.
 
-Why the imports are inside the function: `core.testing.replay` and the judge
-pull `deepeval` in, which costs a second and opens a telemetry client. `api.py`
+Why the imports are inside the function: `convo.testing.replay` and the judge
+pull `deepeval` in, which costs a second and opens a telemetry client. `convo/api/app.py`
 imports this module at startup and must pay neither until a call is actually
 scored.
 

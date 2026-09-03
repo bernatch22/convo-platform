@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/testing/callers/tts_
 
 ## module
 
-    uv run python -m core.testing.tts_golden
+    uv run python -m convo.testing.callers.tts_golden
 
 `eleven_v3_conversational` is what a project speaks with, `eleven_flash_v2_5`
 the latency profile one may opt into. The sentence is what goes wrong in
@@ -32,7 +32,7 @@ the input text and cannot say. It is a duration, so it is exact and free.
 ## _spans
 
 `end_time` is relative to the websocket chunk the word arrived in (see
-`core.observability.voice.TimedWords`), so a word's span is the step up
+`convo.observability.voice.TimedWords`), so a word's span is the step up
 from the word before it — and a word that opens a new chunk has no
 measurable step. That is reported as None rather than as the small positive
 number the reset would otherwise produce.

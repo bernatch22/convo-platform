@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/testing/callers/call
 
 ## module
 
-`core.testing.ring2` decides what a call is FOR — which project, which lines,
+`convo.testing.reports.ring2` decides what a call is FOR — which project, which lines,
 what comes back. This is the room mechanics underneath it: connect, publish a
 microphone, read `lk.transcription`, watch `lk.agent.state`, write the agent's
 frames onto a timeline, hang up. Nothing here knows a tenant or a golden, and

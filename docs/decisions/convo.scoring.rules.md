@@ -10,9 +10,9 @@ nouns that belong to the shop next door, and what "a good call" means here.
 That is what this dataclass carries, and a project declares it in
 `tenants/<id>/projects/<p>/evals/scoring.py` next to its goldens.
 
-Loaded the way `core.registry` loads a tenant — by name, at call time, inside a
+Loaded the way `convo.session.registry` loads a tenant — by name, at call time, inside a
 try/except — so a project with no rules file is scored on what the platform can
-decide alone instead of taking the scorer down, and `core/` still compiles with
+decide alone instead of taking the scorer down, and `convo/` still compiles with
 no customer folder on disk.
 
 Deliberately free of `deepeval`: this module is imported by the projects

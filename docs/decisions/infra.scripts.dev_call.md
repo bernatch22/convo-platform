@@ -4,15 +4,15 @@ The reasoning that used to live in the docstrings of `infra/scripts/dev_call.py`
 
 ## module
 
-The stack runs in three terminals (compose up · `uvicorn api:app` ·
-`python worker.py dev`); this script is the fourth, standing in for the web
+The stack runs in three terminals (compose up · `convo api` ·
+`convo worker dev`); this script is the fourth, standing in for the web
 client nobody has written yet. It asks the control plane for a token, joins the
 room that token names, types on `lk.chat`, reads the agent's deltas on
 `lk.transcription` and hangs up.
 
-    uv run python scripts/dev_call.py                          # both demo tenants
-    uv run python scripts/dev_call.py clinica-norte/reagendamiento
-    uv run python scripts/dev_call.py tienda-sur/pedidos "hola" "¿cuándo llega?"
+    uv run python infra/scripts/dev_call.py                          # both demo tenants
+    uv run python infra/scripts/dev_call.py clinica-norte/reagendamiento
+    uv run python infra/scripts/dev_call.py tienda-sur/pedidos "hola" "¿cuándo llega?"
 
 Nothing below knows a tenant. Who answers is decided by the dispatch metadata
 inside the token — `RoomAgentDispatch(agent_name=FLEET, metadata=SessionMeta)`

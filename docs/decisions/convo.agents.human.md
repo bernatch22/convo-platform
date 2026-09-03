@@ -8,11 +8,11 @@ One `@function_tool`, module-level rather than a method of `TenantAgent`, for
 the only reason that matters here: a method is on every stage of every project
 forever, and this verb has to be able to be ABSENT. A project that names no
 `transfer_number` never sees it in its tool list — not greyed out, not failing
-politely, absent — which is the same promise `core.pipeline` makes about a
+politely, absent — which is the same promise `convo.session.pipeline` makes about a
 provider whose key this box does not carry.
 
 It is a thin door on purpose. The decision of what a transfer costs and where
-it goes is `core.telephony.human`; the run is `core.adapters.human`, reached
+it goes is `convo.telephony.human`; the run is `convo.adapters.human`, reached
 through the executor like every other write, so the guard, the timeout and the
 project's own failure sentence all apply. What is left here is the docstring —
 and the waiting.
@@ -24,7 +24,7 @@ stage, including the stages that will never transfer anybody. It is written in
 the register Anthropic's current guidance asks for — «úsala cuando…», not
 «CRITICAL: DEBES llamarla» — because aggressive triggering language makes a
 modern model overtrigger, and it says what to DO rather than listing what not
-to. `core.telephony.human.PROTOCOL` keeps only the half a description cannot
+to. `convo.telephony.human.PROTOCOL` keeps only the half a description cannot
 carry: that the announcement is a spoken turn.
 
 **The waiting is the load-bearing line.** A model that announces «le paso con

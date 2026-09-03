@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/testing/fake_job.py`
 
 ## module
 
-`core.router.resolve` reads five things — the job's `id`, `metadata` and
+`convo.session.router.resolve` reads five things — the job's `id`, `metadata` and
 dispatch `attributes`, the SIP `participant.attributes`, and the participants
 already in the room — and nothing else. This builds exactly those, as plain
 objects, so a test can say "a call to this number on this fleet" in one line.

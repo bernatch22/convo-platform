@@ -26,7 +26,7 @@ the only resume path is `resume_false_interruption`, and `_user_turn_committed`
 cancels its timer for any turn that is going to reply. Documented on the card.
 
 Open source note: the list is data. A project sets `Project.backchannels` and
-core never learns another language.
+`convo/` never learns another language.
 
 ## holds_the_floor
 

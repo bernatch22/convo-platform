@@ -11,8 +11,8 @@ opened a `call-…` room and the fleet was dispatched; the worker's log then sho
 which tenant `store.route` resolved. Only the audio is not exercised — no RTP is
 sent, so the agent greets an empty line and hangs up when we send BYE.
 
-    uv run python scripts/sip_probe.py                       # the wired number
-    uv run python scripts/sip_probe.py --dialled +34910000000 --hold 20
+    uv run python infra/scripts/sip_probe.py                       # the wired number
+    uv run python infra/scripts/sip_probe.py --dialled +34910000000 --hold 20
 
 The box's allow-list will refuse you. `SIPInboundTrunk.allowed_addresses` holds
 Twilio's signalling ranges, so an INVITE from a laptop is dropped with no reply

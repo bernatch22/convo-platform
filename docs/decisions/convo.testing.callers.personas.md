@@ -31,7 +31,7 @@ before talking over it. `None` means "hears the answer out", which is every
 caller the platform has ever been tested with until now.
 
 Open source note: nothing below knows a tenant. A `CallerPersona` is a voice
-id, a prompt and a patience — hand it to `core.testing.ring2.converse` against
+id, a prompt and a patience — hand it to `convo.testing.reports.ring2.converse` against
 any project, or to DeepEval's simulator via `card()`.
 
 ## CallerPersona

@@ -19,7 +19,7 @@ ElevenLabs speaks, and the answer comes back over WebRTC like any other call.
 
 Three facts shape everything below.
 
-  **The room is minted by `api.py`, never here.** DeepEval's `LiveKitConnector`
+  **The room is minted by `convo/api/app.py`, never here.** DeepEval's `LiveKitConnector`
   signs its own token and dispatches by `agent_name` with no metadata
   (`voice/connectors/providers/livekit.py:179`), so a room it opens alone
   reaches a worker that cannot tell which tenant called. `POST /evals/rooms`
@@ -40,7 +40,7 @@ Three facts shape everything below.
   scores nothing without them.
 
 The room mechanics — joining, the microphone, the two transcription streams,
-the agent's own clock — are `core.testing.caller.Call`, which is where the
+the agent's own clock — are `convo.testing.callers.caller.Call`, which is where the
 first two facts are made true; this module is the door and the result.
 
 Open source note: nothing here knows a tenant. Point `converse` at any control

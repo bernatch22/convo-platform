@@ -48,7 +48,7 @@ property that lets a replayed call prove the receptionist read the agenda
 instead of guessing.
 
 The hour is written as the clock writes it (`spanish_moment`), not as a
-person says it, exactly like `_offer`: the shared paragraph in `reception.py`
+person says it, exactly like `_offer`: the shared `prompts/_reception/says_hours_the_way_people_do.md` paragraph
 is what turns 10:00 into "las diez de la mañana" out loud, and a tool that
 did it too would be deciding the wording twice.
 

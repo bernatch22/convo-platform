@@ -13,12 +13,11 @@ switches into English inside a sentence.
 
     deepeval test run tenants/clinica-norte/projects/reagendamiento/evals/test_ring2.py
 
-Needs the dev stack up — `docker compose -f infra/compose/dev.yml up`, `uvicorn
-api:app --port 8090`, `python worker.py dev` — plus `ANTHROPIC_API_KEY`,
+Needs the dev stack up — `docker compose -f infra/compose/dev.yml up`, `convo api`, `convo worker dev` — plus `ANTHROPIC_API_KEY`,
 `ELEVENLABS_API_KEY` and `SONIOX_API_KEY`. `CONVO_API` points it at another
 control plane; the nightly run uses it to call the box.
 
 Consent is scored on the event log and register on the wire, which is
-`core.testing.ring2_goldens`'s doing and worth knowing while reading a failure:
+`convo.testing.reports.ring2_goldens`'s doing and worth knowing while reading a failure:
 no track carries a tool call, so what the platform DID is a question only the
 log can answer.

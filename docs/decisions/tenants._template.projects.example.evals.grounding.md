@@ -5,9 +5,9 @@ The reasoning that used to live in the docstrings of `tenants/_template/projects
 ## module
 
 The machinery — extract, match, escalate the remainder — is
-`core.testing.grounding`, shared by every tenant. What lives here is the
+`convo.testing.metrics.grounding`, shared by every tenant. What lives here is the
 vocabulary: the kinds of claim a customer would ACT on and an agent could
-invent. Clock hours, prices and phone numbers come free from core.
+invent. Clock hours, prices and phone numbers come free from `convo/`.
 
 TODO(copy): one extractor per thing of yours that has a canonical form — an
 order number, a policy number, a carrier, a professional's name. A claim no

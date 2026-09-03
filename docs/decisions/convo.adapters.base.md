@@ -12,7 +12,7 @@ not about the platform. The event log answers what the platform did, with its
 summaries PII-filtered by design; the reservation itself, with the patient's
 name on it, lives where it has always lived, and this is the door to it.
 
-Nothing in `core` knows what an adapter's records are called. The adapter
+Nothing in `convo/` knows what an adapter's records are called. The adapter
 answers with its own SHAPE, its own column labels and its own state words, and
 the console renders whatever came back — so a clinic answers with appointments,
 a shop answers with orders, and a tenant whose systems have no such view

@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `tenants/tienda-sur/tenant.
 
 ## module
 
-The second business on the same worker, and the point of it: nothing in `core/`
+The second business on the same worker, and the point of it: nothing in `convo/`
 knows a clinic from a shop. What changes between the two tenants is data —
 adapters, prompts, knowledge, tools, voice and register — and what does not
 change is every line of the runtime that carries them.
@@ -19,6 +19,6 @@ arrived a whole milestone later and this is the only line of wiring it
 needed.
 
 Order matters for exactly one reader. The console asks every system that
-offers a record view for it (`core.business`), and it draws them in this
+offers a record view for it (`convo.domain.business`), and it draws them in this
 order, so the orders the shop lives on lead and the incident queue
 follows.

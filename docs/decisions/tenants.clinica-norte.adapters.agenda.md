@@ -127,7 +127,7 @@ professional who does not do that consultation.
 
 The console's read, never a tool: no stage may call it and no model ever
 sees it. It answers with the clinic's own shape and the clinic's own
-words for a state, so `core` renders a table it has no vocabulary for.
+words for a state, so `convo/` renders a table it has no vocabulary for.
 
 Two sources, in this order. The seeded book is what the clinic held
 before anyone rang; the ledger is every row a call has written since,

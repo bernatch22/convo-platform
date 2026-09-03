@@ -5,7 +5,7 @@ The reasoning that used to live in the docstrings of `convo/telephony/lines.py`;
 ## module
 
 A number is not a field of a project. It is a ROUTE — one row keyed by fleet
-and dialled number, the same `routes` table `core/router.py` reads when a call
+and dialled number, the same `routes` table `convo/session/router.py` reads when a call
 arrives — so a project has zero, one or several lines, and the console has to
 be able to say all three honestly. That is the whole reason this module exists:
 before it, the number lived as a string in the web client's chrome, printed
@@ -13,7 +13,7 @@ under every tenant, which made two projects look like they shared a line when
 only one of them was reachable by phone at all.
 
 The store is where the mapping lives; the SIP dispatch rule on the box is what
-actually routes the call. `SEEDED_LINES` is that rule written down so a fresh
+actually routes the call. `seeded_lines()` reading `infra/seed/routes.json` is that rule written down so a fresh
 database is not empty and honest-looking at the same time, and `seed` only ever
 FILLS A GAP: a key already in the store is left exactly as the operator set it,
 because the operator has seen the box more recently than this file has.

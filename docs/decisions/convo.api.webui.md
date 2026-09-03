@@ -4,8 +4,8 @@ The reasoning that used to live in the docstrings of `convo/api/webui.py`; the c
 
 ## module
 
-One deploy, one port: in production `api.py` is both the API and the web
-server, so a browser hitting `/t/clinica-norte/reception` gets `index.html`
+One deploy, one port: in production `convo/api/app.py` is both the API and the web
+server, so a browser hitting `/t/clinica-norte/reagendamiento/sessions` gets `index.html`
 and the router takes it from there. In development nothing is built and this
 does nothing at all — `npm run dev` serves the app and proxies the API here.
 

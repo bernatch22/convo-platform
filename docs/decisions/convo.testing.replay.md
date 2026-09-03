@@ -24,7 +24,7 @@ but grounding could not: a claim that came off the agenda reached the judge
 with evidence that could not contain it, and every real session scored 0.0 on
 the metric's own blindness.
 
-A tool now declares a `result_summary` on its `ToolSpec` (`core/tools/contract.py`):
+A tool now declares a `result_summary` on its `ToolSpec` (`convo/domain/tools.py`):
 the executor renders the result through it, the session's PII mask blanks
 whatever the renderer let through, and the line is written as `summary` on
 `tool.result`. `tools.py` puts it into `ToolCall.output` and grounding's

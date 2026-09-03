@@ -4,12 +4,12 @@ The reasoning that used to live in the docstrings of `convo/testing/reports/voic
 
 ## module
 
-    uv run python -m core.testing.voice_report <session-id>
+    uv run python -m convo.testing.reports.voice_report <session-id>
 
 Writes `tmp/reports/ms-6.html` with the OGG playable in the page, one row per
 agent turn with the latencies the framework measured, the two offline voice
 metrics with their defect breakdown, and the TTS golden read from
-`tmp/golden/golden.json` (written by `python -m core.testing.tts_golden`; it is
+`tmp/golden/golden.json` (written by `python -m convo.testing.callers.tts_golden`; it is
 read rather than re-run because ElevenLabs bills per character).
 
 Nothing here costs a model call: both voice metrics are DSP.

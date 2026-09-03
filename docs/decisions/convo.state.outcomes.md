@@ -43,7 +43,7 @@ to show, and inventing one would be worse than the dash.
 A refused call (`tool.refused`) is deliberately NOT a row: the guard stopped
 it, nothing happened to the business, and a board of outcomes that listed
 non-events would make a well-defended call look like a busy one. Refusals are
-evidence, and they are already scored — `core.scoring.checks.consent` reads
+evidence, and they are already scored — `convo.scoring.checks.consent` reads
 the same two kinds from the same log.
 
 ## _of_session
@@ -51,7 +51,7 @@ the same two kinds from the same log.
 The pairing is the log's own order and nothing else. There is no call id in
 an event, so a result closes the OLDEST open call of the same name — the
 executor awaits one call at a time, which is what makes that correct; the
-same reasoning `core.testing.replay.tools` runs on.
+same reasoning `convo.testing.replay.tools` runs on.
 
 A grant is consumed by the call it authorised, so a caller who said yes
 once and a tool that ran twice leaves the second transaction unconfirmed,

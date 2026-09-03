@@ -30,18 +30,18 @@ control plane refuses such an override at the door, and `provider_for` treats
 one already stored as unusable config and falls back, so a switched ear can
 never leave a project deaf. Only the variable NAME is ever printed.
 
-The turn detector in `core.providers.turn` is the second opinion either way;
+The turn detector in `convo.providers.turn` is the second opinion either way;
 the session combines both.
 
 ## provider_for
 
-Same rule as `core.providers.tts.tts_model`: unusable data falls back to the
+Same rule as `convo.providers.tts.tts_model`: unusable data falls back to the
 platform default instead of failing a call, and a key this box does not
 carry makes the choice unusable exactly as an unknown name does. Soniox is
 the floor — when its own key is absent too, `soniox_stt` answers None and
 the session is text-only, which is what it has always done.
 
-The control plane refuses both at the door (`core.pipeline.overridable`):
+The control plane refuses both at the door (`convo.session.pipeline.overridable`):
 an unknown provider, and one whose key is missing from the host it would
 run on. This is the second line, for an override stored before the key
 went away.

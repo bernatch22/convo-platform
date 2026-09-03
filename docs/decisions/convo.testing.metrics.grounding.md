@@ -19,7 +19,7 @@ files a reader can hold in their head at once:
 - `evidence.py` — what the call produced that could ground a claim (`Evidence`,
   `evidence_of`) and what is left over when nothing does (`unsupported`).
 
-Both halves are re-exported here, so `from core.testing import grounding` and
+Both halves are re-exported here, so `from convo.testing import grounding` and
 every `grounding.<name>` a project writes keep working unchanged.
 
 Open source note: nothing here knows a language. The Spanish spoken hour, the

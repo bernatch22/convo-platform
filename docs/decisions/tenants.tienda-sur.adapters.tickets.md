@@ -11,7 +11,7 @@ said, and it has to be readable by its number on the NEXT call — which is a
 different room, a different job and a different process.
 
 That is why this adapter reads the ledger and `FakeOrders` does not. The rule
-in `core/adapters/ledger.py` is write-through: a demo adapter records what it
+in `convo/adapters/ledger.py` is write-through: a demo adapter records what it
 changed so the console can see it, and never reads it back into a conversation,
 so no call can be contaminated by what another one wrote. The rule holds
 because an order's identity lives in the seeded book — the ledger only ever
@@ -22,7 +22,7 @@ sticky note. So this adapter's book is the seed with the ledger merged over it,
 in both directions, and the isolation the rule was protecting is kept where it
 actually belongs: `tests/conftest.py` gives every test its own ledger file.
 
-It stores the CONSOLE's row shape (`core.adapters.base.LIST_RECORDS`) and reads
+It stores the CONSOLE's row shape (`convo.adapters.base.LIST_RECORDS`) and reads
 tickets back out of it, rather than inventing a second private schema in the
 same file. One shape on disk, one reader, and what the operator sees is by
 construction what the next call will find.
@@ -35,7 +35,7 @@ shapes, and every layer above — tool, guard, prompt, console — works unchang
 
 The console's read, never a tool. The same shop answers this question
 twice in one project and with two different shapes — orders here,
-tickets there — which is the whole reason nothing in `core` holds a list
+tickets there — which is the whole reason nothing in `convo/` holds a list
 of columns or of state words.
 
 ## summarise_ticket

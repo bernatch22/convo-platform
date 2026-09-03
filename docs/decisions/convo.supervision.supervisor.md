@@ -13,7 +13,7 @@ everything else it is handed as data.
 
 The audit vocabulary lives next to the gate that admits it: the five dotted
 kinds a supervisor's presence adds to a session's log (documented with the
-rest of the vocabulary in `core.state.log`).
+rest of the vocabulary in `convo.state.log`).
 
 Open source note: a prefix-scoped identity plus role-scoped grants is a
 reusable pattern for any LiveKit deployment that lets a second human into a

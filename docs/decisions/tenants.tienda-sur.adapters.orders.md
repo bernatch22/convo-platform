@@ -25,7 +25,7 @@ the executor turns into a sentence the caller hears — never a stack trace.
 
 The console's read, never a tool. The shop answers the same question the
 clinic does and with a different shape — `orders`, with an order's own
-columns — which is the whole reason nothing in `core` holds a list of
+columns — which is the whole reason nothing in `convo/` holds a list of
 columns: a project with no agenda is not an empty agenda.
 
 The seeded book is what the shop held before anyone rang; the ledger is

@@ -8,7 +8,7 @@ The reasoning that used to live in the docstrings of `convo/supervision/desk.py`
 presence. What belongs in a compliance log is the arrival — so the desk asks
 the SFU who is actually in the room before it writes anything down, and reads
 the capability off the SFU's own copy of the signed token
-(`attributes["cap"]`, put there by `core.auth.mint_supervisor`) rather than
+(`attributes["cap"]`, put there by `convo.api.auth.mint_supervisor`) rather than
 off anything the browser sends. A client that lies about its capability is
 lying to a field nobody reads.
 
@@ -29,7 +29,7 @@ takeover, a release or a transfer aimed at the room's agent, server-side. A brow
 not need it — it holds a `whisper` ticket and calls the agent's RPC directly —
 but a control plane does: an escalation rule, a compliance trigger or a
 `curl` from a terminal has no room connection to perform RPC over. Both roads
-end at `core.security.control.SupervisorControl.apply`, which asks the same
+end at `convo.supervision.control.SupervisorControl.apply`, which asks the same
 `is_supervisor` question of the same identity.
 
 ## entered

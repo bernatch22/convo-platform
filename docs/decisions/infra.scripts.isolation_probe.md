@@ -11,9 +11,9 @@ frames each one actually receives while both candidate mechanisms are switched
 on and off. A phase is isolated when the counter does not move.
 
     docker compose -f infra/compose/dev.yml up -d          # a server to ask
-    uv run python scripts/isolation_probe.py
+    uv run python infra/scripts/isolation_probe.py
 
-Expected, on livekit-server v1.9.1 (this is the measurement `core/telephony/
+Expected, on livekit-server v1.9.1 (this is the measurement `convo/telephony/
 isolation.py` is built on — 400 frames is 4 s of audio, 0 is silence):
 
     P0 baseline                     caller <- agent 400   caller <- human 400
@@ -28,7 +28,7 @@ isolation.py` is built on — 400 frames is 4 s of audio, 0 is silence):
 
 Both mechanisms cut the audio completely, and both take about the same time to
 bite: 44 frames over two streams is ~220 ms per stream. That number is the
-warm transfer's one residual — see `core.telephony.transfer.WarmLeg.dial`.
+warm transfer's one residual — see `convo.telephony.transfer.WarmLeg.dial`.
 
 **Count frames, not events.** The first version of this probe watched
 `track_subscribed` / `track_unsubscribed` on the participant being cut off and

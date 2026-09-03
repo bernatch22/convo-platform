@@ -13,7 +13,7 @@ TODO(copy): reuse the two word lists your `dag.py` already declares — never
 restate them here, or the suite and the live scorer will drift apart — and
 rewrite `JUDGE_STEPS` in terms of what YOUR callers ring up for. Delete
 `judge_steps` entirely to take the platform's default
-(`core.scoring.judge.DEFAULT_STEPS`), which asks the same question in general
+(`convo.scoring.judge.DEFAULT_STEPS`), which asks the same question in general
 terms.
 
 A project that deletes this file is still scored: the checks that need no

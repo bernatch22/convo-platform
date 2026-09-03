@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `tenants/clinica-norte/proj
 
 ## module
 
-The machinery is `core.testing.simulator` — one live session per conversation, a
+The machinery is `convo.testing.callers.simulator` — one live session per conversation, a
 deterministic stopping controller, one call at a time. What lives here is the
 clinic's half of it, and only that: the personas, the goldens, the tool names
 that settle a call, and the context each call starts from.
@@ -21,13 +21,13 @@ compensable `write`, so the consent graph ends at its first computed node and
 would report 1.0 without reading a thing — and a green that measured nothing is
 worse than no green at all (`evals/dag.py` makes the same argument about
 per-errand metrics). That verb is proved where it can be: the goldens, the unit
-ring, and the live call at the bottom of `tests/test_stages.py`.
+ring, and the live call at the bottom of `tests/test_stages_model.py`.
 
 Three of these choices are worth the sentence:
 
 - **The rescheduling calls start at `ChooseSlot`, already identified.** Every
   user turn is a Haiku call for the persona and another for the agent, and
-  identification is already pinned by `tests/test_stages.py` with two
+  identification is already pinned by `tests/test_stages_handoffs.py` with two
   deterministic turns. Paying five conversations' worth of model time to
   re-prove it would buy nothing this metric can read: `book_slot` only exists in
   the stage these calls start in. The new-booking calls start at `NewBooking`
@@ -35,7 +35,7 @@ Three of these choices are worth the sentence:
 - **`book_slot`, `create_appointment`, `update_contact`, `cancel_appointment`
   and `decline` end the call.** The first four mean something irreversible was
   written, the last that the patient said no. None of them needs a judge.
-- **The three who back out are the cheapest goldens here.** The consent graph's
+- **The four who back out are the cheapest goldens here.** The consent graph's
   first node is computed, so a conversation where nothing was written ends
   there: they are scored on every model and in every nightly for nothing
   (`tests/test_consent_dag.py` counts the judge calls and gets zero, on the new

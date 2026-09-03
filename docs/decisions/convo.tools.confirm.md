@@ -7,7 +7,7 @@ The reasoning that used to live in the docstrings of `convo/tools/confirm.py`; t
 A token is minted the moment the caller confirms and it authorises exactly one
 call: one tool, one set of arguments, once, within a couple of minutes. It is
 not a session flag — "the caller confirmed something earlier" is precisely the
-ambiguity that books the wrong hour. The guard (`core.tools.guard`) checks it
+ambiguity that books the wrong hour. The guard (`convo.tools.guard`) checks it
 before an irreversible tool runs; the executor consumes it after.
 
 Open source note: this module is framework-agnostic and copies as-is. A

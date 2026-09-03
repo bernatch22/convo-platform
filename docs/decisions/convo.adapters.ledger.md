@@ -13,7 +13,7 @@ one property the real thing already has: the rows outlive the process that
 wrote them, and a second process can read them.
 
 That is all this is. It is not a second event log and it is not a cache of one:
-the append-only log records what the PLATFORM did (`core/outcomes.py` counts
+the append-only log records what the PLATFORM did (`convo/state/outcomes.py` counts
 transactions off it, and its summaries are PII-filtered by design). This file
 records what the BUSINESS SYSTEM now holds — the reservation itself, with the
 name on it — because a booking system is exactly the place a customer's own

@@ -31,7 +31,7 @@ Kinds are plain dotted strings so a reader needs no enum to grep a log:
 A supervisor's verbs are appended to the CALLER's log, not a log of their own:
 one call is one story, and "at seq 41 a human took the line" only means
 anything in the same sequence as the turn before it. The names live in
-`core.security.supervisor` so a handler imports them instead of retyping them.
+`convo.supervision.supervisor` so a handler imports them instead of retyping them.
 
 Open source note: framework-agnostic; `Store` is a Protocol, `MemoryStore`
 and `SQLiteStore` ship with it, Postgres is one more file.

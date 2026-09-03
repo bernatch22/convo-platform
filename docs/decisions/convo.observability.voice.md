@@ -4,7 +4,7 @@ The reasoning that used to live in the docstrings of `convo/observability/voice.
 
 ## module
 
-`core.observability.observers` records what every session has — turns, final
+`convo.observability.observers` records what every session has — turns, final
 transcripts, state, tools, the close. This file records what only a session
 with a microphone has: an interruption the framework decided was false, an
 overlap the detector judged, and the agent's own words with the times they

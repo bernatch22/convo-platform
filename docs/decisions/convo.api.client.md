@@ -4,13 +4,14 @@ The reasoning that used to live in the docstrings of `convo/api/client.py`; the 
 
 ## module
 
-`api.py` is the door; this is what is behind it. Every function here takes a
+The routers under `convo/api/` are the door; this is what is behind them. Every function here takes a
 `Store` and returns plain dicts — no FastAPI, no SQL above the store, no
 knowledge of who is asking — so the same views feed the HTTP endpoints, a
 test, and one day a Postgres deploy without a line changing.
 
-The job process never calls this in production: it talks HTTP to `api.py` and
-the control plane is the only thing holding a database handle.
+The job process never calls this: the worker and the control plane open the same
+SQLite file (`convo/session/router.py`, `convo/state/attach.py`), and the worker writes
+its log straight into it.
 
 `live` is the same read as `session`, one poll at a time: an SSE stream over
 the store with a `seq` cursor. A session's log is append-only and numbered, so

@@ -12,7 +12,7 @@ on its own: `claude-*` builds the anthropic plugin exactly as it always did,
 `gpt-*` builds the openai one.
 
 `ALLOWED_MODELS` is short on purpose and it is not a suggestion. A model the
-platform runs is a model somebody priced (`core.observability.prices`) and
+platform runs is a model somebody priced (`convo.observability.prices`) and
 measured; a PUT naming anything else is a 422 that lists these two, and a
 project whose git names something else falls back to the default rather than
 opening a connection nobody costed.
@@ -24,7 +24,7 @@ same fall-back-to-the-default rule the allow-list already had. It is written
 down because the absence cost us a morning: on 2026-08-31 the console stored
 `llm_model=gpt-5.4-mini` on a box with no `OPENAI_API_KEY` and every job died
 with a `KeyError` here until somebody read a worker log. The control plane now
-refuses that override at the door (`core.pipeline.overridable`) AND the worker
+refuses that override at the door (`convo.session.pipeline.overridable`) AND the worker
 survives one already stored. Only the variable NAME is ever printed.
 
 The two families do not cache the same way and the difference is not cosmetic:
